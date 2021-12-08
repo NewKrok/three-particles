@@ -1,0 +1,9 @@
+{
+  "name": "three-particles",
+  "version": "0.0.1",
+  "private": false,
+  "homepage": "https://github.com/NewKrok/three-particles",
+  "publishConfig": {
+    "@NewKrok:registry": "https://npm.pkg.github.com"
+  }
+}
