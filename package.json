@@ -3,7 +3,9 @@
   "version": "0.0.1",
   "description": "Particle system for ThreeJS",
   "main": "src/js/three-particles.js",
-  "bin": "src/js/three-particles.js",
+  "bin": {
+    "three-particles": "src/js/three-particles.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NewKrok/three-particles.git"
@@ -19,5 +21,8 @@
   "bugs": {
     "url": "https://github.com/NewKrok/three-particles/issues"
   },
-  "homepage": "https://github.com/NewKrok/three-particles#readme"
+  "homepage": "https://github.com/NewKrok/three-particles#readme",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
 }
