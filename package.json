@@ -1,8 +1,9 @@
 {
   "name": "@newkrok/three-particles",
   "version": "0.0.1",
-  "description": "Particle sytem for ThreeJS",
-  "main": "js/three-particles.js",
+  "description": "Particle system for ThreeJS",
+  "main": "src/js/three-particles.js",
+  "bin": "src/js/three-particles.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NewKrok/three-particles.git"
@@ -13,13 +14,10 @@
     "3d",
     "lib"
   ],
-  "author": "Krisztian Somoracz",
-  "license": "ISC",
+  "author": "Istvan Krisztian Somoracz",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/NewKrok/three-particles/issues"
   },
-  "homepage": "https://github.com/NewKrok/three-particles#readme",
-  "publishConfig": {
-    "@NewKrok:registry": "https://npm.pkg.github.com"
-  }
+  "homepage": "https://github.com/NewKrok/three-particles#readme"
 }
