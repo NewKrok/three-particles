@@ -1,9 +1,36 @@
 {
-  "name": "three-particles",
+  "name": "@newkrok/three-particles",
   "version": "0.0.1",
-  "private": false,
-  "homepage": "https://github.com/NewKrok/three-particles",
+  "description": "Particle sytem for ThreeJS",
+  "main": "js/three-particles.js",
+  "scripts": {
+    "build": "webpack",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NewKrok/three-particles.git"
+  },
+  "keywords": [
+    "threejs",
+    "particles"
+  ],
+  "author": "Krisztian Somoracz",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NewKrok/three-particles/issues"
+  },
+  "homepage": "https://github.com/NewKrok/three-particles#readme",
   "publishConfig": {
     "@NewKrok:registry": "https://npm.pkg.github.com"
+  },
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "three": "^0.135.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.31.0",
+    "webpack": "^5.65.0",
+    "webpack-cli": "^4.9.1"
   }
 }
