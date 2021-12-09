@@ -3,18 +3,15 @@
   "version": "0.0.1",
   "description": "Particle sytem for ThreeJS",
   "main": "js/three-particles.js",
-  "scripts": {
-    "build": "webpack",
-    "ci": "webpack",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NewKrok/three-particles.git"
   },
   "keywords": [
     "threejs",
-    "particles"
+    "particles",
+    "3d",
+    "lib"
   ],
   "author": "Krisztian Somoracz",
   "license": "ISC",
@@ -24,14 +21,5 @@
   "homepage": "https://github.com/NewKrok/three-particles#readme",
   "publishConfig": {
     "@NewKrok:registry": "https://npm.pkg.github.com"
-  },
-  "dependencies": {
-    "lodash": "^4.17.21",
-    "three": "^0.135.0"
-  },
-  "devDependencies": {
-    "eslint": "^7.31.0",
-    "webpack": "^5.65.0",
-    "webpack-cli": "^4.9.1"
   }
 }
