@@ -5,6 +5,7 @@
   "main": "js/three-particles.js",
   "scripts": {
     "build": "webpack",
+    "ci": "webpack",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
