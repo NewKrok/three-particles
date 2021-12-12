@@ -1,5 +1,11 @@
 import * as THREE from "three/build/three.module.js";
 
+import {
+  calculateRandomPositionAndVelocityOnCircle,
+  calculateRandomPositionAndVelocityOnCone,
+  calculateRandomPositionAndVelocityOnSphere,
+} from "./three-particles-utils.js";
+
 import ParticleSystemFragmentShader from "./shaders/particle-system-fragment-shader.glsl.js";
 import ParticleSystemVertexShader from "./shaders/particle-system-vertex-shader.glsl.js";
 
@@ -46,34 +52,40 @@ const createFloat32Attributes = ({
   );
 };
 
-const getRandomStartPositionByShape = ({ shape, radius, radiusThickness }) => {
-  const position = new THREE.Vector3();
+const calculatePositionAndVelocity = (
+  { shape, sphere, cone, circle },
+  startSpeed,
+  position,
+  velocity
+) => {
   switch (shape) {
-    case Shape.SPHERE: {
-      const u = Math.random();
-      const v = Math.random();
-      const randomizedDistanceRatio = Math.random();
-      const theta = 2 * Math.PI * u;
-      const phi = Math.acos(2 * v - 1);
-      const xDirection = Math.sin(phi) * Math.cos(theta);
-      const yDirection = Math.sin(phi) * Math.sin(theta);
-      const zDirection = Math.cos(phi);
-      const normalizedThickness = 1 - radiusThickness;
-
-      position.x =
-        radius * normalizedThickness * xDirection +
-        radius * radiusThickness * randomizedDistanceRatio * xDirection;
-      position.y =
-        radius * normalizedThickness * yDirection +
-        radius * radiusThickness * randomizedDistanceRatio * yDirection;
-      position.z =
-        radius * normalizedThickness * zDirection +
-        radius * radiusThickness * randomizedDistanceRatio * zDirection;
+    case Shape.SPHERE:
+      calculateRandomPositionAndVelocityOnSphere(
+        position,
+        velocity,
+        startSpeed,
+        sphere
+      );
       break;
-    }
-  }
 
-  return position;
+    case Shape.CONE:
+      calculateRandomPositionAndVelocityOnCone(
+        position,
+        velocity,
+        startSpeed,
+        cone
+      );
+      break;
+
+    case Shape.CIRCLE:
+      calculateRandomPositionAndVelocityOnCircle(
+        position,
+        velocity,
+        startSpeed,
+        circle
+      );
+      break;
+  }
 };
 
 export const createParticleSystem = ({
@@ -96,12 +108,7 @@ export const createParticleSystem = ({
     rateOverTime: 10.0,
     rateOverDistance: 0.0,
   },
-  shape = {
-    shape: Shape.SPHERE,
-    radius: 1.0,
-    radiusThickness: 1.0,
-    arc: 360.0,
-  },
+  shape,
   map,
   onUpdate = null,
   onComplete = null,
@@ -129,11 +136,36 @@ export const createParticleSystem = ({
   };
   const normalizedShape = {
     shape: Shape.SPHERE,
-    radius: 1.0,
-    radiusThickness: 1.0,
-    arc: 360.0,
+    sphere: {
+      radius: 1.0,
+      radiusThickness: 1.0,
+      arc: 360.0,
+      ...shape.sphere,
+    },
+    cone: {
+      angle: 25,
+      radius: 1.0,
+      radiusThickness: 1.0,
+      arc: 360.0,
+      ...shape.cone,
+    },
+    circle: {
+      radius: 1.0,
+      radiusThickness: 1.0,
+      arc: 360.0,
+      ...shape.circle,
+    },
     ...shape,
   };
+
+  const startPositions = Array.from(
+    { length: maxParticles },
+    () => new THREE.Vector3()
+  );
+  const velocities = Array.from(
+    { length: maxParticles },
+    () => new THREE.Vector3()
+  );
 
   const rawUniforms = {
     ...defaultTextureSheetAnimation,
@@ -171,9 +203,18 @@ export const createParticleSystem = ({
 
   const geometry = new THREE.BufferGeometry();
 
-  const startPosition = getRandomStartPositionByShape(normalizedShape);
+  for (let i = 0; i < maxParticles; i++)
+    calculatePositionAndVelocity(
+      normalizedShape,
+      normalizedStartSpeed,
+      startPositions[i],
+      velocities[i]
+    );
+
   geometry.setFromPoints(
-    Array.from({ length: maxParticles }, () => ({ ...startPosition }))
+    Array.from({ length: maxParticles }, (_, index) => ({
+      ...startPositions[index],
+    }))
   );
 
   const createFloat32AttributesRequest = (propertyName, factory) => {
@@ -193,23 +234,6 @@ export const createParticleSystem = ({
       normalizedStartLifeTime.min,
       normalizedStartLifeTime.max
     )
-  );
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    normalizedStartSpeed.min,
-    normalizedStartSpeed.max
-  );
-  const speedMultiplierByPosition = startPosition.length() / 1;
-  createFloat32AttributesRequest(
-    "velocityX",
-    () => startPosition.x * speedMultiplierByPosition * randomizedSpeed
-  );
-  createFloat32AttributesRequest(
-    "velocityY",
-    () => startPosition.y * speedMultiplierByPosition * randomizedSpeed
-  );
-  createFloat32AttributesRequest(
-    "velocityZ",
-    () => startPosition.z * speedMultiplierByPosition * randomizedSpeed
   );
 
   createFloat32AttributesRequest("opacity", 0);
@@ -325,26 +349,20 @@ export const createParticleSystem = ({
     );
     geometry.attributes.rotation.needsUpdate = true;
 
-    const startPosition = getRandomStartPositionByShape(normalizedShape);
-    geometry.attributes.position.array[Math.floor(particleIndex * 3)] =
-      startPosition.x;
-    geometry.attributes.position.array[Math.floor(particleIndex * 3) + 1] =
-      startPosition.y;
-    geometry.attributes.position.array[Math.floor(particleIndex * 3) + 2] =
-      startPosition.z;
-    particleSystem.geometry.attributes.position.needsUpdate = true;
-
-    const randomizedSpeed = THREE.MathUtils.randFloat(
-      normalizedStartSpeed.min,
-      normalizedStartSpeed.max
+    calculatePositionAndVelocity(
+      normalizedShape,
+      normalizedStartSpeed,
+      startPositions[particleIndex],
+      velocities[particleIndex]
     );
-    const speedMultiplierByPosition = 1 / startPosition.length();
-    geometry.attributes.velocityX.array[particleIndex] =
-      startPosition.x * speedMultiplierByPosition * randomizedSpeed;
-    geometry.attributes.velocityY.array[particleIndex] =
-      startPosition.y * speedMultiplierByPosition * randomizedSpeed;
-    geometry.attributes.velocityZ.array[particleIndex] =
-      startPosition.z * speedMultiplierByPosition * randomizedSpeed;
+    const positionIndex = Math.floor(particleIndex * 3);
+    geometry.attributes.position.array[positionIndex] =
+      startPositions[particleIndex].x;
+    geometry.attributes.position.array[positionIndex + 1] =
+      startPositions[particleIndex].y;
+    geometry.attributes.position.array[positionIndex + 2] =
+      startPositions[particleIndex].z;
+    particleSystem.geometry.attributes.position.needsUpdate = true;
 
     geometry.attributes.lifeTime.array[particleIndex] = 0;
     geometry.attributes.lifeTime.needsUpdate = true;
@@ -376,6 +394,7 @@ export const createParticleSystem = ({
     gravity,
     emission: normalizedEmission,
     iterationCount: 0,
+    velocities,
     deactivateParticle,
     activateParticle,
   });
@@ -409,6 +428,7 @@ export const updateParticleSystems = ({ delta, elapsed }) => {
       looping,
       emission,
       iterationCount,
+      velocities,
       deactivateParticle,
       activateParticle,
       simulationSpace,
@@ -440,29 +460,26 @@ export const updateParticleSystems = ({ delta, elapsed }) => {
           )
             deactivateParticle(index);
           else {
-            const accelerationX =
-              particleSystem.geometry.attributes.velocityX.array[index];
+            const velocity = velocities[index];
+            velocity.y -= gravity;
 
-            const accelerationY =
-              particleSystem.geometry.attributes.velocityY.array[index] -
-              gravity;
-            particleSystem.geometry.attributes.velocityY.array[index] =
-              accelerationY;
-
-            const accelerationZ =
-              particleSystem.geometry.attributes.velocityZ.array[index];
-
-            if (gravity !== 0 || accelerationX !== 0 || accelerationY !== 0) {
+            if (
+              gravity !== 0 ||
+              velocity.x !== 0 ||
+              velocity.y !== 0 ||
+              velocity.z !== 0
+            ) {
+              const positionIndex = index * 3;
               const positionArr =
                 particleSystem.geometry.attributes.position.array;
               if (simulationSpace === SimulationSpace.WORLD) {
-                positionArr[index * 3] -= worldPositionChange.x;
-                positionArr[index * 3 + 1] -= worldPositionChange.y;
-                positionArr[index * 3 + 2] -= worldPositionChange.z;
+                positionArr[positionIndex] -= worldPositionChange.x;
+                positionArr[positionIndex + 1] -= worldPositionChange.y;
+                positionArr[positionIndex + 2] -= worldPositionChange.z;
               }
-              positionArr[index * 3] += accelerationX * delta;
-              positionArr[index * 3 + 1] += accelerationY * delta;
-              positionArr[index * 3 + 2] += accelerationZ * delta;
+              positionArr[positionIndex] += velocity.x * delta;
+              positionArr[positionIndex + 1] += velocity.y * delta;
+              positionArr[positionIndex + 2] += velocity.z * delta;
               particleSystem.geometry.attributes.position.needsUpdate = true;
             }
 
