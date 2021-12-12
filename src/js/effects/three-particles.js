@@ -4,6 +4,7 @@ import {
   calculateRandomPositionAndVelocityOnCircle,
   calculateRandomPositionAndVelocityOnCone,
   calculateRandomPositionAndVelocityOnSphere,
+  deepMerge,
 } from "./three-particles-utils.js";
 
 import ParticleSystemFragmentShader from "./shaders/particle-system-fragment-shader.glsl.js";
@@ -27,9 +28,50 @@ export const Shape = {
   RECTANGLE: "RECTANGLE",
 };
 
-const defaultTextureSheetAnimation = {
-  tiles: new THREE.Vector2(1.0, 1.0),
-  fps: 30.0,
+export const getDefaultParticleSystemConfig = () =>
+  JSON.parse(JSON.stringify(DEFAULT_PARTICLE_SYSTEM_CONFIG));
+
+const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
+  duration: 5.0,
+  looping: true,
+  startDelay: { min: 0.0, max: 0.0 },
+  startLifeTime: { min: 5.0, max: 5.0 },
+  startSpeed: { min: 1.0, max: 1.0 },
+  startSize: { min: 1.0, max: 1.0 },
+  startRotation: { min: 0.0, max: 0.0 },
+  startColor: {
+    min: { r: 1.0, g: 1.0, b: 1.0 },
+    max: { r: 1.0, g: 1.0, b: 1.0 },
+  },
+  startOpacity: { min: 1.0, max: 1.0 },
+  gravity: 0,
+  simulationSpace: SimulationSpace.LOCAL,
+  maxParticles: 100.0,
+  emission: {
+    rateOverTime: 10.0,
+    rateOverDistance: 0.0,
+  },
+  shape: {
+    shape: Shape.SPHERE,
+    sphere: {
+      radius: 1,
+      radiusThickness: 1,
+      arc: 360,
+    },
+    cone: {
+      angle: 25,
+      radius: 1,
+      radiusThickness: 1,
+      arc: 360,
+    },
+    circle: {
+      radius: 1,
+      radiusThickness: 1,
+      arc: 360,
+    },
+  },
+  map: null,
+  textureSheetAnimation: { tiles: new THREE.Vector2(1.0, 1.0), fps: 30.0 },
 };
 
 const createFloat32Attributes = ({
@@ -88,75 +130,34 @@ const calculatePositionAndVelocity = (
   }
 };
 
-export const createParticleSystem = ({
-  duration = 5.0,
-  looping = true,
-  startDelay = { min: 0.0, max: 0.0 },
-  startLifeTime = { min: 5.0, max: 5.0 },
-  startSpeed = { min: 5.0, max: 5.0 },
-  startSize = { min: 1.0, max: 1.0 },
-  startRotation = { min: 0.0, max: 0.0 },
-  startColor = {
-    min: { r: 1.0, g: 1.0, b: 1.0 },
-    max: { r: 1.0, g: 1.0, b: 1.0 },
-  },
-  startOpacity = { min: 1.0, max: 1.0 },
-  gravity = 0.0,
-  simulationSpace = SimulationSpace.LOCAL,
-  maxParticles = 100,
-  emission = {
-    rateOverTime: 10.0,
-    rateOverDistance: 0.0,
-  },
-  shape,
-  map,
-  onUpdate = null,
-  onComplete = null,
-  textureSheetAnimation = defaultTextureSheetAnimation,
-}) => {
+export const createParticleSystem = (
+  config = DEFAULT_PARTICLE_SYSTEM_CONFIG
+) => {
   const now = Date.now();
   const lastWorldPosition = new THREE.Vector3(-99999, -99999, -99999);
   const worldPositionChange = new THREE.Vector3();
   const generalData = { distanceFromLastEmitByDistance: 0 };
 
-  const normalizedStartDelay = { min: 0.0, max: 0.0, ...startDelay };
-  const normalizedStartLifeTime = { min: 5.0, max: 5.0, ...startLifeTime };
-  const normalizedStartSpeed = { min: 5.0, max: 5.0, ...startSpeed };
-  const normalizedStartSize = { min: 1.0, max: 1.0, ...startSize };
-  const normalizedStartRotation = { min: 0.0, max: 0.0, ...startRotation };
-  const normalizedStartColor = {
-    min: { r: 1.0, g: 1.0, b: 1.0, ...startColor.min },
-    max: { r: 1.0, g: 1.0, b: 1.0, ...startColor.max },
-  };
-  const normalizedStartOpacity = { min: 0.0, max: 0.0, ...startOpacity };
-  const normalizedEmission = {
-    rateOverTime: 10.0,
-    rateOverDistance: 0.0,
-    ...emission,
-  };
-  const normalizedShape = {
-    shape: Shape.SPHERE,
-    sphere: {
-      radius: 1.0,
-      radiusThickness: 1.0,
-      arc: 360.0,
-      ...shape.sphere,
-    },
-    cone: {
-      angle: 25,
-      radius: 1.0,
-      radiusThickness: 1.0,
-      arc: 360.0,
-      ...shape.cone,
-    },
-    circle: {
-      radius: 1.0,
-      radiusThickness: 1.0,
-      arc: 360.0,
-      ...shape.circle,
-    },
-    ...shape,
-  };
+  const {
+    duration,
+    looping,
+    startDelay,
+    startLifeTime,
+    startSpeed,
+    startSize,
+    startRotation,
+    startColor,
+    startOpacity,
+    gravity,
+    simulationSpace,
+    maxParticles,
+    emission,
+    shape,
+    map,
+    onUpdate,
+    onComplete,
+    textureSheetAnimation,
+  } = deepMerge(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
 
   const startPositions = Array.from(
     { length: maxParticles },
@@ -167,18 +168,10 @@ export const createParticleSystem = ({
     () => new THREE.Vector3()
   );
 
-  const rawUniforms = {
-    ...defaultTextureSheetAnimation,
-    ...textureSheetAnimation,
-  };
-  rawUniforms.tiles = rawUniforms.tiles
-    ? rawUniforms.tiles
-    : defaultTextureSheetAnimation.tiles;
-
-  const uniforms = Object.keys(rawUniforms).reduce(
+  const uniforms = Object.keys(textureSheetAnimation).reduce(
     (prev, key) => ({
       ...prev,
-      [key]: { value: rawUniforms[key] },
+      [key]: { value: textureSheetAnimation[key] },
     }),
     {}
   );
@@ -205,8 +198,8 @@ export const createParticleSystem = ({
 
   for (let i = 0; i < maxParticles; i++)
     calculatePositionAndVelocity(
-      normalizedShape,
-      normalizedStartSpeed,
+      shape,
+      startSpeed,
       startPositions[i],
       velocities[i]
     );
@@ -230,10 +223,7 @@ export const createParticleSystem = ({
   createFloat32AttributesRequest("creationTime", 0);
   createFloat32AttributesRequest("lifeTime", 0);
   createFloat32AttributesRequest("startLifeTime", () =>
-    THREE.MathUtils.randFloat(
-      normalizedStartLifeTime.min,
-      normalizedStartLifeTime.max
-    )
+    THREE.MathUtils.randFloat(startLifeTime.min, startLifeTime.max)
   );
 
   createFloat32AttributesRequest("opacity", 0);
@@ -244,10 +234,7 @@ export const createParticleSystem = ({
     maxParticles,
     factory: () =>
       THREE.Math.degToRad(
-        THREE.MathUtils.randFloat(
-          normalizedStartRotation.min,
-          normalizedStartRotation.max
-        )
+        THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
       ),
   });
 
@@ -255,11 +242,7 @@ export const createParticleSystem = ({
     geometry,
     propertyName: "startSize",
     maxParticles,
-    factory: () =>
-      THREE.MathUtils.randFloat(
-        normalizedStartSize.min,
-        normalizedStartSize.max
-      ),
+    factory: () => THREE.MathUtils.randFloat(startSize.min, startSize.max),
   });
 
   createFloat32AttributesRequest("rotation", 0);
@@ -268,23 +251,20 @@ export const createParticleSystem = ({
   createFloat32AttributesRequest(
     "colorR",
     () =>
-      normalizedStartColor.min.r +
-      colorRandomRatio *
-        (normalizedStartColor.max.r - normalizedStartColor.min.r)
+      startColor.min.r +
+      colorRandomRatio * (startColor.max.r - startColor.min.r)
   );
   createFloat32AttributesRequest(
     "colorG",
     () =>
-      normalizedStartColor.min.g +
-      colorRandomRatio *
-        (normalizedStartColor.max.g - normalizedStartColor.min.g)
+      startColor.min.g +
+      colorRandomRatio * (startColor.max.g - startColor.min.g)
   );
   createFloat32AttributesRequest(
     "colorB",
     () =>
-      normalizedStartColor.min.b +
-      colorRandomRatio *
-        (normalizedStartColor.max.b - normalizedStartColor.min.b)
+      startColor.min.b +
+      colorRandomRatio * (startColor.max.b - startColor.min.b)
   );
   createFloat32AttributesRequest("colorA", 0);
 
@@ -304,54 +284,42 @@ export const createParticleSystem = ({
     const colorRandomRatio = Math.random();
 
     geometry.attributes.colorR.array[particleIndex] =
-      normalizedStartColor.min.r +
-      colorRandomRatio *
-        (normalizedStartColor.max.r - normalizedStartColor.min.r);
+      startColor.min.r +
+      colorRandomRatio * (startColor.max.r - startColor.min.r);
     geometry.attributes.colorR.needsUpdate = true;
 
     geometry.attributes.colorG.array[particleIndex] =
-      normalizedStartColor.min.g +
-      colorRandomRatio *
-        (normalizedStartColor.max.g - normalizedStartColor.min.g);
+      startColor.min.g +
+      colorRandomRatio * (startColor.max.g - startColor.min.g);
     geometry.attributes.colorG.needsUpdate = true;
 
     geometry.attributes.colorB.array[particleIndex] =
-      normalizedStartColor.min.b +
-      colorRandomRatio *
-        (normalizedStartColor.max.b - normalizedStartColor.min.b);
+      startColor.min.b +
+      colorRandomRatio * (startColor.max.b - startColor.min.b);
     geometry.attributes.colorB.needsUpdate = true;
 
     geometry.attributes.colorA.array[particleIndex] = THREE.MathUtils.randFloat(
-      normalizedStartOpacity.min,
-      normalizedStartOpacity.max
+      startOpacity.min,
+      startOpacity.max
     );
     geometry.attributes.colorA.needsUpdate = true;
 
     geometry.attributes.startLifeTime.array[particleIndex] =
-      THREE.MathUtils.randFloat(
-        normalizedStartLifeTime.min,
-        normalizedStartLifeTime.max
-      ) * 1000;
+      THREE.MathUtils.randFloat(startLifeTime.min, startLifeTime.max) * 1000;
     geometry.attributes.startLifeTime.needsUpdate = true;
 
     geometry.attributes.startSize.array[particleIndex] =
-      THREE.MathUtils.randFloat(
-        normalizedStartSize.min,
-        normalizedStartSize.max
-      );
+      THREE.MathUtils.randFloat(startSize.min, startSize.max);
     geometry.attributes.startSize.needsUpdate = true;
 
     geometry.attributes.rotation.array[particleIndex] = THREE.Math.degToRad(
-      THREE.MathUtils.randFloat(
-        normalizedStartRotation.min,
-        normalizedStartRotation.max
-      )
+      THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
     );
     geometry.attributes.rotation.needsUpdate = true;
 
     calculatePositionAndVelocity(
-      normalizedShape,
-      normalizedStartSpeed,
+      shape,
+      startSpeed,
       startPositions[particleIndex],
       velocities[particleIndex]
     );
@@ -372,12 +340,7 @@ export const createParticleSystem = ({
   particleSystem.sortParticles = true;
 
   const calculatedCreationTime =
-    now +
-    THREE.MathUtils.randFloat(
-      normalizedStartDelay.min,
-      normalizedStartDelay.max
-    ) *
-      1000;
+    now + THREE.MathUtils.randFloat(startDelay.min, startDelay.max) * 1000;
 
   createdParticleSystems.push({
     particleSystem,
@@ -392,7 +355,7 @@ export const createParticleSystem = ({
     looping,
     simulationSpace,
     gravity,
-    emission: normalizedEmission,
+    emission,
     iterationCount: 0,
     velocities,
     deactivateParticle,

@@ -1,5 +1,18 @@
 import * as THREE from "three/build/three.module.js";
 
+export const deepMerge = (objectA, objectB) => {
+  const result = {};
+  Object.keys(objectA).forEach((key) => {
+    result[key] =
+      typeof objectA[key] === "object" && objectA[key] && objectB[key]
+        ? deepMerge(objectA[key], objectB[key])
+        : objectB[key] === 0
+        ? 0
+        : objectB[key] || objectA[key];
+  });
+  return result;
+};
+
 export const calculateRandomPositionAndVelocityOnSphere = (
   position,
   velocity,
