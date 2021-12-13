@@ -1,23 +1,21 @@
 # THREE Particles
+
 Particle sytem for ThreeJS
 
 # THREE Particles Editor
+
 You can create your own particle effects with it's editor https://github.com/NewKrok/three-particles-editor
 
 # Live demo
+
 https://newkrok.com/three-particles-editor/index.html
 
 # Install
+
 npm package https://www.npmjs.com/package/@newkrok/three-particles
 
 Install with npm
 `npm i @newkrok/three-particles`
 
 Add as a package.json dependency
-`
-"dependencies": {
-    ...
-    "@newkrok/three-particles": "0.0.1"
-    ...
-  },
- `
+`"dependencies": { ... "@newkrok/three-particles": "0.2.0" ... }, `

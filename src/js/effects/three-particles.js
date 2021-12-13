@@ -3,6 +3,7 @@ import * as THREE from "three/build/three.module.js";
 import {
   calculateRandomPositionAndVelocityOnCircle,
   calculateRandomPositionAndVelocityOnCone,
+  calculateRandomPositionAndVelocityOnRectangle,
   calculateRandomPositionAndVelocityOnSphere,
   deepMerge,
 } from "./three-particles-utils.js";
@@ -35,7 +36,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   duration: 5.0,
   looping: true,
   startDelay: { min: 0.0, max: 0.0 },
-  startLifeTime: { min: 5.0, max: 5.0 },
+  startLifeTime: { min: 2.0, max: 2.0 },
   startSpeed: { min: 1.0, max: 1.0 },
   startSize: { min: 1.0, max: 1.0 },
   startRotation: { min: 0.0, max: 0.0 },
@@ -54,20 +55,24 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   shape: {
     shape: Shape.SPHERE,
     sphere: {
-      radius: 1,
-      radiusThickness: 1,
-      arc: 360,
+      radius: 1.0,
+      radiusThickness: 1.0,
+      arc: 360.0,
     },
     cone: {
-      angle: 25,
-      radius: 1,
-      radiusThickness: 1,
-      arc: 360,
+      angle: 25.0,
+      radius: 1.0,
+      radiusThickness: 1.0,
+      arc: 360.0,
     },
     circle: {
-      radius: 1,
-      radiusThickness: 1,
-      arc: 360,
+      radius: 1.0,
+      radiusThickness: 1.0,
+      arc: 360.0,
+    },
+    rectangle: {
+      rotation: { x: 0.0, y: 0.0 }, // TODO: add z rotation
+      scale: { x: 1.0, y: 1.0 },
     },
   },
   map: null,
@@ -95,7 +100,7 @@ const createFloat32Attributes = ({
 };
 
 const calculatePositionAndVelocity = (
-  { shape, sphere, cone, circle },
+  { shape, sphere, cone, circle, rectangle },
   startSpeed,
   position,
   velocity
@@ -125,6 +130,15 @@ const calculatePositionAndVelocity = (
         velocity,
         startSpeed,
         circle
+      );
+      break;
+
+    case Shape.RECTANGLE:
+      calculateRandomPositionAndVelocityOnRectangle(
+        position,
+        velocity,
+        startSpeed,
+        rectangle
       );
       break;
   }

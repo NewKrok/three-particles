@@ -119,16 +119,37 @@ export const calculateRandomPositionAndVelocityOnCircle = (
     radius * radiusThickness * randomizedDistanceRatio * yDirection;
   position.z = 0;
 
-  const positionLength = position.length();
-
   const randomizedSpeed = THREE.MathUtils.randFloat(
     startSpeed.min,
     startSpeed.max
   );
+
+  const positionLength = position.length();
   const speedMultiplierByPosition = 1 / positionLength;
   velocity.set(
     position.x * speedMultiplierByPosition * randomizedSpeed,
     position.y * speedMultiplierByPosition * randomizedSpeed,
     0
   );
+};
+
+export const calculateRandomPositionAndVelocityOnRectangle = (
+  position,
+  velocity,
+  startSpeed,
+  { rotation, scale }
+) => {
+  const xOffset = Math.random() * scale.x - scale.x / 2;
+  const yOffset = Math.random() * scale.y - scale.y / 2;
+  const rotationX = THREE.Math.degToRad(rotation.x);
+  const rotationY = THREE.Math.degToRad(rotation.y);
+  position.x = xOffset * Math.cos(rotationY);
+  position.y = yOffset * Math.cos(rotationX);
+  position.z = xOffset * Math.sin(rotationY) - yOffset * Math.sin(rotationX);
+
+  const randomizedSpeed = THREE.MathUtils.randFloat(
+    startSpeed.min,
+    startSpeed.max
+  );
+  velocity.set(0, 0, -randomizedSpeed);
 };
