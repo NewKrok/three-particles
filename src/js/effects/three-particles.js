@@ -76,7 +76,11 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
     },
   },
   map: null,
-  textureSheetAnimation: { tiles: new THREE.Vector2(1.0, 1.0), fps: 30.0 },
+  textureSheetAnimation: {
+    tiles: new THREE.Vector2(1.0, 1.0),
+    fps: 30.0,
+    startFrame: { min: 0, max: 0 },
+  },
 };
 
 const createFloat32Attributes = ({
@@ -182,14 +186,6 @@ export const createParticleSystem = (
     () => new THREE.Vector3()
   );
 
-  const uniforms = Object.keys(textureSheetAnimation).reduce(
-    (prev, key) => ({
-      ...prev,
-      [key]: { value: textureSheetAnimation[key] },
-    }),
-    {}
-  );
-
   const material = new THREE.ShaderMaterial({
     uniforms: {
       elapsed: {
@@ -198,7 +194,12 @@ export const createParticleSystem = (
       map: {
         value: map,
       },
-      ...uniforms,
+      tiles: {
+        value: textureSheetAnimation.tiles,
+      },
+      fps: {
+        value: textureSheetAnimation.fps,
+      },
     },
     vertexShader: ParticleSystemVertexShader,
     fragmentShader: ParticleSystemFragmentShader,
@@ -238,6 +239,12 @@ export const createParticleSystem = (
   createFloat32AttributesRequest("lifeTime", 0);
   createFloat32AttributesRequest("startLifeTime", () =>
     THREE.MathUtils.randFloat(startLifeTime.min, startLifeTime.max)
+  );
+  createFloat32AttributesRequest("startFrame", () =>
+    THREE.MathUtils.randInt(
+      textureSheetAnimation.startFrame.min,
+      textureSheetAnimation.startFrame.max
+    )
   );
 
   createFloat32AttributesRequest("opacity", 0);
@@ -317,6 +324,13 @@ export const createParticleSystem = (
       startOpacity.max
     );
     geometry.attributes.colorA.needsUpdate = true;
+
+    geometry.attributes.startFrame.array[particleIndex] =
+      THREE.MathUtils.randInt(
+        textureSheetAnimation.startFrame.min,
+        textureSheetAnimation.startFrame.max
+      );
+    geometry.attributes.startFrame.needsUpdate = true;
 
     geometry.attributes.startLifeTime.array[particleIndex] =
       THREE.MathUtils.randFloat(startLifeTime.min, startLifeTime.max) * 1000;

@@ -1,6 +1,6 @@
 # THREE Particles
 
-Particle sytem for ThreeJS
+Particle system for ThreeJS
 
 # THREE Particles Editor
 
