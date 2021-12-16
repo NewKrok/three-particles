@@ -2,10 +2,12 @@ const ParticleSystemFragmentShader = `
   uniform sampler2D map;
   uniform float elapsed;
   uniform float fps;
+  uniform bool useFPSForFrameIndex;
   uniform vec2 tiles;
 
   varying vec4 vColor;
   varying float vLifeTime;
+  varying float vStartLifeTime;
   varying float vRotation;
   varying float vStartFrame;
 
@@ -14,7 +16,14 @@ const ParticleSystemFragmentShader = `
     gl_FragColor = vColor;
     float mid = 0.5;
 
-    float frameIndex = fps == 0.0 ? round(vStartFrame) : max((vLifeTime / 1000.0) * fps, 0.0);
+    float frameIndex =
+      useFPSForFrameIndex == true
+        ?
+          fps == 0.0
+            ? round(vStartFrame)
+            : max((vLifeTime / 1000.0) * fps, 0.0)
+        : floor(min(vLifeTime / vStartLifeTime, 1.0) * (tiles.x * tiles.y));
+        
     float spriteXIndex = floor(mod(frameIndex, tiles.x));
     float spriteYIndex = floor(mod(frameIndex / tiles.x, tiles.y));
 

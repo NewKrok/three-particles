@@ -29,6 +29,11 @@ export const Shape = {
   RECTANGLE: "RECTANGLE",
 };
 
+export const TimeMode = {
+  LIFE_TIME: "LIFE_TIME",
+  FPS: "FPS",
+};
+
 export const getDefaultParticleSystemConfig = () =>
   JSON.parse(JSON.stringify(DEFAULT_PARTICLE_SYSTEM_CONFIG));
 
@@ -78,6 +83,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   map: null,
   textureSheetAnimation: {
     tiles: new THREE.Vector2(1.0, 1.0),
+    timeMode: TimeMode.LIFE_TIME,
     fps: 30.0,
     startFrame: { min: 0, max: 0 },
   },
@@ -199,6 +205,9 @@ export const createParticleSystem = (
       },
       fps: {
         value: textureSheetAnimation.fps,
+      },
+      useFPSForFrameIndex: {
+        value: textureSheetAnimation.timeMode === TimeMode.FPS,
       },
     },
     vertexShader: ParticleSystemVertexShader,

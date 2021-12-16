@@ -5,12 +5,14 @@ const ParticleSystemVertexShader = `
   attribute float colorB;
   attribute float colorA;
   attribute float lifeTime;
+  attribute float startLifeTime;
   attribute float rotation;
   attribute float startFrame;
 
   varying mat4 vPosition;
   varying vec4 vColor;
   varying float vLifeTime;
+  varying float vStartLifeTime;
   varying float vRotation;
   varying float vStartFrame;
 
@@ -18,6 +20,7 @@ const ParticleSystemVertexShader = `
   {
     vColor = vec4(colorR, colorG, colorB, colorA);
     vLifeTime = lifeTime;
+    vStartLifeTime = startLifeTime;
     vRotation = rotation;
     vStartFrame = startFrame;
 
