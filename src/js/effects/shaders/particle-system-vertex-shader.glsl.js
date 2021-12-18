@@ -19,7 +19,7 @@ const ParticleSystemVertexShader = `
   void main()
   {
     vColor = vec4(colorR, colorG, colorB, colorA);
-    vLifeTime = lifeTime;
+    vLifetime = lifetime;
     vStartLifetime = startLifetime;
     vRotation = rotation;
     vStartFrame = startFrame;

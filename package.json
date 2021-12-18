@@ -1,6 +1,6 @@
 {
   "name": "@newkrok/three-particles",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Particle system for ThreeJS",
   "main": "src/js/three-particles.js",
   "bin": {
