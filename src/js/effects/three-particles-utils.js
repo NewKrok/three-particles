@@ -1,14 +1,20 @@
 import * as THREE from "three/build/three.module.js";
 
-export const deepMerge = (objectA, objectB) => {
+export const deepMerge = (
+  objectA,
+  objectB,
+  config = { skippedProperties: [], applyToFirstObject: false }
+) => {
   const result = {};
   Object.keys(objectA).forEach((key) => {
-    result[key] =
-      typeof objectA[key] === "object" && objectA[key] && objectB[key]
-        ? deepMerge(objectA[key], objectB[key])
-        : objectB[key] === 0
-        ? 0
-        : objectB[key] || objectA[key];
+    if (!config.skippedProperties || !config.skippedProperties.includes(key)) {
+      if (typeof objectA[key] === "object" && objectA[key] && objectB[key]) {
+        result[key] = deepMerge(objectA[key], objectB[key], config);
+      } else {
+        result[key] = objectB[key] === 0 ? 0 : objectB[key] || objectA[key];
+        if (config.applyToFirstObject) objectA[key] = result[key];
+      }
+    }
   });
   return result;
 };

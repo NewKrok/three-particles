@@ -50,7 +50,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
     max: { r: 1.0, g: 1.0, b: 1.0 },
   },
   startOpacity: { min: 1.0, max: 1.0 },
-  gravity: 0,
+  gravity: 0.0,
   simulationSpace: SimulationSpace.LOCAL,
   maxParticles: 100.0,
   emission: {
@@ -84,8 +84,8 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   textureSheetAnimation: {
     tiles: new THREE.Vector2(1.0, 1.0),
     timeMode: TimeMode.LIFE_TIME,
-    fps: 30.0,
-    startFrame: { min: 0, max: 0 },
+    fps: 10.0,
+    startFrame: { min: 0.0, max: 0.0 },
   },
 };
 
@@ -412,8 +412,7 @@ export const destroyParticleSystem = (particleSystem) => {
   particleSystem.parent.remove(particleSystem);
 };
 
-export const updateParticleSystems = ({ delta, elapsed }) => {
-  const now = Date.now();
+export const updateParticleSystems = ({ now, delta, elapsed }) => {
   createdParticleSystems.forEach((props) => {
     const {
       onUpdate,

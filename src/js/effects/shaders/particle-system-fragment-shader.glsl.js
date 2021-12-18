@@ -16,13 +16,13 @@ const ParticleSystemFragmentShader = `
     gl_FragColor = vColor;
     float mid = 0.5;
 
-    float frameIndex =
+    float frameIndex = round(vStartFrame) + (
       useFPSForFrameIndex == true
-        ?
-          fps == 0.0
-            ? round(vStartFrame)
+        ? fps == 0.0
+            ? 0.0
             : max((vLifeTime / 1000.0) * fps, 0.0)
-        : floor(min(vLifeTime / vStartLifeTime, 1.0) * (tiles.x * tiles.y));
+        : max(min(floor(min(vLifeTime / vStartLifeTime, 1.0) * (tiles.x * tiles.y)), tiles.x * tiles.y - 1.0), 0.0)
+    );
         
     float spriteXIndex = floor(mod(frameIndex, tiles.x));
     float spriteYIndex = floor(mod(frameIndex / tiles.x, tiles.y));
