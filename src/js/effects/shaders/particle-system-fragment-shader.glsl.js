@@ -6,8 +6,8 @@ const ParticleSystemFragmentShader = `
   uniform vec2 tiles;
 
   varying vec4 vColor;
-  varying float vLifeTime;
-  varying float vStartLifeTime;
+  varying float vLifetime;
+  varying float vStartLifetime;
   varying float vRotation;
   varying float vStartFrame;
 
@@ -20,8 +20,8 @@ const ParticleSystemFragmentShader = `
       useFPSForFrameIndex == true
         ? fps == 0.0
             ? 0.0
-            : max((vLifeTime / 1000.0) * fps, 0.0)
-        : max(min(floor(min(vLifeTime / vStartLifeTime, 1.0) * (tiles.x * tiles.y)), tiles.x * tiles.y - 1.0), 0.0)
+            : max((vLifetime / 1000.0) * fps, 0.0)
+        : max(min(floor(min(vLifetime / vStartLifetime, 1.0) * (tiles.x * tiles.y)), tiles.x * tiles.y - 1.0), 0.0)
     );
         
     float spriteXIndex = floor(mod(frameIndex, tiles.x));
