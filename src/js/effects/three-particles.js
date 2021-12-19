@@ -5,7 +5,7 @@ import {
   calculateRandomPositionAndVelocityOnCone,
   calculateRandomPositionAndVelocityOnRectangle,
   calculateRandomPositionAndVelocityOnSphere,
-  deepMerge,
+  patchObject,
 } from "./three-particles-utils.js";
 
 import ParticleSystemFragmentShader from "./shaders/particle-system-fragment-shader.glsl.js";
@@ -38,6 +38,11 @@ export const getDefaultParticleSystemConfig = () =>
   JSON.parse(JSON.stringify(DEFAULT_PARTICLE_SYSTEM_CONFIG));
 
 const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
+  transform: {
+    position: { x: 0, y: 0, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+  },
   duration: 5.0,
   looping: true,
   startDelay: { min: 0.0, max: 0.0 },
@@ -158,11 +163,19 @@ export const createParticleSystem = (
   config = DEFAULT_PARTICLE_SYSTEM_CONFIG
 ) => {
   const now = Date.now();
-  const lastWorldPosition = new THREE.Vector3(-99999, -99999, -99999);
-  const worldPositionChange = new THREE.Vector3();
-  const generalData = { distanceFromLastEmitByDistance: 0 };
+  const generalData = {
+    distanceFromLastEmitByDistance: 0,
+    lastWorldPosition: new THREE.Vector3(-99999),
+    currentWorldPosition: new THREE.Vector3(-99999),
+    worldPositionChange: new THREE.Vector3(),
+    worldQuaternion: new THREE.Quaternion(),
+    lastWorldQuaternion: new THREE.Quaternion(-99999),
+    worldEuler: new THREE.Euler(),
+    gravityVelocity: new THREE.Vector3(0, 0, 0),
+  };
 
   const {
+    transform,
     duration,
     looping,
     startDelay,
@@ -181,7 +194,7 @@ export const createParticleSystem = (
     onUpdate,
     onComplete,
     textureSheetAnimation,
-  } = deepMerge(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
+  } = patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
 
   const startPositions = Array.from(
     { length: maxParticles },
@@ -376,14 +389,18 @@ export const createParticleSystem = (
   const particleSystem = new THREE.Points(geometry, material);
   particleSystem.sortParticles = true;
 
+  particleSystem.position.copy(transform.position);
+  particleSystem.rotation.x = THREE.Math.degToRad(transform.rotation.x);
+  particleSystem.rotation.y = THREE.Math.degToRad(transform.rotation.y);
+  particleSystem.rotation.z = THREE.Math.degToRad(transform.rotation.z);
+  particleSystem.scale.copy(transform.scale);
+
   const calculatedCreationTime =
     now + THREE.MathUtils.randFloat(startDelay.min, startDelay.max) * 1000;
 
   createdParticleSystems.push({
     particleSystem,
     generalData,
-    lastWorldPosition,
-    worldPositionChange,
     onUpdate,
     onComplete,
     creationTime: calculatedCreationTime,
@@ -417,8 +434,6 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
     const {
       onUpdate,
       generalData,
-      lastWorldPosition,
-      worldPositionChange,
       onComplete,
       particleSystem,
       creationTime,
@@ -433,21 +448,43 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       simulationSpace,
       gravity,
     } = props;
+
+    const {
+      lastWorldPosition,
+      currentWorldPosition,
+      worldPositionChange,
+      lastWorldQuaternion,
+      worldQuaternion,
+      worldEuler,
+      gravityVelocity,
+    } = generalData;
+
     const lifetime = now - creationTime;
     particleSystem.material.uniforms.elapsed.value = elapsed;
 
-    if (
-      lastWorldPosition.x !== -99999 &&
-      lastWorldPosition.y !== -99999 &&
-      lastWorldPosition.z !== -99999
-    )
+    particleSystem.getWorldPosition(currentWorldPosition);
+    if (lastWorldPosition.x !== -99999)
       worldPositionChange.set(
-        particleSystem.position.x - lastWorldPosition.x,
-        particleSystem.position.y - lastWorldPosition.y,
-        particleSystem.position.z - lastWorldPosition.z
+        currentWorldPosition.x - lastWorldPosition.x,
+        currentWorldPosition.y - lastWorldPosition.y,
+        currentWorldPosition.z - lastWorldPosition.z
       );
     generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
-    lastWorldPosition.copy(particleSystem.position);
+    particleSystem.getWorldPosition(lastWorldPosition);
+
+    particleSystem.getWorldQuaternion(worldQuaternion);
+    if (
+      lastWorldQuaternion.x === -99999 ||
+      lastWorldQuaternion.x != worldQuaternion.x ||
+      lastWorldQuaternion.y != worldQuaternion.y ||
+      lastWorldQuaternion.z != worldQuaternion.z
+    ) {
+      worldEuler.setFromQuaternion(worldQuaternion);
+      lastWorldQuaternion.copy(worldQuaternion);
+
+      gravityVelocity.set(0, gravity, 0);
+      particleSystem.worldToLocal(gravityVelocity);
+    }
 
     particleSystem.geometry.attributes.creationTime.array.forEach(
       (entry, index) => {
@@ -460,7 +497,9 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
             deactivateParticle(index);
           else {
             const velocity = velocities[index];
-            velocity.y -= gravity;
+            velocity.x -= gravityVelocity.x;
+            velocity.y -= gravityVelocity.y;
+            velocity.z -= gravityVelocity.z;
 
             if (
               gravity !== 0 ||

@@ -1,6 +1,6 @@
 import * as THREE from "three/build/three.module.js";
 
-export const deepMerge = (
+export const patchObject = (
   objectA,
   objectB,
   config = { skippedProperties: [], applyToFirstObject: false }
@@ -9,7 +9,7 @@ export const deepMerge = (
   Object.keys(objectA).forEach((key) => {
     if (!config.skippedProperties || !config.skippedProperties.includes(key)) {
       if (typeof objectA[key] === "object" && objectA[key] && objectB[key]) {
-        result[key] = deepMerge(objectA[key], objectB[key], config);
+        result[key] = patchObject(objectA[key], objectB[key], config);
       } else {
         result[key] = objectB[key] === 0 ? 0 : objectB[key] || objectA[key];
         if (config.applyToFirstObject) objectA[key] = result[key];
@@ -100,7 +100,7 @@ export const calculateRandomPositionAndVelocityOnCone = (
       sinNormalizedAngle *
       speedMultiplierByPosition *
       randomizedSpeed,
-    -Math.cos(normalizedAngle) * randomizedSpeed
+    Math.cos(normalizedAngle) * randomizedSpeed
   );
 };
 
@@ -157,5 +157,5 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
     startSpeed.min,
     startSpeed.max
   );
-  velocity.set(0, 0, -randomizedSpeed);
+  velocity.set(0, 0, randomizedSpeed);
 };
