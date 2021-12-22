@@ -1,5 +1,5 @@
 const ParticleSystemVertexShader = `
-  attribute float startSize;
+  attribute float size;
   attribute float colorR;
   attribute float colorG;
   attribute float colorB;
@@ -25,7 +25,7 @@ const ParticleSystemVertexShader = `
     vStartFrame = startFrame;
 
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = startSize * (100.0 / length(mvPosition.xyz));
+    gl_PointSize = size * (100.0 / length(mvPosition.xyz));
     gl_Position = projectionMatrix * mvPosition;
   }
 `;

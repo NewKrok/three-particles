@@ -6,10 +6,12 @@ import {
   calculateRandomPositionAndVelocityOnRectangle,
   calculateRandomPositionAndVelocityOnSphere,
   patchObject,
-} from "./three-particles-utils.js";
+} from "./three-particles/three-particles-utils.js";
 
-import ParticleSystemFragmentShader from "./shaders/particle-system-fragment-shader.glsl.js";
-import ParticleSystemVertexShader from "./shaders/particle-system-vertex-shader.glsl.js";
+import { CurveFunction } from "./three-particles/three-particles-curves.js";
+import ParticleSystemFragmentShader from "./three-particles/shaders/particle-system-fragment-shader.glsl.js";
+import ParticleSystemVertexShader from "./three-particles/shaders/particle-system-vertex-shader.glsl.js";
+import { applyModifiers } from "./three-particles/three-particles-modifiers.js";
 
 // Float32Array is not enough accurate when we are storing timestamp in it so we just remove unnecessary time
 const float32Helper = 1638200000000;
@@ -86,6 +88,18 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
     },
   },
   map: null,
+  sizeOverLifetime: {
+    isActive: false,
+    curveFunction: CurveFunction.LINEAR,
+  },
+  /* colorOverLifetime: {
+    isActive: false,
+    curveFunction: CurveFunction.LINEAR,
+  }, */
+  opacityOverLifetime: {
+    isActive: false,
+    curveFunction: CurveFunction.LINEAR,
+  },
   textureSheetAnimation: {
     tiles: new THREE.Vector2(1.0, 1.0),
     timeMode: TimeMode.LIFETIME,
@@ -172,8 +186,10 @@ export const createParticleSystem = (
     lastWorldQuaternion: new THREE.Quaternion(-99999),
     worldEuler: new THREE.Euler(),
     gravityVelocity: new THREE.Vector3(0, 0, 0),
+    startValues: {},
   };
 
+  const normalizedConfig = patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
   const {
     transform,
     duration,
@@ -194,7 +210,7 @@ export const createParticleSystem = (
     onUpdate,
     onComplete,
     textureSheetAnimation,
-  } = patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
+  } = normalizedConfig;
 
   const startPositions = Array.from(
     { length: maxParticles },
@@ -204,6 +220,16 @@ export const createParticleSystem = (
     { length: maxParticles },
     () => new THREE.Vector3()
   );
+
+  const startValueKeys = ["startSize", "startOpacity"];
+  startValueKeys.forEach((key) => {
+    generalData.startValues[key] = Array.from({ length: maxParticles }, () =>
+      THREE.MathUtils.randFloat(
+        normalizedConfig[key].min,
+        normalizedConfig[key].max
+      )
+    );
+  });
 
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -271,22 +297,16 @@ export const createParticleSystem = (
 
   createFloat32AttributesRequest("opacity", 0);
 
-  createFloat32Attributes({
-    geometry,
-    propertyName: "rotation",
-    maxParticles,
-    factory: () =>
-      THREE.Math.degToRad(
-        THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
-      ),
-  });
+  createFloat32AttributesRequest("rotation", () =>
+    THREE.Math.degToRad(
+      THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
+    )
+  );
 
-  createFloat32Attributes({
-    geometry,
-    propertyName: "startSize",
-    maxParticles,
-    factory: () => THREE.MathUtils.randFloat(startSize.min, startSize.max),
-  });
+  createFloat32AttributesRequest(
+    "size",
+    (_, index) => generalData.startValues.startSize[index]
+  );
 
   createFloat32AttributesRequest("rotation", 0);
 
@@ -313,8 +333,6 @@ export const createParticleSystem = (
 
   const deactivateParticle = (particleIndex) => {
     geometry.attributes.isActive.array[particleIndex] = false;
-    geometry.attributes.lifetime.array[particleIndex] = 0;
-    geometry.attributes.lifetime.needsUpdate = true;
     geometry.attributes.colorA.array[particleIndex] = 0;
     geometry.attributes.colorA.needsUpdate = true;
   };
@@ -341,12 +359,6 @@ export const createParticleSystem = (
       colorRandomRatio * (startColor.max.b - startColor.min.b);
     geometry.attributes.colorB.needsUpdate = true;
 
-    geometry.attributes.colorA.array[particleIndex] = THREE.MathUtils.randFloat(
-      startOpacity.min,
-      startOpacity.max
-    );
-    geometry.attributes.colorA.needsUpdate = true;
-
     geometry.attributes.startFrame.array[particleIndex] =
       THREE.MathUtils.randInt(
         textureSheetAnimation.startFrame.min,
@@ -358,14 +370,17 @@ export const createParticleSystem = (
       THREE.MathUtils.randFloat(startLifetime.min, startLifetime.max) * 1000;
     geometry.attributes.startLifetime.needsUpdate = true;
 
-    geometry.attributes.startSize.array[particleIndex] =
+    generalData.startValues.startSize[particleIndex] =
       THREE.MathUtils.randFloat(startSize.min, startSize.max);
-    geometry.attributes.startSize.needsUpdate = true;
+    generalData.startValues.startOpacity[particleIndex] =
+      THREE.MathUtils.randFloat(startOpacity.min, startOpacity.max);
 
     geometry.attributes.rotation.array[particleIndex] = THREE.Math.degToRad(
       THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
     );
+
     geometry.attributes.rotation.needsUpdate = true;
+    geometry.attributes.colorB.needsUpdate = true;
 
     calculatePositionAndVelocity(
       shape,
@@ -384,6 +399,15 @@ export const createParticleSystem = (
 
     geometry.attributes.lifetime.array[particleIndex] = 0;
     geometry.attributes.lifetime.needsUpdate = true;
+
+    applyModifiers({
+      startValues: generalData.startValues,
+      normalizedConfig,
+      attributes: particleSystem.geometry.attributes,
+      particleLifetimePercentage: 0,
+      particleIndex,
+      forceUpdate: true,
+    });
   };
 
   const particleSystem = new THREE.Points(geometry, material);
@@ -410,6 +434,7 @@ export const createParticleSystem = (
     simulationSpace,
     gravity,
     emission,
+    normalizedConfig,
     iterationCount: 0,
     velocities,
     deactivateParticle,
@@ -441,6 +466,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       duration,
       looping,
       emission,
+      normalizedConfig,
       iterationCount,
       velocities,
       deactivateParticle,
@@ -532,12 +558,16 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
               particleLifetime;
             particleSystem.geometry.attributes.lifetime.needsUpdate = true;
 
-            // TEMP
-            particleSystem.geometry.attributes.colorA.array[index] =
-              1 -
+            const particleLifetimePercentage =
               particleLifetime /
-                particleSystem.geometry.attributes.startLifetime.array[index];
-            particleSystem.geometry.attributes.colorA.needsUpdate = true;
+              particleSystem.geometry.attributes.startLifetime.array[index];
+            applyModifiers({
+              startValues: generalData.startValues,
+              normalizedConfig,
+              attributes: particleSystem.geometry.attributes,
+              particleLifetimePercentage,
+              particleIndex: index,
+            });
           }
         }
       }
