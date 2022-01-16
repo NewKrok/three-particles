@@ -9,9 +9,9 @@ import {
 } from "./three-particles/three-particles-utils.js";
 
 import { CurveFunction } from "./three-particles/three-particles-curves.js";
+import { FBM } from "three-noise/build/three-noise.module.js";
 import ParticleSystemFragmentShader from "./three-particles/shaders/particle-system-fragment-shader.glsl.js";
 import ParticleSystemVertexShader from "./three-particles/shaders/particle-system-vertex-shader.glsl.js";
-import { Perlin } from "three-noise/build/three-noise.module.js";
 import { applyModifiers } from "./three-particles/three-particles-modifiers.js";
 
 let createdParticleSystems = [];
@@ -46,8 +46,8 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   duration: 5.0,
   looping: true,
   startDelay: { min: 0.0, max: 0.0 },
-  startLifetime: { min: 10.0, max: 10.0 }, // { min: 2.0, max: 2.0 },
-  startSpeed: { min: 0.0, max: 0.0 }, // { min: 1.0, max: 1.0 },
+  startLifetime: { min: 2.0, max: 2.0 },
+  startSpeed: { min: 1.0, max: 1.0 },
   startSize: { min: 1.0, max: 1.0 },
   startRotation: { min: 0.0, max: 0.0 },
   startColor: {
@@ -57,7 +57,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   startOpacity: { min: 1.0, max: 1.0 },
   gravity: 0.0,
   simulationSpace: SimulationSpace.LOCAL,
-  maxParticles: 40, // 100.0,
+  maxParticles: 100.0,
   emission: {
     rateOverTime: 10.0,
     rateOverDistance: 0.0,
@@ -65,8 +65,8 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   shape: {
     shape: Shape.SPHERE,
     sphere: {
-      radius: 0.0001, // 1.0,
-      radiusThickness: 0.0, // 1.0,
+      radius: 1.0,
+      radiusThickness: 1.0,
       arc: 360.0,
     },
     cone: {
@@ -117,8 +117,11 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
     max: 0.0,
   },
   noise: {
-    isActive: true, // false,
+    isActive: false,
+    useRandomOffset: false,
     strength: 1.0,
+    frequency: 10.0,
+    octaves: 4,
   },
   textureSheetAnimation: {
     tiles: new THREE.Vector2(1.0, 1.0),
@@ -288,8 +291,18 @@ export const createParticleSystem = (
   });
 
   generalData.noise = {
-    ...noise,
-    sampler: noise.isActive ? new Perlin(Math.random()) : null,
+    isActive: noise.isActive,
+    strength: noise.strength,
+    sampler: noise.isActive
+      ? new FBM({
+          seed: Math.random(),
+          scale: noise.frequency,
+          octaves: noise.octaves,
+        })
+      : null,
+    offsets: noise.useRandomOffset
+      ? Array.from({ length: maxParticles }, () => Math.random() * 100)
+      : null,
   };
 
   const material = new THREE.ShaderMaterial({
@@ -401,6 +414,9 @@ export const createParticleSystem = (
   const activateParticle = ({ particleIndex, activationTime }) => {
     geometry.attributes.isActive.array[particleIndex] = true;
     generalData.creationTimes[particleIndex] = activationTime;
+
+    if (generalData.noise.offsets)
+      generalData.noise.offsets[particleIndex] = Math.random() * 100;
 
     const colorRandomRatio = Math.random();
 
