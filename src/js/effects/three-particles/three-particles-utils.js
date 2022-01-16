@@ -11,7 +11,12 @@ export const patchObject = (
       if (typeof objectA[key] === "object" && objectA[key] && objectB[key]) {
         result[key] = patchObject(objectA[key], objectB[key], config);
       } else {
-        result[key] = objectB[key] === 0 ? 0 : objectB[key] || objectA[key];
+        result[key] =
+          objectB[key] === 0
+            ? 0
+            : objectB[key] === false
+            ? false
+            : objectB[key] || objectA[key];
         if (config.applyToFirstObject) objectA[key] = result[key];
       }
     }

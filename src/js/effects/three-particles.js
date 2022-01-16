@@ -11,10 +11,8 @@ import {
 import { CurveFunction } from "./three-particles/three-particles-curves.js";
 import ParticleSystemFragmentShader from "./three-particles/shaders/particle-system-fragment-shader.glsl.js";
 import ParticleSystemVertexShader from "./three-particles/shaders/particle-system-vertex-shader.glsl.js";
+import { Perlin } from "three-noise/build/three-noise.module.js";
 import { applyModifiers } from "./three-particles/three-particles-modifiers.js";
-
-// Float32Array is not enough accurate when we are storing timestamp in it so we just remove unnecessary time
-const float32Helper = 1638200000000;
 
 let createdParticleSystems = [];
 
@@ -48,8 +46,8 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   duration: 5.0,
   looping: true,
   startDelay: { min: 0.0, max: 0.0 },
-  startLifetime: { min: 2.0, max: 2.0 },
-  startSpeed: { min: 1.0, max: 1.0 },
+  startLifetime: { min: 10.0, max: 10.0 }, // { min: 2.0, max: 2.0 },
+  startSpeed: { min: 0.0, max: 0.0 }, // { min: 1.0, max: 1.0 },
   startSize: { min: 1.0, max: 1.0 },
   startRotation: { min: 0.0, max: 0.0 },
   startColor: {
@@ -59,7 +57,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   startOpacity: { min: 1.0, max: 1.0 },
   gravity: 0.0,
   simulationSpace: SimulationSpace.LOCAL,
-  maxParticles: 100.0,
+  maxParticles: 40, // 100.0,
   emission: {
     rateOverTime: 10.0,
     rateOverDistance: 0.0,
@@ -67,8 +65,8 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   shape: {
     shape: Shape.SPHERE,
     sphere: {
-      radius: 1.0,
-      radiusThickness: 1.0,
+      radius: 0.0001, // 1.0,
+      radiusThickness: 0.0, // 1.0,
       arc: 360.0,
     },
     cone: {
@@ -88,6 +86,19 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
     },
   },
   map: null,
+  velocityOverLifetime: {
+    isActive: false,
+    linear: {
+      x: { min: 0, max: 0 },
+      y: { min: 0, max: 0 },
+      z: { min: 0, max: 0 },
+    },
+    orbital: {
+      x: { min: 0, max: 0 },
+      y: { min: 0, max: 0 },
+      z: { min: 0, max: 0 },
+    },
+  },
   sizeOverLifetime: {
     isActive: false,
     curveFunction: CurveFunction.LINEAR,
@@ -99,6 +110,15 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   opacityOverLifetime: {
     isActive: false,
     curveFunction: CurveFunction.LINEAR,
+  },
+  rotationOverLifetime: {
+    isActive: false,
+    min: 0.0,
+    max: 0.0,
+  },
+  noise: {
+    isActive: true, // false,
+    strength: 1.0,
   },
   textureSheetAnimation: {
     tiles: new THREE.Vector2(1.0, 1.0),
@@ -132,7 +152,8 @@ const calculatePositionAndVelocity = (
   { shape, sphere, cone, circle, rectangle },
   startSpeed,
   position,
-  velocity
+  velocity,
+  velocityOverLifetime
 ) => {
   switch (shape) {
     case Shape.SPHERE:
@@ -171,6 +192,21 @@ const calculatePositionAndVelocity = (
       );
       break;
   }
+
+  if (velocityOverLifetime.isActive) {
+    velocity.x += THREE.MathUtils.randFloat(
+      velocityOverLifetime.linear.x.min,
+      velocityOverLifetime.linear.x.max
+    );
+    velocity.y += THREE.MathUtils.randFloat(
+      velocityOverLifetime.linear.y.min,
+      velocityOverLifetime.linear.y.max
+    );
+    velocity.z += THREE.MathUtils.randFloat(
+      velocityOverLifetime.linear.z.min,
+      velocityOverLifetime.linear.z.max
+    );
+  }
 };
 
 export const createParticleSystem = (
@@ -187,6 +223,9 @@ export const createParticleSystem = (
     worldEuler: new THREE.Euler(),
     gravityVelocity: new THREE.Vector3(0, 0, 0),
     startValues: {},
+    lifetimeValues: {},
+    creationTimes: [],
+    noise: null,
   };
 
   const normalizedConfig = patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
@@ -207,6 +246,8 @@ export const createParticleSystem = (
     emission,
     shape,
     map,
+    noise,
+    velocityOverLifetime,
     onUpdate,
     onComplete,
     textureSheetAnimation,
@@ -221,6 +262,8 @@ export const createParticleSystem = (
     () => new THREE.Vector3()
   );
 
+  generalData.creationTimes = Array.from({ length: maxParticles }, () => 0);
+
   const startValueKeys = ["startSize", "startOpacity"];
   startValueKeys.forEach((key) => {
     generalData.startValues[key] = Array.from({ length: maxParticles }, () =>
@@ -230,6 +273,24 @@ export const createParticleSystem = (
       )
     );
   });
+
+  const lifetimeValueKeys = ["rotationOverLifetime"];
+  lifetimeValueKeys.forEach((key) => {
+    if (normalizedConfig[key].isActive)
+      generalData.lifetimeValues[key] = Array.from(
+        { length: maxParticles },
+        () =>
+          THREE.MathUtils.randFloat(
+            normalizedConfig[key].min,
+            normalizedConfig[key].max
+          )
+      );
+  });
+
+  generalData.noise = {
+    ...noise,
+    sampler: noise.isActive ? new Perlin(Math.random()) : null,
+  };
 
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -264,7 +325,8 @@ export const createParticleSystem = (
       shape,
       startSpeed,
       startPositions[i],
-      velocities[i]
+      velocities[i],
+      velocityOverLifetime
     );
 
   geometry.setFromPoints(
@@ -283,7 +345,6 @@ export const createParticleSystem = (
   };
 
   createFloat32AttributesRequest("isActive", false);
-  createFloat32AttributesRequest("creationTime", 0);
   createFloat32AttributesRequest("lifetime", 0);
   createFloat32AttributesRequest("startLifetime", () =>
     THREE.MathUtils.randFloat(startLifetime.min, startLifetime.max)
@@ -339,8 +400,7 @@ export const createParticleSystem = (
 
   const activateParticle = ({ particleIndex, activationTime }) => {
     geometry.attributes.isActive.array[particleIndex] = true;
-    geometry.attributes.creationTime.array[particleIndex] =
-      activationTime - float32Helper;
+    generalData.creationTimes[particleIndex] = activationTime;
 
     const colorRandomRatio = Math.random();
 
@@ -379,6 +439,13 @@ export const createParticleSystem = (
       THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
     );
 
+    if (normalizedConfig.rotationOverLifetime.isActive)
+      generalData.lifetimeValues.rotationOverLifetime[particleIndex] =
+        THREE.MathUtils.randFloat(
+          normalizedConfig.rotationOverLifetime.min,
+          normalizedConfig.rotationOverLifetime.max
+        );
+
     geometry.attributes.rotation.needsUpdate = true;
     geometry.attributes.colorB.needsUpdate = true;
 
@@ -386,7 +453,8 @@ export const createParticleSystem = (
       shape,
       startSpeed,
       startPositions[particleIndex],
-      velocities[particleIndex]
+      velocities[particleIndex],
+      velocityOverLifetime
     );
     const positionIndex = Math.floor(particleIndex * 3);
     geometry.attributes.position.array[positionIndex] =
@@ -395,13 +463,16 @@ export const createParticleSystem = (
       startPositions[particleIndex].y;
     geometry.attributes.position.array[positionIndex + 2] =
       startPositions[particleIndex].z;
-    particleSystem.geometry.attributes.position.needsUpdate = true;
 
     geometry.attributes.lifetime.array[particleIndex] = 0;
     geometry.attributes.lifetime.needsUpdate = true;
 
     applyModifiers({
+      delta: 0,
+      elapsed: 0,
+      noise: generalData.noise,
       startValues: generalData.startValues,
+      lifetimeValues: generalData.lifetimeValues,
       normalizedConfig,
       attributes: particleSystem.geometry.attributes,
       particleLifetimePercentage: 0,
@@ -519,59 +590,61 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       particleSystem.updateMatrixWorld();
     }
 
-    particleSystem.geometry.attributes.creationTime.array.forEach(
-      (entry, index) => {
-        if (particleSystem.geometry.attributes.isActive.array[index]) {
-          const particleLifetime = now - float32Helper - entry;
+    generalData.creationTimes.forEach((entry, index) => {
+      if (particleSystem.geometry.attributes.isActive.array[index]) {
+        const particleLifetime = now - entry;
+        if (
+          particleLifetime >
+          particleSystem.geometry.attributes.startLifetime.array[index]
+        )
+          deactivateParticle(index);
+        else {
+          const velocity = velocities[index];
+          velocity.x -= gravityVelocity.x;
+          velocity.y -= gravityVelocity.y;
+          velocity.z -= gravityVelocity.z;
+
           if (
-            particleLifetime >
-            particleSystem.geometry.attributes.startLifetime.array[index]
-          )
-            deactivateParticle(index);
-          else {
-            const velocity = velocities[index];
-            velocity.x -= gravityVelocity.x;
-            velocity.y -= gravityVelocity.y;
-            velocity.z -= gravityVelocity.z;
-
-            if (
-              gravity !== 0 ||
-              velocity.x !== 0 ||
-              velocity.y !== 0 ||
-              velocity.z !== 0
-            ) {
-              const positionIndex = index * 3;
-              const positionArr =
-                particleSystem.geometry.attributes.position.array;
-              if (simulationSpace === SimulationSpace.WORLD) {
-                positionArr[positionIndex] -= worldPositionChange.x;
-                positionArr[positionIndex + 1] -= worldPositionChange.y;
-                positionArr[positionIndex + 2] -= worldPositionChange.z;
-              }
-              positionArr[positionIndex] += velocity.x * delta;
-              positionArr[positionIndex + 1] += velocity.y * delta;
-              positionArr[positionIndex + 2] += velocity.z * delta;
-              particleSystem.geometry.attributes.position.needsUpdate = true;
+            gravity !== 0 ||
+            velocity.x !== 0 ||
+            velocity.y !== 0 ||
+            velocity.z !== 0
+          ) {
+            const positionIndex = index * 3;
+            const positionArr =
+              particleSystem.geometry.attributes.position.array;
+            if (simulationSpace === SimulationSpace.WORLD) {
+              positionArr[positionIndex] -= worldPositionChange.x;
+              positionArr[positionIndex + 1] -= worldPositionChange.y;
+              positionArr[positionIndex + 2] -= worldPositionChange.z;
             }
-
-            particleSystem.geometry.attributes.lifetime.array[index] =
-              particleLifetime;
-            particleSystem.geometry.attributes.lifetime.needsUpdate = true;
-
-            const particleLifetimePercentage =
-              particleLifetime /
-              particleSystem.geometry.attributes.startLifetime.array[index];
-            applyModifiers({
-              startValues: generalData.startValues,
-              normalizedConfig,
-              attributes: particleSystem.geometry.attributes,
-              particleLifetimePercentage,
-              particleIndex: index,
-            });
+            positionArr[positionIndex] += velocity.x * delta;
+            positionArr[positionIndex + 1] += velocity.y * delta;
+            positionArr[positionIndex + 2] += velocity.z * delta;
+            particleSystem.geometry.attributes.position.needsUpdate = true;
           }
+
+          particleSystem.geometry.attributes.lifetime.array[index] =
+            particleLifetime;
+          particleSystem.geometry.attributes.lifetime.needsUpdate = true;
+
+          const particleLifetimePercentage =
+            particleLifetime /
+            particleSystem.geometry.attributes.startLifetime.array[index];
+          applyModifiers({
+            delta,
+            elapsed,
+            noise: generalData.noise,
+            startValues: generalData.startValues,
+            lifetimeValues: generalData.lifetimeValues,
+            normalizedConfig,
+            attributes: particleSystem.geometry.attributes,
+            particleLifetimePercentage,
+            particleIndex: index,
+          });
         }
       }
-    );
+    });
 
     if (looping || lifetime < duration * 1000) {
       const emissionDelta = now - lastEmissionTime;

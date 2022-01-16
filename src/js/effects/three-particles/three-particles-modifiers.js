@@ -1,6 +1,10 @@
+import * as THREE from "three/build/three.module.js";
+
 import { getCurveFunction } from "./three-particles-curves.js";
 
-const modifiers = [
+const noiseInput = new THREE.Vector3(0, 0, 0);
+
+const curveModifiers = [
   // {key:"colorOverLifetime", attributeKeys:["colorR", "colorG", "colorB"]},
   {
     key: "opacityOverLifetime",
@@ -15,17 +19,20 @@ const modifiers = [
 ];
 
 export const applyModifiers = ({
+  delta,
+  noise,
   startValues,
+  lifetimeValues,
   normalizedConfig,
   attributes,
   particleLifetimePercentage,
   particleIndex,
   forceUpdate = false,
 }) => {
-  modifiers.forEach(({ key, attributeKeys, startValueKeys }) => {
-    const modifier = normalizedConfig[key];
-    if (modifier.isActive) {
-      const multiplier = getCurveFunction(modifier.curveFunction)(
+  curveModifiers.forEach(({ key, attributeKeys, startValueKeys }) => {
+    const curveModifier = normalizedConfig[key];
+    if (curveModifier.isActive) {
+      const multiplier = getCurveFunction(curveModifier.curveFunction)(
         particleLifetimePercentage
       );
       attributeKeys.forEach((attributeKey, index) => {
@@ -41,4 +48,34 @@ export const applyModifiers = ({
       });
     }
   });
+
+  if (lifetimeValues.rotationOverLifetime) {
+    attributes.rotation.array[particleIndex] +=
+      lifetimeValues.rotationOverLifetime[particleIndex] * delta * 0.02;
+    attributes.rotation.needsUpdate = true;
+  }
+
+  if (noise.isActive) {
+    const { sampler, strength } = noise;
+    const positionIndex = particleIndex * 3;
+    const positionArr = attributes.position.array;
+    let noiseOnPosition;
+
+    const noisePosition = particleLifetimePercentage * 10 * strength;
+    const noisePower = 0.015;
+
+    noiseInput.set(noisePosition, 0, 0);
+    noiseOnPosition = sampler.get3(noiseInput);
+    positionArr[positionIndex] += noiseOnPosition * noisePower;
+
+    noiseInput.set(noisePosition, noisePosition, 0);
+    noiseOnPosition = sampler.get3(noiseInput);
+    positionArr[positionIndex + 1] += noiseOnPosition * noisePower;
+
+    noiseInput.set(noisePosition, noisePosition, noisePosition);
+    noiseOnPosition = sampler.get3(noiseInput);
+    positionArr[positionIndex + 2] += noiseOnPosition * noisePower;
+
+    attributes.position.needsUpdate = true;
+  }
 };
