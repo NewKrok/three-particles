@@ -34,6 +34,14 @@ export const TimeMode = {
   FPS: "FPS",
 };
 
+export const blendingMap = {
+  "THREE.NoBlending": THREE.NoBlending,
+  "THREE.NormalBlending": THREE.NormalBlending,
+  "THREE.AdditiveBlending": THREE.AdditiveBlending,
+  "THREE.SubtractiveBlending": THREE.SubtractiveBlending,
+  "THREE.MultiplyBlending": THREE.MultiplyBlending,
+};
+
 export const getDefaultParticleSystemConfig = () =>
   JSON.parse(JSON.stringify(DEFAULT_PARTICLE_SYSTEM_CONFIG));
 
@@ -86,6 +94,12 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
     },
   },
   map: null,
+  renderer: {
+    blending: THREE.THREE.NormalBlending,
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+  },
   velocityOverLifetime: {
     isActive: false,
     linear: {
@@ -120,8 +134,11 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
     isActive: false,
     useRandomOffset: false,
     strength: 1.0,
-    frequency: 10.0,
-    octaves: 4,
+    frequency: 0.5,
+    octaves: 1,
+    positionAmount: 1.0,
+    rotationAmount: 0.0,
+    sizeAmount: 0.0,
   },
   textureSheetAnimation: {
     tiles: new THREE.Vector2(1.0, 1.0),
@@ -249,12 +266,16 @@ export const createParticleSystem = (
     emission,
     shape,
     map,
+    renderer,
     noise,
     velocityOverLifetime,
     onUpdate,
     onComplete,
     textureSheetAnimation,
   } = normalizedConfig;
+
+  if (typeof renderer.blending === "string")
+    renderer.blending = blendingMap[renderer.blending];
 
   const startPositions = Array.from(
     { length: maxParticles },
@@ -293,6 +314,9 @@ export const createParticleSystem = (
   generalData.noise = {
     isActive: noise.isActive,
     strength: noise.strength,
+    positionAmount: noise.positionAmount,
+    rotationAmount: noise.rotationAmount,
+    sizeAmount: noise.sizeAmount,
     sampler: noise.isActive
       ? new FBM({
           seed: Math.random(),
@@ -325,10 +349,10 @@ export const createParticleSystem = (
     },
     vertexShader: ParticleSystemVertexShader,
     fragmentShader: ParticleSystemFragmentShader,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthTest: true,
-    depthWrite: false,
+    transparent: renderer.transparent,
+    blending: renderer.blending,
+    depthTest: renderer.depthTest,
+    depthWrite: renderer.depthWrite,
   });
 
   const geometry = new THREE.BufferGeometry();
