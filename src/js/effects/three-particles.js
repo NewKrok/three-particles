@@ -95,7 +95,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   },
   map: null,
   renderer: {
-    blending: THREE.THREE.NormalBlending,
+    blending: THREE.NormalBlending,
     transparent: true,
     depthTest: true,
     depthWrite: false,
