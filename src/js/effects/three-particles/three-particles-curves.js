@@ -1,6 +1,7 @@
 import Easing from "easing-functions";
 
 export const CurveFunction = {
+  BEZIER: "BEZIER",
   LINEAR: "LINEAR",
   QUADRATIC_IN: "QUADRATIC_IN",
   QUADRATIC_OUT: "QUADRATIC_OUT",

@@ -13,6 +13,7 @@ import { FBM } from "three-noise/build/three-noise.module.js";
 import ParticleSystemFragmentShader from "./three-particles/shaders/particle-system-fragment-shader.glsl.js";
 import ParticleSystemVertexShader from "./three-particles/shaders/particle-system-vertex-shader.glsl.js";
 import { applyModifiers } from "./three-particles/three-particles-modifiers.js";
+import { createBezierCurveFunction } from "@newkrok/three-particles/src/js/effects/three-particles/three-particles-bezier";
 
 let createdParticleSystems = [];
 
@@ -115,7 +116,11 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   },
   sizeOverLifetime: {
     isActive: false,
-    curveFunction: CurveFunction.LINEAR,
+    curveFunction: CurveFunction.BEZIER,
+    bezierPoints: [
+      { x: 0, y: 0, percentage: 0 },
+      { x: 1, y: 1, percentage: 1 },
+    ],
   },
   /* colorOverLifetime: {
     isActive: false,
@@ -249,6 +254,15 @@ export const createParticleSystem = (
   };
 
   const normalizedConfig = patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
+  if (
+    normalizedConfig.sizeOverLifetime.isActive &&
+    normalizedConfig.sizeOverLifetime.curveFunction === CurveFunction.BEZIER &&
+    normalizedConfig.sizeOverLifetime.bezierPoints
+  )
+    normalizedConfig.sizeOverLifetime.curveFunction = createBezierCurveFunction(
+      normalizedConfig.sizeOverLifetime.bezierPoints
+    );
+
   const {
     transform,
     duration,

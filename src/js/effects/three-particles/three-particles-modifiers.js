@@ -1,7 +1,6 @@
 import * as THREE from "three/build/three.module.js";
 
 import { getCurveFunction } from "./three-particles-curves.js";
-import { size } from "lodash";
 
 const noiseInput = new THREE.Vector3(0, 0, 0);
 
