@@ -8,7 +8,12 @@ export const patchObject = (
   const result = {};
   Object.keys(objectA).forEach((key) => {
     if (!config.skippedProperties || !config.skippedProperties.includes(key)) {
-      if (typeof objectA[key] === "object" && objectA[key] && objectB[key]) {
+      if (
+        typeof objectA[key] === "object" &&
+        objectA[key] &&
+        objectB[key] &&
+        !Array.isArray(objectA[key])
+      ) {
         result[key] = patchObject(objectA[key], objectB[key], config);
       } else {
         result[key] =

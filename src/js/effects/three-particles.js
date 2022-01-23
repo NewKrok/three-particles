@@ -128,7 +128,11 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   }, */
   opacityOverLifetime: {
     isActive: false,
-    curveFunction: CurveFunction.LINEAR,
+    curveFunction: CurveFunction.BEZIER,
+    bezierPoints: [
+      { x: 0, y: 0, percentage: 0 },
+      { x: 1, y: 1, percentage: 1 },
+    ],
   },
   rotationOverLifetime: {
     isActive: false,
@@ -254,14 +258,21 @@ export const createParticleSystem = (
   };
 
   const normalizedConfig = patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
-  if (
-    normalizedConfig.sizeOverLifetime.isActive &&
-    normalizedConfig.sizeOverLifetime.curveFunction === CurveFunction.BEZIER &&
-    normalizedConfig.sizeOverLifetime.bezierPoints
-  )
-    normalizedConfig.sizeOverLifetime.curveFunction = createBezierCurveFunction(
-      normalizedConfig.sizeOverLifetime.bezierPoints
-    );
+
+  const bezierCompatibleProperties = [
+    "sizeOverLifetime",
+    "opacityOverLifetime",
+  ];
+  bezierCompatibleProperties.forEach((key) => {
+    if (
+      normalizedConfig[key].isActive &&
+      normalizedConfig[key].curveFunction === CurveFunction.BEZIER &&
+      normalizedConfig[key].bezierPoints
+    )
+      normalizedConfig[key].curveFunction = createBezierCurveFunction(
+        normalizedConfig[key].bezierPoints
+      );
+  });
 
   const {
     transform,
@@ -614,12 +625,13 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
     particleSystem.material.uniforms.elapsed.value = elapsed;
 
     particleSystem.getWorldPosition(currentWorldPosition);
-    if (lastWorldPosition.x !== -99999)
+    if (lastWorldPosition.x !== -99999) {
       worldPositionChange.set(
         currentWorldPosition.x - lastWorldPosition.x,
         currentWorldPosition.y - lastWorldPosition.y,
         currentWorldPosition.z - lastWorldPosition.z
       );
+    }
     generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
     particleSystem.getWorldPosition(lastWorldPosition);
 
@@ -662,11 +674,15 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
             gravity !== 0 ||
             velocity.x !== 0 ||
             velocity.y !== 0 ||
-            velocity.z !== 0
+            velocity.z !== 0 ||
+            worldPositionChange.x !== 0 ||
+            worldPositionChange.y !== 0 ||
+            worldPositionChange.z !== 0
           ) {
             const positionIndex = index * 3;
             const positionArr =
               particleSystem.geometry.attributes.position.array;
+
             if (simulationSpace === SimulationSpace.WORLD) {
               positionArr[positionIndex] -= worldPositionChange.x;
               positionArr[positionIndex + 1] -= worldPositionChange.y;
