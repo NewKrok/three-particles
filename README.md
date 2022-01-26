@@ -18,4 +18,4 @@ Install with npm
 `npm i @newkrok/three-particles`
 
 Add as a package.json dependency
-`"dependencies": { ... "@newkrok/three-particles": "0.5.0" ... }, `
+`"dependencies": { ... "@newkrok/three-particles": "0.6.0" ... }, `
