@@ -1,5 +1,7 @@
 import * as THREE from "three/build/three.module.js";
 
+import { EmitFrom } from "@newkrok/three-particles/src/js/effects/three-particles";
+
 export const patchObject = (
   objectA,
   objectB,
@@ -112,6 +114,54 @@ export const calculateRandomPositionAndVelocityOnCone = (
       randomizedSpeed,
     Math.cos(normalizedAngle) * randomizedSpeed
   );
+};
+
+export const calculateRandomPositionAndVelocityOnBox = (
+  position,
+  velocity,
+  startSpeed,
+  { scale, emitFrom }
+) => {
+  switch (emitFrom) {
+    case EmitFrom.VOLUME:
+      position.x = Math.random() * scale.x - scale.x / 2;
+      position.y = Math.random() * scale.y - scale.y / 2;
+      position.z = Math.random() * scale.z - scale.z / 2;
+      break;
+
+    case EmitFrom.SHELL:
+      const side = Math.floor(Math.random() * 6);
+      const perpendicularAxis = side % 3;
+      const shellResult = [];
+      shellResult[perpendicularAxis] = side > 2 ? 1 : 0;
+      shellResult[(perpendicularAxis + 1) % 3] = Math.random();
+      shellResult[(perpendicularAxis + 2) % 3] = Math.random();
+      position.x = shellResult[0] * scale.x - scale.x / 2;
+      position.y = shellResult[1] * scale.y - scale.y / 2;
+      position.z = shellResult[2] * scale.z - scale.z / 2;
+      break;
+
+    case EmitFrom.EDGE:
+      const side2 = Math.floor(Math.random() * 6);
+      const perpendicularAxis2 = side2 % 3;
+      const edge = Math.floor(Math.random() * 4);
+      const edgeResult = [];
+      edgeResult[perpendicularAxis2] = side2 > 2 ? 1 : 0;
+      edgeResult[(perpendicularAxis2 + 1) % 3] =
+        edge < 2 ? Math.random() : edge - 2;
+      edgeResult[(perpendicularAxis2 + 2) % 3] =
+        edge < 2 ? edge : Math.random();
+      position.x = edgeResult[0] * scale.x - scale.x / 2;
+      position.y = edgeResult[1] * scale.y - scale.y / 2;
+      position.z = edgeResult[2] * scale.z - scale.z / 2;
+      break;
+  }
+
+  const randomizedSpeed = THREE.MathUtils.randFloat(
+    startSpeed.min,
+    startSpeed.max
+  );
+  velocity.set(0, 0, randomizedSpeed);
 };
 
 export const calculateRandomPositionAndVelocityOnCircle = (

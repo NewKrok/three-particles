@@ -1,6 +1,7 @@
 import * as THREE from "three/build/three.module.js";
 
 import {
+  calculateRandomPositionAndVelocityOnBox,
   calculateRandomPositionAndVelocityOnCircle,
   calculateRandomPositionAndVelocityOnCone,
   calculateRandomPositionAndVelocityOnRectangle,
@@ -28,6 +29,12 @@ export const Shape = {
   BOX: "BOX",
   CIRCLE: "CIRCLE",
   RECTANGLE: "RECTANGLE",
+};
+
+export const EmitFrom = {
+  VOLUME: "VOLUME",
+  SHELL: "SHELL",
+  EDGE: "EDGE",
 };
 
 export const TimeMode = {
@@ -92,6 +99,10 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
     rectangle: {
       rotation: { x: 0.0, y: 0.0 }, // TODO: add z rotation
       scale: { x: 1.0, y: 1.0 },
+    },
+    box: {
+      scale: { x: 1.0, y: 1.0, z: 1.0 },
+      emitFrom: EmitFrom.VOLUME,
     },
   },
   map: null,
@@ -178,7 +189,7 @@ const createFloat32Attributes = ({
 };
 
 const calculatePositionAndVelocity = (
-  { shape, sphere, cone, circle, rectangle },
+  { shape, sphere, cone, circle, rectangle, box },
   startSpeed,
   position,
   velocity,
@@ -218,6 +229,15 @@ const calculatePositionAndVelocity = (
         velocity,
         startSpeed,
         rectangle
+      );
+      break;
+
+    case Shape.BOX:
+      calculateRandomPositionAndVelocityOnBox(
+        position,
+        velocity,
+        startSpeed,
+        box
       );
       break;
   }
@@ -528,6 +548,7 @@ export const createParticleSystem = (
       startPositions[particleIndex].y;
     geometry.attributes.position.array[positionIndex + 2] =
       startPositions[particleIndex].z;
+    geometry.attributes.position.needsUpdate = true;
 
     geometry.attributes.lifetime.array[particleIndex] = 0;
     geometry.attributes.lifetime.needsUpdate = true;
