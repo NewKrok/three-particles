@@ -1,4 +1,4 @@
-import * as THREE from "three/build/three.module.js";
+import * as THREE from "three";
 
 import {
   calculateRandomPositionAndVelocityOnBox,
@@ -14,7 +14,7 @@ import { FBM } from "three-noise/build/three-noise.module.js";
 import ParticleSystemFragmentShader from "./three-particles/shaders/particle-system-fragment-shader.glsl.js";
 import ParticleSystemVertexShader from "./three-particles/shaders/particle-system-vertex-shader.glsl.js";
 import { applyModifiers } from "./three-particles/three-particles-modifiers.js";
-import { createBezierCurveFunction } from "@newkrok/three-particles/src/js/effects/three-particles/three-particles-bezier";
+import { createBezierCurveFunction } from "./three-particles/three-particles-bezier";
 
 let createdParticleSystems = [];
 

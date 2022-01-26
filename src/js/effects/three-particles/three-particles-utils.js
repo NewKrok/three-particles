@@ -1,6 +1,6 @@
-import * as THREE from "three/build/three.module.js";
+import * as THREE from "three";
 
-import { EmitFrom } from "@newkrok/three-particles/src/js/effects/three-particles";
+import { EmitFrom } from "../three-particles.js";
 
 export const patchObject = (
   objectA,

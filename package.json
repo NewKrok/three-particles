@@ -27,7 +27,7 @@
   "homepage": "https://github.com/NewKrok/three-particles#readme",
   "dependencies": {
     "easing-functions": "1.0.1",
-    "three": "0.136.0",
+    "three": "0.137.0",
     "three-noise": "^1.1.1"
   },
   "scripts": {

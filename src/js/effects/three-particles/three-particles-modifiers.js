@@ -1,4 +1,4 @@
-import * as THREE from "three/build/three.module.js";
+import * as THREE from "three";
 
 import { getCurveFunction } from "./three-particles-curves.js";
 
