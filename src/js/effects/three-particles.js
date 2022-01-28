@@ -665,16 +665,12 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
     ) {
       worldEuler.setFromQuaternion(worldQuaternion);
       lastWorldQuaternion.copy(worldQuaternion);
-
-      const tempPosX = particleSystem.position.x;
-      const tempPosY = particleSystem.position.y;
-      const tempPosZ = particleSystem.position.z;
-      gravityVelocity.set(0, gravity, 0);
-      particleSystem.position.set(0, 0, 0);
-      particleSystem.updateMatrixWorld();
+      gravityVelocity.set(
+        lastWorldPosition.x,
+        lastWorldPosition.y + gravity,
+        lastWorldPosition.z
+      );
       particleSystem.worldToLocal(gravityVelocity);
-      particleSystem.position.set(tempPosX, tempPosY, tempPosZ);
-      particleSystem.updateMatrixWorld();
     }
 
     generalData.creationTimes.forEach((entry, index) => {
