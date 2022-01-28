@@ -652,10 +652,10 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
         currentWorldPosition.y - lastWorldPosition.y,
         currentWorldPosition.z - lastWorldPosition.z
       );
+      worldPositionChange.applyQuaternion(worldQuaternion.invert())
     }
     generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
     particleSystem.getWorldPosition(lastWorldPosition);
-
     particleSystem.getWorldQuaternion(worldQuaternion);
     if (
       lastWorldQuaternion.x === -99999 ||
@@ -669,7 +669,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
         lastWorldPosition.x,
         lastWorldPosition.y + gravity,
         lastWorldPosition.z
-      );
+        );
       particleSystem.worldToLocal(gravityVelocity);
     }
 
