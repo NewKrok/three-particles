@@ -6,6 +6,10 @@ Particle system for ThreeJS
 
 You can create your own particle effects with it's editor https://github.com/NewKrok/three-particles-editor
 
+# Video
+- Projectiles: https://youtu.be/Q352JuxON04
+- First preview: https://youtu.be/dtN_bndvoGU
+
 # Live demo
 
 https://newkrok.com/three-particles-editor/index.html
