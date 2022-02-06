@@ -480,7 +480,7 @@ export const createParticleSystem = (
     geometry.attributes.colorA.needsUpdate = true;
   };
 
-  const activateParticle = ({ particleIndex, activationTime }) => {
+  const activateParticle = ({ particleIndex, activationTime, position }) => {
     geometry.attributes.isActive.array[particleIndex] = true;
     generalData.creationTimes[particleIndex] = activationTime;
 
@@ -543,11 +543,11 @@ export const createParticleSystem = (
     );
     const positionIndex = Math.floor(particleIndex * 3);
     geometry.attributes.position.array[positionIndex] =
-      startPositions[particleIndex].x;
+      (position ? position.x : 0) + startPositions[particleIndex].x;
     geometry.attributes.position.array[positionIndex + 1] =
-      startPositions[particleIndex].y;
+      (position ? position.y : 0) + startPositions[particleIndex].y;
     geometry.attributes.position.array[positionIndex + 2] =
-      startPositions[particleIndex].z;
+      (position ? position.z : 0) + startPositions[particleIndex].z;
     geometry.attributes.position.needsUpdate = true;
 
     geometry.attributes.lifetime.array[particleIndex] = 0;
@@ -642,6 +642,8 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       gravityVelocity,
     } = generalData;
 
+    const lastWorldPositionSnapshot = { ...lastWorldPosition };
+
     const lifetime = now - creationTime;
     particleSystem.material.uniforms.elapsed.value = elapsed;
 
@@ -652,7 +654,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
         currentWorldPosition.y - lastWorldPosition.y,
         currentWorldPosition.z - lastWorldPosition.z
       );
-      worldPositionChange.applyQuaternion(worldQuaternion.invert())
+      worldPositionChange.applyQuaternion(worldQuaternion.invert());
     }
     generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
     particleSystem.getWorldPosition(lastWorldPosition);
@@ -669,7 +671,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
         lastWorldPosition.x,
         lastWorldPosition.y + gravity,
         lastWorldPosition.z
-        );
+      );
       particleSystem.worldToLocal(gravityVelocity);
     }
 
@@ -746,12 +748,28 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
                 (1 / emission.rateOverDistance)
             )
           : 0;
+      const distanceStep =
+        neededParticlesByDistance > 0
+          ? {
+              x:
+                (currentWorldPosition.x - lastWorldPositionSnapshot.x) /
+                neededParticlesByDistance,
+              y:
+                (currentWorldPosition.y - lastWorldPositionSnapshot.y) /
+                neededParticlesByDistance,
+              z:
+                (currentWorldPosition.z - lastWorldPositionSnapshot.z) /
+                neededParticlesByDistance,
+            }
+          : null;
       const neededParticles = neededParticlesByTime + neededParticlesByDistance;
 
-      if (emission.rateOverDistance > 0 && neededParticlesByDistance >= 1)
+      if (emission.rateOverDistance > 0 && neededParticlesByDistance >= 1) {
         generalData.distanceFromLastEmitByDistance = 0;
+      }
 
       if (neededParticles > 0) {
+        let generatedParticlesByDistanceNeeds = 0;
         for (let i = 0; i < neededParticles; i++) {
           let particleIndex = -1;
           particleSystem.geometry.attributes.isActive.array.find(
@@ -770,7 +788,19 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
             particleIndex <
               particleSystem.geometry.attributes.isActive.array.length
           ) {
-            activateParticle({ particleIndex, activationTime: now });
+            let position;
+            if (generatedParticlesByDistanceNeeds < neededParticlesByDistance) {
+              position =
+                generatedParticlesByDistanceNeeds < neededParticlesByDistance
+                  ? {
+                      x: distanceStep.x * generatedParticlesByDistanceNeeds,
+                      y: distanceStep.y * generatedParticlesByDistanceNeeds,
+                      z: distanceStep.z * generatedParticlesByDistanceNeeds,
+                    }
+                  : null;
+              generatedParticlesByDistanceNeeds++;
+            }
+            activateParticle({ particleIndex, activationTime: now, position });
             props.lastEmissionTime = now;
           }
         }
