@@ -108,6 +108,9 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
   map: null,
   renderer: {
     blending: THREE.NormalBlending,
+    discardBackgroundColor: false,
+    backgroundColorTolerance: 1.0,
+    backgroundColor: { r: 1.0, g: 1.0, b: 1.0 },
     transparent: true,
     depthTest: true,
     depthWrite: false,
@@ -390,6 +393,15 @@ export const createParticleSystem = (
       },
       useFPSForFrameIndex: {
         value: textureSheetAnimation.timeMode === TimeMode.FPS,
+      },
+      backgroundColor: {
+        value: renderer.backgroundColor,
+      },
+      discardBackgroundColor: {
+        value: renderer.discardBackgroundColor,
+      },
+      backgroundColorTolerance: {
+        value: renderer.backgroundColorTolerance,
       },
     },
     vertexShader: ParticleSystemVertexShader,

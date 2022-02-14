@@ -4,6 +4,9 @@ const ParticleSystemFragmentShader = `
   uniform float fps;
   uniform bool useFPSForFrameIndex;
   uniform vec2 tiles;
+  uniform bool discardBackgroundColor;
+  uniform vec3 backgroundColor;
+  uniform float backgroundColorTolerance;
 
   varying vec4 vColor;
   varying float vLifetime;
@@ -56,6 +59,8 @@ const ParticleSystemFragmentShader = `
     vec4 rotatedTexture = texture2D(map, uvPoint);
 
     gl_FragColor = gl_FragColor * rotatedTexture;
+
+    if (discardBackgroundColor && abs(length(rotatedTexture.rgb - backgroundColor.rgb)) < backgroundColorTolerance ) discard;
   }
 `;
 
