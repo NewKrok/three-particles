@@ -7,6 +7,7 @@ Particle system for ThreeJS
 You can create your own particle effects with it's editor https://github.com/NewKrok/three-particles-editor
 
 # Video
+
 - Projectiles: https://youtu.be/Q352JuxON04
 - First preview: https://youtu.be/dtN_bndvoGU
 
@@ -22,4 +23,4 @@ Install with npm
 `npm i @newkrok/three-particles`
 
 Add as a package.json dependency
-`"dependencies": { ... "@newkrok/three-particles": "0.6.2" ... }, `
+`"dependencies": { ... "@newkrok/three-particles": "0.7.0" ... }, `
