@@ -2,37 +2,9 @@ import * as THREE from "three";
 
 import { EmitFrom } from "../three-particles.js";
 
-export const patchObject = (
-  objectA,
-  objectB,
-  config = { skippedProperties: [], applyToFirstObject: false }
-) => {
-  const result = {};
-  Object.keys(objectA).forEach((key) => {
-    if (!config.skippedProperties || !config.skippedProperties.includes(key)) {
-      if (
-        typeof objectA[key] === "object" &&
-        objectA[key] &&
-        objectB[key] &&
-        !Array.isArray(objectA[key])
-      ) {
-        result[key] = patchObject(objectA[key], objectB[key], config);
-      } else {
-        result[key] =
-          objectB[key] === 0
-            ? 0
-            : objectB[key] === false
-            ? false
-            : objectB[key] || objectA[key];
-        if (config.applyToFirstObject) objectA[key] = result[key];
-      }
-    }
-  });
-  return result;
-};
-
 export const calculateRandomPositionAndVelocityOnSphere = (
   position,
+  quaternion,
   velocity,
   startSpeed,
   { radius, radiusThickness, arc }
@@ -59,6 +31,8 @@ export const calculateRandomPositionAndVelocityOnSphere = (
     radius * normalizedThickness * zDirection +
     radius * radiusThickness * randomizedDistanceRatio * zDirection;
 
+  position.applyQuaternion(quaternion);
+
   const randomizedSpeed = THREE.MathUtils.randFloat(
     startSpeed.min,
     startSpeed.max
@@ -73,6 +47,7 @@ export const calculateRandomPositionAndVelocityOnSphere = (
 
 export const calculateRandomPositionAndVelocityOnCone = (
   position,
+  quaternion,
   velocity,
   startSpeed,
   { radius, radiusThickness, arc, angle = 90 }
@@ -91,6 +66,8 @@ export const calculateRandomPositionAndVelocityOnCone = (
     radius * normalizedThickness * yDirection +
     radius * radiusThickness * randomizedDistanceRatio * yDirection;
   position.z = 0;
+
+  position.applyQuaternion(quaternion);
 
   const positionLength = position.length();
   const normalizedAngle = Math.abs(
@@ -118,6 +95,7 @@ export const calculateRandomPositionAndVelocityOnCone = (
 
 export const calculateRandomPositionAndVelocityOnBox = (
   position,
+  quaternion,
   velocity,
   startSpeed,
   { scale, emitFrom }
@@ -157,6 +135,8 @@ export const calculateRandomPositionAndVelocityOnBox = (
       break;
   }
 
+  position.applyQuaternion(quaternion);
+
   const randomizedSpeed = THREE.MathUtils.randFloat(
     startSpeed.min,
     startSpeed.max
@@ -166,6 +146,7 @@ export const calculateRandomPositionAndVelocityOnBox = (
 
 export const calculateRandomPositionAndVelocityOnCircle = (
   position,
+  quaternion,
   velocity,
   startSpeed,
   { radius, radiusThickness, arc }
@@ -185,6 +166,8 @@ export const calculateRandomPositionAndVelocityOnCircle = (
     radius * radiusThickness * randomizedDistanceRatio * yDirection;
   position.z = 0;
 
+  position.applyQuaternion(quaternion);
+
   const randomizedSpeed = THREE.MathUtils.randFloat(
     startSpeed.min,
     startSpeed.max
@@ -201,6 +184,7 @@ export const calculateRandomPositionAndVelocityOnCircle = (
 
 export const calculateRandomPositionAndVelocityOnRectangle = (
   position,
+  quaternion,
   velocity,
   startSpeed,
   { rotation, scale }
@@ -212,6 +196,8 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
   position.x = xOffset * Math.cos(rotationY);
   position.y = yOffset * Math.cos(rotationX);
   position.z = xOffset * Math.sin(rotationY) - yOffset * Math.sin(rotationX);
+
+  position.applyQuaternion(quaternion);
 
   const randomizedSpeed = THREE.MathUtils.randFloat(
     startSpeed.min,

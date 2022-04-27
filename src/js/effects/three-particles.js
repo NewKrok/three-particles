@@ -6,15 +6,16 @@ import {
   calculateRandomPositionAndVelocityOnCone,
   calculateRandomPositionAndVelocityOnRectangle,
   calculateRandomPositionAndVelocityOnSphere,
-  patchObject,
 } from "./three-particles/three-particles-utils.js";
 
 import { CurveFunction } from "./three-particles/three-particles-curves.js";
 import { FBM } from "three-noise/build/three-noise.module.js";
+import { Gyroscope } from "three/examples/jsm/misc/Gyroscope";
 import ParticleSystemFragmentShader from "./three-particles/shaders/particle-system-fragment-shader.glsl.js";
 import ParticleSystemVertexShader from "./three-particles/shaders/particle-system-vertex-shader.glsl.js";
 import { applyModifiers } from "./three-particles/three-particles-modifiers.js";
 import { createBezierCurveFunction } from "./three-particles/three-particles-bezier";
+import { patchObject } from "@newkrok/three-utils/src/js/newkrok/three-utils/object-utils.js";
 
 let createdParticleSystems = [];
 
@@ -195,6 +196,7 @@ const calculatePositionAndVelocity = (
   { shape, sphere, cone, circle, rectangle, box },
   startSpeed,
   position,
+  quaternion,
   velocity,
   velocityOverLifetime
 ) => {
@@ -202,6 +204,7 @@ const calculatePositionAndVelocity = (
     case Shape.SPHERE:
       calculateRandomPositionAndVelocityOnSphere(
         position,
+        quaternion,
         velocity,
         startSpeed,
         sphere
@@ -211,6 +214,7 @@ const calculatePositionAndVelocity = (
     case Shape.CONE:
       calculateRandomPositionAndVelocityOnCone(
         position,
+        quaternion,
         velocity,
         startSpeed,
         cone
@@ -220,6 +224,7 @@ const calculatePositionAndVelocity = (
     case Shape.CIRCLE:
       calculateRandomPositionAndVelocityOnCircle(
         position,
+        quaternion,
         velocity,
         startSpeed,
         circle
@@ -229,6 +234,7 @@ const calculatePositionAndVelocity = (
     case Shape.RECTANGLE:
       calculateRandomPositionAndVelocityOnRectangle(
         position,
+        quaternion,
         velocity,
         startSpeed,
         rectangle
@@ -238,6 +244,7 @@ const calculatePositionAndVelocity = (
     case Shape.BOX:
       calculateRandomPositionAndVelocityOnBox(
         position,
+        quaternion,
         velocity,
         startSpeed,
         box
@@ -271,6 +278,7 @@ export const createParticleSystem = (
     currentWorldPosition: new THREE.Vector3(-99999),
     worldPositionChange: new THREE.Vector3(),
     worldQuaternion: new THREE.Quaternion(),
+    wrapperQuaternion: new THREE.Quaternion(),
     lastWorldQuaternion: new THREE.Quaternion(-99999),
     worldEuler: new THREE.Euler(),
     gravityVelocity: new THREE.Vector3(0, 0, 0),
@@ -419,6 +427,7 @@ export const createParticleSystem = (
       shape,
       startSpeed,
       startPositions[i],
+      generalData.wrapperQuaternion,
       velocities[i],
       velocityOverLifetime
     );
@@ -550,6 +559,7 @@ export const createParticleSystem = (
       shape,
       startSpeed,
       startPositions[particleIndex],
+      generalData.wrapperQuaternion,
       velocities[particleIndex],
       velocityOverLifetime
     );
@@ -579,7 +589,7 @@ export const createParticleSystem = (
     });
   };
 
-  const particleSystem = new THREE.Points(geometry, material);
+  let particleSystem = new THREE.Points(geometry, material);
   particleSystem.sortParticles = true;
 
   particleSystem.position.copy(transform.position);
@@ -591,8 +601,15 @@ export const createParticleSystem = (
   const calculatedCreationTime =
     now + THREE.MathUtils.randFloat(startDelay.min, startDelay.max) * 1000;
 
+  let wrapper;
+  if (normalizedConfig.simulationSpace === SimulationSpace.WORLD) {
+    wrapper = new Gyroscope();
+    wrapper.add(particleSystem);
+  }
+
   createdParticleSystems.push({
     particleSystem,
+    wrapper,
     generalData,
     onUpdate,
     onComplete,
@@ -609,18 +626,26 @@ export const createParticleSystem = (
     deactivateParticle,
     activateParticle,
   });
-  return particleSystem;
+
+  return wrapper || particleSystem;
 };
 
 export const destroyParticleSystem = (particleSystem) => {
   createdParticleSystems = createdParticleSystems.filter(
-    ({ particleSystem: savedParticleSystem }) =>
-      savedParticleSystem !== particleSystem
-  );
+    ({ particleSystem: savedParticleSystem, wrapper }) => {
+      if (
+        savedParticleSystem !== particleSystem &&
+        wrapper !== particleSystem
+      ) {
+        return true;
+      }
 
-  particleSystem.geometry.dispose();
-  particleSystem.material.dispose();
-  particleSystem.parent.remove(particleSystem);
+      savedParticleSystem.geometry.dispose();
+      savedParticleSystem.material.dispose();
+      savedParticleSystem.parent.remove(savedParticleSystem);
+      return false;
+    }
+  );
 };
 
 export const updateParticleSystems = ({ now, delta, elapsed }) => {
@@ -630,6 +655,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       generalData,
       onComplete,
       particleSystem,
+      wrapper,
       creationTime,
       lastEmissionTime,
       duration,
@@ -653,6 +679,8 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       worldEuler,
       gravityVelocity,
     } = generalData;
+
+    if (wrapper) generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
 
     const lastWorldPositionSnapshot = { ...lastWorldPosition };
 
