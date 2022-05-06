@@ -253,18 +253,33 @@ const calculatePositionAndVelocity = (
   }
 
   if (velocityOverLifetime.isActive) {
-    velocity.x += THREE.MathUtils.randFloat(
-      velocityOverLifetime.linear.x.min,
-      velocityOverLifetime.linear.x.max
-    );
-    velocity.y += THREE.MathUtils.randFloat(
-      velocityOverLifetime.linear.y.min,
-      velocityOverLifetime.linear.y.max
-    );
-    velocity.z += THREE.MathUtils.randFloat(
-      velocityOverLifetime.linear.z.min,
-      velocityOverLifetime.linear.z.max
-    );
+    if (
+      velocityOverLifetime.linear.x.min !== 0 ||
+      velocityOverLifetime.linear.x.max !== 0
+    ) {
+      velocity.x += THREE.MathUtils.randFloat(
+        velocityOverLifetime.linear.x.min,
+        velocityOverLifetime.linear.x.max
+      );
+    }
+    if (
+      velocityOverLifetime.linear.y.min !== 0 ||
+      velocityOverLifetime.linear.y.max !== 0
+    ) {
+      velocity.y += THREE.MathUtils.randFloat(
+        velocityOverLifetime.linear.y.min,
+        velocityOverLifetime.linear.y.max
+      );
+    }
+    if (
+      velocityOverLifetime.linear.z.min !== 0 ||
+      velocityOverLifetime.linear.z.max !== 0
+    ) {
+      velocity.z += THREE.MathUtils.randFloat(
+        velocityOverLifetime.linear.z.min,
+        velocityOverLifetime.linear.z.max
+      );
+    }
   }
 };
 
@@ -283,6 +298,8 @@ export const createParticleSystem = (
     worldEuler: new THREE.Euler(),
     gravityVelocity: new THREE.Vector3(0, 0, 0),
     startValues: {},
+    hasOrbitalVelocity: false,
+    orbitalVelocityData: [],
     lifetimeValues: {},
     creationTimes: [],
     noise: null,
@@ -343,6 +360,24 @@ export const createParticleSystem = (
   );
 
   generalData.creationTimes = Array.from({ length: maxParticles }, () => 0);
+  generalData.hasOrbitalVelocity =
+    normalizedConfig.velocityOverLifetime.isActive &&
+    (normalizedConfig.velocityOverLifetime.orbital.x.min !== 0 ||
+      normalizedConfig.velocityOverLifetime.orbital.x.max !== 0 ||
+      normalizedConfig.velocityOverLifetime.orbital.y.min !== 0 ||
+      normalizedConfig.velocityOverLifetime.orbital.y.max !== 0 ||
+      normalizedConfig.velocityOverLifetime.orbital.z.min !== 0 ||
+      normalizedConfig.velocityOverLifetime.orbital.z.max !== 0);
+
+  if (generalData.hasOrbitalVelocity) {
+    generalData.orbitalVelocityData = Array.from(
+      { length: maxParticles },
+      () => ({
+        speed: new THREE.Vector3(),
+        positionOffset: new THREE.Vector3(),
+      })
+    );
+  }
 
   const startValueKeys = ["startSize", "startOpacity"];
   startValueKeys.forEach((key) => {
@@ -572,6 +607,31 @@ export const createParticleSystem = (
       (position ? position.z : 0) + startPositions[particleIndex].z;
     geometry.attributes.position.needsUpdate = true;
 
+    if (generalData.hasOrbitalVelocity) {
+      generalData.orbitalVelocityData[particleIndex].speed.set(
+        THREE.MathUtils.randFloat(
+          normalizedConfig.velocityOverLifetime.orbital.x.min,
+          normalizedConfig.velocityOverLifetime.orbital.x.max
+        ) *
+          (Math.PI / 180),
+        THREE.MathUtils.randFloat(
+          normalizedConfig.velocityOverLifetime.orbital.y.min,
+          normalizedConfig.velocityOverLifetime.orbital.y.max
+        ) *
+          (Math.PI / 180),
+        THREE.MathUtils.randFloat(
+          normalizedConfig.velocityOverLifetime.orbital.z.min,
+          normalizedConfig.velocityOverLifetime.orbital.z.max
+        ) *
+          (Math.PI / 180)
+      );
+      generalData.orbitalVelocityData[particleIndex].positionOffset.set(
+        startPositions[particleIndex].x,
+        startPositions[particleIndex].y,
+        startPositions[particleIndex].z
+      );
+    }
+
     geometry.attributes.lifetime.array[particleIndex] = 0;
     geometry.attributes.lifetime.needsUpdate = true;
 
@@ -581,8 +641,11 @@ export const createParticleSystem = (
       noise: generalData.noise,
       startValues: generalData.startValues,
       lifetimeValues: generalData.lifetimeValues,
+      hasOrbitalVelocity: generalData.hasOrbitalVelocity,
+      orbitalVelocityData: generalData.orbitalVelocityData,
       normalizedConfig,
       attributes: particleSystem.geometry.attributes,
+      particleLifetime: 0,
       particleLifetimePercentage: 0,
       particleIndex,
       forceUpdate: true,
@@ -678,6 +741,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       worldQuaternion,
       worldEuler,
       gravityVelocity,
+      hasOrbitalVelocity,
     } = generalData;
 
     if (wrapper) generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
@@ -694,7 +758,6 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
         currentWorldPosition.y - lastWorldPosition.y,
         currentWorldPosition.z - lastWorldPosition.z
       );
-      worldPositionChange.applyQuaternion(worldQuaternion.invert());
     }
     generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
     particleSystem.getWorldPosition(lastWorldPosition);
@@ -725,9 +788,9 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
           deactivateParticle(index);
         else {
           const velocity = velocities[index];
-          velocity.x -= gravityVelocity.x;
-          velocity.y -= gravityVelocity.y;
-          velocity.z -= gravityVelocity.z;
+          velocity.x -= gravityVelocity.x * delta;
+          velocity.y -= gravityVelocity.y * delta;
+          velocity.z -= gravityVelocity.z * delta;
 
           if (
             gravity !== 0 ||
@@ -747,6 +810,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
               positionArr[positionIndex + 1] -= worldPositionChange.y;
               positionArr[positionIndex + 2] -= worldPositionChange.z;
             }
+
             positionArr[positionIndex] += velocity.x * delta;
             positionArr[positionIndex + 1] += velocity.y * delta;
             positionArr[positionIndex + 2] += velocity.z * delta;
@@ -766,8 +830,11 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
             noise: generalData.noise,
             startValues: generalData.startValues,
             lifetimeValues: generalData.lifetimeValues,
+            hasOrbitalVelocity: generalData.hasOrbitalVelocity,
+            orbitalVelocityData: generalData.orbitalVelocityData,
             normalizedConfig,
             attributes: particleSystem.geometry.attributes,
+            particleLifetime,
             particleLifetimePercentage,
             particleIndex: index,
           });

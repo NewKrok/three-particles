@@ -2,7 +2,9 @@ import * as THREE from "three";
 
 import { getCurveFunction } from "./three-particles-curves.js";
 
+const ROTATION_CONVERTER = THREE.MathUtils.radToDeg(1);
 const noiseInput = new THREE.Vector3(0, 0, 0);
+const orbitalEuler = new THREE.Euler();
 
 const curveModifiers = [
   // {key:"colorOverLifetime", attributeKeys:["colorR", "colorG", "colorB"]},
@@ -23,12 +25,38 @@ export const applyModifiers = ({
   noise,
   startValues,
   lifetimeValues,
+  hasOrbitalVelocity,
+  orbitalVelocityData,
   normalizedConfig,
   attributes,
+  particleLifetime,
   particleLifetimePercentage,
   particleIndex,
   forceUpdate = false,
 }) => {
+  if (hasOrbitalVelocity) {
+    const positionIndex = particleIndex * 3;
+    const positionArr = attributes.position.array;
+    const { speed, positionOffset } = orbitalVelocityData[particleIndex];
+
+    positionArr[positionIndex] -= positionOffset.x;
+    positionArr[positionIndex + 1] -= positionOffset.y;
+    positionArr[positionIndex + 2] -= positionOffset.z;
+
+    orbitalEuler.set(
+      speed.x * ROTATION_CONVERTER * delta,
+      speed.z * ROTATION_CONVERTER * delta,
+      speed.y * ROTATION_CONVERTER * delta
+    );
+    positionOffset.applyEuler(orbitalEuler);
+
+    positionArr[positionIndex] += positionOffset.x;
+    positionArr[positionIndex + 1] += positionOffset.y;
+    positionArr[positionIndex + 2] += positionOffset.z;
+
+    attributes.position.needsUpdate = true;
+  }
+
   curveModifiers.forEach(({ key, attributeKeys, startValueKeys }) => {
     const curveModifier = normalizedConfig[key];
     if (curveModifier.isActive) {

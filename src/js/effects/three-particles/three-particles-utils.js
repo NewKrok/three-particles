@@ -43,6 +43,7 @@ export const calculateRandomPositionAndVelocityOnSphere = (
     position.y * speedMultiplierByPosition * randomizedSpeed,
     position.z * speedMultiplierByPosition * randomizedSpeed
   );
+  velocity.applyQuaternion(quaternion);
 };
 
 export const calculateRandomPositionAndVelocityOnCone = (
@@ -91,6 +92,7 @@ export const calculateRandomPositionAndVelocityOnCone = (
       randomizedSpeed,
     Math.cos(normalizedAngle) * randomizedSpeed
   );
+  velocity.applyQuaternion(quaternion);
 };
 
 export const calculateRandomPositionAndVelocityOnBox = (
@@ -142,6 +144,7 @@ export const calculateRandomPositionAndVelocityOnBox = (
     startSpeed.max
   );
   velocity.set(0, 0, randomizedSpeed);
+  velocity.applyQuaternion(quaternion);
 };
 
 export const calculateRandomPositionAndVelocityOnCircle = (
@@ -180,6 +183,7 @@ export const calculateRandomPositionAndVelocityOnCircle = (
     position.y * speedMultiplierByPosition * randomizedSpeed,
     0
   );
+  velocity.applyQuaternion(quaternion);
 };
 
 export const calculateRandomPositionAndVelocityOnRectangle = (
@@ -204,4 +208,5 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
     startSpeed.max
   );
   velocity.set(0, 0, randomizedSpeed);
+  velocity.applyQuaternion(quaternion);
 };
