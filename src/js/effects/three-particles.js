@@ -10,7 +10,7 @@ import {
 
 import { CurveFunction } from "./three-particles/three-particles-curves.js";
 import { FBM } from "three-noise/build/three-noise.module.js";
-import { Gyroscope } from "three/examples/jsm/misc/Gyroscope";
+import { Gyroscope } from "three/examples/jsm/misc/Gyroscope.js";
 import ParticleSystemFragmentShader from "./three-particles/shaders/particle-system-fragment-shader.glsl.js";
 import ParticleSystemVertexShader from "./three-particles/shaders/particle-system-vertex-shader.glsl.js";
 import { applyModifiers } from "./three-particles/three-particles-modifiers.js";
