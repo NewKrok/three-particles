@@ -1,6 +1,6 @@
 {
   "name": "@newkrok/three-particles",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Particle system for ThreeJS",
   "main": "src/js/three-particles.js",
   "bin": {
@@ -27,9 +27,9 @@
   "homepage": "https://github.com/NewKrok/three-particles#readme",
   "dependencies": {
     "easing-functions": "1.0.1",
-    "three": "0.140.0",
+    "three": "0.140.1",
     "three-noise": "1.1.2",
-    "@newkrok/three-utils": "0.1.0"
+    "@newkrok/three-utils": "0.1.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
