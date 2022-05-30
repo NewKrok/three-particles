@@ -284,9 +284,10 @@ const calculatePositionAndVelocity = (
 };
 
 export const createParticleSystem = (
-  config = DEFAULT_PARTICLE_SYSTEM_CONFIG
+  config = DEFAULT_PARTICLE_SYSTEM_CONFIG,
+  externalNow
 ) => {
-  const now = Date.now();
+  const now = externalNow || Date.now();
   const generalData = {
     distanceFromLastEmitByDistance: 0,
     lastWorldPosition: new THREE.Vector3(-99999),
@@ -741,7 +742,6 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       worldQuaternion,
       worldEuler,
       gravityVelocity,
-      hasOrbitalVelocity,
     } = generalData;
 
     if (wrapper) generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
