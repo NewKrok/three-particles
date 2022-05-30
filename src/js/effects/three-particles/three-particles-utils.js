@@ -72,7 +72,7 @@ export const calculateRandomPositionAndVelocityOnCone = (
 
   const positionLength = position.length();
   const normalizedAngle = Math.abs(
-    (positionLength / radius) * THREE.Math.degToRad(angle)
+    (positionLength / radius) * THREE.MathUtils.degToRad(angle)
   );
   const sinNormalizedAngle = Math.sin(normalizedAngle);
 
@@ -195,8 +195,8 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
 ) => {
   const xOffset = Math.random() * scale.x - scale.x / 2;
   const yOffset = Math.random() * scale.y - scale.y / 2;
-  const rotationX = THREE.Math.degToRad(rotation.x);
-  const rotationY = THREE.Math.degToRad(rotation.y);
+  const rotationX = THREE.MathUtils.degToRad(rotation.x);
+  const rotationY = THREE.MathUtils.degToRad(rotation.y);
   position.x = xOffset * Math.cos(rotationY);
   position.y = yOffset * Math.cos(rotationX);
   position.z = xOffset * Math.sin(rotationY) - yOffset * Math.sin(rotationX);

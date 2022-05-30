@@ -498,7 +498,7 @@ export const createParticleSystem = (
   createFloat32AttributesRequest("opacity", 0);
 
   createFloat32AttributesRequest("rotation", () =>
-    THREE.Math.degToRad(
+    THREE.MathUtils.degToRad(
       THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
     )
   );
@@ -577,7 +577,7 @@ export const createParticleSystem = (
     generalData.startValues.startOpacity[particleIndex] =
       THREE.MathUtils.randFloat(startOpacity.min, startOpacity.max);
 
-    geometry.attributes.rotation.array[particleIndex] = THREE.Math.degToRad(
+    geometry.attributes.rotation.array[particleIndex] = THREE.MathUtils.degToRad(
       THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
     );
 
@@ -657,9 +657,9 @@ export const createParticleSystem = (
   particleSystem.sortParticles = true;
 
   particleSystem.position.copy(transform.position);
-  particleSystem.rotation.x = THREE.Math.degToRad(transform.rotation.x);
-  particleSystem.rotation.y = THREE.Math.degToRad(transform.rotation.y);
-  particleSystem.rotation.z = THREE.Math.degToRad(transform.rotation.z);
+  particleSystem.rotation.x = THREE.MathUtils.degToRad(transform.rotation.x);
+  particleSystem.rotation.y = THREE.MathUtils.degToRad(transform.rotation.y);
+  particleSystem.rotation.z = THREE.MathUtils.degToRad(transform.rotation.z);
   particleSystem.scale.copy(transform.scale);
 
   const calculatedCreationTime =
