@@ -2,9 +2,9 @@
   "name": "@newkrok/three-particles",
   "version": "1.0.0",
   "description": "Particle system for ThreeJS",
-  "main": "src/js/three-particles.js",
+  "main": "src/js/effects/three-particles.js",
   "bin": {
-    "three-particles": "src/js/three-particles.js"
+    "three-particles": "src/js/effects/three-particles.js"
   },
   "repository": {
     "type": "git",
