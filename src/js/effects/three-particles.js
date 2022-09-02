@@ -283,6 +283,26 @@ const calculatePositionAndVelocity = (
   }
 };
 
+export const destroyParticleSystem = (particleSystem) => {
+  createdParticleSystems = createdParticleSystems.filter(
+    ({ particleSystem: savedParticleSystem, wrapper }) => {
+      if (
+        savedParticleSystem !== particleSystem &&
+        wrapper !== particleSystem &&
+        particleSystem.instance !== particleSystem
+      ) {
+        return true;
+      }
+
+      savedParticleSystem.geometry.dispose();
+      savedParticleSystem.material.dispose();
+      if (savedParticleSystem.parent)
+        savedParticleSystem.parent.remove(savedParticleSystem);
+      return false;
+    }
+  );
+};
+
 export const createParticleSystem = (
   config = DEFAULT_PARTICLE_SYSTEM_CONFIG,
   externalNow
@@ -304,6 +324,7 @@ export const createParticleSystem = (
     lifetimeValues: {},
     creationTimes: [],
     noise: null,
+    isEnabled: true,
   };
 
   const normalizedConfig = patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
@@ -577,9 +598,10 @@ export const createParticleSystem = (
     generalData.startValues.startOpacity[particleIndex] =
       THREE.MathUtils.randFloat(startOpacity.min, startOpacity.max);
 
-    geometry.attributes.rotation.array[particleIndex] = THREE.MathUtils.degToRad(
-      THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
-    );
+    geometry.attributes.rotation.array[particleIndex] =
+      THREE.MathUtils.degToRad(
+        THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
+      );
 
     if (normalizedConfig.rotationOverLifetime.isActive)
       generalData.lifetimeValues.rotationOverLifetime[particleIndex] =
@@ -691,25 +713,16 @@ export const createParticleSystem = (
     activateParticle,
   });
 
-  return wrapper || particleSystem;
-};
+  const resumeEmitter = () => (generalData.isEnabled = true);
+  const pauseEmitter = () => (generalData.isEnabled = false);
+  const dispose = () => destroyParticleSystem(particleSystem);
 
-export const destroyParticleSystem = (particleSystem) => {
-  createdParticleSystems = createdParticleSystems.filter(
-    ({ particleSystem: savedParticleSystem, wrapper }) => {
-      if (
-        savedParticleSystem !== particleSystem &&
-        wrapper !== particleSystem
-      ) {
-        return true;
-      }
-
-      savedParticleSystem.geometry.dispose();
-      savedParticleSystem.material.dispose();
-      savedParticleSystem.parent.remove(savedParticleSystem);
-      return false;
-    }
-  );
+  return {
+    instance: wrapper || particleSystem,
+    resumeEmitter,
+    pauseEmitter,
+    dispose,
+  };
 };
 
 export const updateParticleSystems = ({ now, delta, elapsed }) => {
@@ -742,6 +755,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       worldQuaternion,
       worldEuler,
       gravityVelocity,
+      isEnabled,
     } = generalData;
 
     if (wrapper) generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
@@ -842,7 +856,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }) => {
       }
     });
 
-    if (looping || lifetime < duration * 1000) {
+    if (isEnabled && (looping || lifetime < duration * 1000)) {
       const emissionDelta = now - lastEmissionTime;
       const neededParticlesByTime = Math.floor(
         emission.rateOverTime * (emissionDelta / 1000)
