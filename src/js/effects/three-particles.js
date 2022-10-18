@@ -1,6 +1,12 @@
 import * as THREE from "three";
 
 import {
+  EmitFrom,
+  Shape,
+  SimulationSpace,
+  TimeMode,
+} from "./three-particles/three-particles-enums.js";
+import {
   calculateRandomPositionAndVelocityOnBox,
   calculateRandomPositionAndVelocityOnCircle,
   calculateRandomPositionAndVelocityOnCone,
@@ -11,37 +17,13 @@ import {
 import { CurveFunction } from "./three-particles/three-particles-curves.js";
 import { FBM } from "three-noise/build/three-noise.module.js";
 import { Gyroscope } from "three/examples/jsm/misc/Gyroscope.js";
+import { ObjectUtils } from "@newkrok/three-utils";
 import ParticleSystemFragmentShader from "./three-particles/shaders/particle-system-fragment-shader.glsl.js";
 import ParticleSystemVertexShader from "./three-particles/shaders/particle-system-vertex-shader.glsl.js";
 import { applyModifiers } from "./three-particles/three-particles-modifiers.js";
 import { createBezierCurveFunction } from "./three-particles/three-particles-bezier";
-import { patchObject } from "@newkrok/three-utils/src/js/newkrok/three-utils/object-utils.js";
 
 let createdParticleSystems = [];
-
-export const SimulationSpace = {
-  LOCAL: "LOCAL",
-  WORLD: "WORLD",
-};
-
-export const Shape = {
-  SPHERE: "SPHERE",
-  CONE: "CONE",
-  BOX: "BOX",
-  CIRCLE: "CIRCLE",
-  RECTANGLE: "RECTANGLE",
-};
-
-export const EmitFrom = {
-  VOLUME: "VOLUME",
-  SHELL: "SHELL",
-  EDGE: "EDGE",
-};
-
-export const TimeMode = {
-  LIFETIME: "LIFETIME",
-  FPS: "FPS",
-};
 
 export const blendingMap = {
   "THREE.NoBlending": THREE.NoBlending,
@@ -283,6 +265,9 @@ const calculatePositionAndVelocity = (
   }
 };
 
+/**
+ * @deprecated Since version 1.0.1. Will be deleted in version 1.1.0. Use particleSystem.dispose instead.
+ */
 export const destroyParticleSystem = (particleSystem) => {
   createdParticleSystems = createdParticleSystems.filter(
     ({ particleSystem: savedParticleSystem, wrapper }) => {
@@ -327,7 +312,10 @@ export const createParticleSystem = (
     isEnabled: true,
   };
 
-  const normalizedConfig = patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
+  const normalizedConfig = ObjectUtils.patchObject(
+    DEFAULT_PARTICLE_SYSTEM_CONFIG,
+    config
+  );
 
   const bezierCompatibleProperties = [
     "sizeOverLifetime",

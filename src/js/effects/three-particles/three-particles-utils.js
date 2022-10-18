@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import { EmitFrom } from "../three-particles.js";
+import { EmitFrom } from "./three-particles-enums.js";
 
 export const calculateRandomPositionAndVelocityOnSphere = (
   position,
