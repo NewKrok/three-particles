@@ -31,6 +31,65 @@ export type Emission = {
   rateOverDistance?: number;
 };
 
+export const enum SimulationSpace {
+  LOCAL = "LOCAL",
+  WORLD = "WORLD",
+}
+
+export const enum Shape {
+  SPHERE = "SPHERE",
+  CONE = "CONE",
+  BOX = "BOX",
+  CIRCLE = "CIRCLE",
+  RECTANGLE = "RECTANGLE",
+}
+
+export const enum EmitFrom {
+  VOLUME = "VOLUME",
+  SHELL = "SHELL",
+  EDGE = "EDGE",
+}
+
+export const enum TimeMode {
+  LIFETIME = "LIFETIME",
+  FPS = "FPS",
+}
+
+export type ShapeConfig = {
+  shape?: Shape;
+  sphere?: {
+    radius?: number;
+    radiusThickness?: number;
+    arc?: number;
+  };
+  cone?: {
+    angle?: number;
+    radius?: number;
+    radiusThickness?: number;
+    arc?: number;
+  };
+  circle?: {
+    radius?: number;
+    radiusThickness?: number;
+    arc?: number;
+  };
+  rectangle?: {
+    rotation?: Point3D;
+    scale?: Point3D;
+  };
+  box?: {
+    scale?: Point3D;
+    emitFrom?: EmitFrom;
+  };
+};
+
+export type TextureSheetAnimation = {
+  tiles?: THREE.Vector2;
+  timeMode?: TimeMode;
+  fps?: number;
+  startFrame?: MinMaxNumber;
+};
+
 export type ParticleSystemConfig = {
   transform?: Transform;
   duration?: number;
@@ -43,10 +102,10 @@ export type ParticleSystemConfig = {
   startColor?: MinMaxColor;
   startOpacity?: MinMaxNumber;
   gravity?: number;
-  simulationSpace?: "LOCAL" | "WORLD";
+  simulationSpace?: SimulationSpace;
   maxParticles?: number;
   emission?: Emission;
-  shape?: any;
+  shape?: ShapeConfig;
   map?: THREE.Texture;
   renderer?: any;
   velocityOverLifetime?: any;
@@ -54,7 +113,7 @@ export type ParticleSystemConfig = {
   opacityOverLifetime?: any;
   rotationOverLifetime?: any;
   noise?: any;
-  textureSheetAnimation?: any;
+  textureSheetAnimation?: TextureSheetAnimation;
   _editorData: any;
 };
 
