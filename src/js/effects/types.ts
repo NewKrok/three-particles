@@ -1,3 +1,11 @@
+import * as THREE from 'three';
+import {
+  EmitFrom,
+  Shape,
+  SimulationSpace,
+  TimeMode,
+} from './three-particles/three-particles-enums';
+
 export type Point3D = {
   x?: number;
   y?: number;
@@ -30,30 +38,6 @@ export type Emission = {
   rateOverTime?: number;
   rateOverDistance?: number;
 };
-
-export const enum SimulationSpace {
-  LOCAL = "LOCAL",
-  WORLD = "WORLD",
-}
-
-export const enum Shape {
-  SPHERE = "SPHERE",
-  CONE = "CONE",
-  BOX = "BOX",
-  CIRCLE = "CIRCLE",
-  RECTANGLE = "RECTANGLE",
-}
-
-export const enum EmitFrom {
-  VOLUME = "VOLUME",
-  SHELL = "SHELL",
-  EDGE = "EDGE",
-}
-
-export const enum TimeMode {
-  LIFETIME = "LIFETIME",
-  FPS = "FPS",
-}
 
 export type ShapeConfig = {
   shape?: Shape;
@@ -114,7 +98,6 @@ export type ParticleSystemConfig = {
   rotationOverLifetime?: any;
   noise?: any;
   textureSheetAnimation?: TextureSheetAnimation;
-  _editorData: any;
 };
 
 export type ParticleSystem = {
@@ -125,9 +108,9 @@ export type ParticleSystem = {
 };
 
 export type CycleData = {
-  now: number,
-  delta: number,
-  elapsed: number,
+  now: number;
+  delta: number;
+  elapsed: number;
 };
 
 export function createParticleSystem(
@@ -135,4 +118,4 @@ export function createParticleSystem(
   externalNow?: number
 ): ParticleSystem;
 
-export function updateParticleSystems(cycleData:CycleData): void;
+export function updateParticleSystems(cycleData: CycleData): void;

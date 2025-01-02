@@ -1,36 +1,37 @@
-import * as THREE from "three";
+import * as THREE from 'three';
 
 import {
   EmitFrom,
   Shape,
   SimulationSpace,
   TimeMode,
-} from "./three-particles/three-particles-enums.js";
+} from './three-particles/three-particles-enums.js';
 import {
   calculateRandomPositionAndVelocityOnBox,
   calculateRandomPositionAndVelocityOnCircle,
   calculateRandomPositionAndVelocityOnCone,
   calculateRandomPositionAndVelocityOnRectangle,
   calculateRandomPositionAndVelocityOnSphere,
-} from "./three-particles/three-particles-utils.js";
+} from './three-particles/three-particles-utils.js';
 
-import { CurveFunction } from "./three-particles/three-particles-curves.js";
-import { FBM } from "three-noise/build/three-noise.module.js";
-import { Gyroscope } from "three/examples/jsm/misc/Gyroscope.js";
-import { ObjectUtils } from "@newkrok/three-utils";
-import ParticleSystemFragmentShader from "./three-particles/shaders/particle-system-fragment-shader.glsl.js";
-import ParticleSystemVertexShader from "./three-particles/shaders/particle-system-vertex-shader.glsl.js";
-import { applyModifiers } from "./three-particles/three-particles-modifiers.js";
-import { createBezierCurveFunction } from "./three-particles/three-particles-bezier";
+import { CurveFunction } from './three-particles/three-particles-curves.js';
+import { FBM } from 'three-noise/build/three-noise.module.js';
+import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
+import { ObjectUtils } from '@newkrok/three-utils';
+import ParticleSystemFragmentShader from './three-particles/shaders/particle-system-fragment-shader.glsl.js';
+import ParticleSystemVertexShader from './three-particles/shaders/particle-system-vertex-shader.glsl.js';
+import { applyModifiers } from './three-particles/three-particles-modifiers.js';
+import { createBezierCurveFunction } from './three-particles/three-particles-bezier';
+import { ParticleSystem, ParticleSystemConfig } from './types.js';
 
 let createdParticleSystems = [];
 
 export const blendingMap = {
-  "THREE.NoBlending": THREE.NoBlending,
-  "THREE.NormalBlending": THREE.NormalBlending,
-  "THREE.AdditiveBlending": THREE.AdditiveBlending,
-  "THREE.SubtractiveBlending": THREE.SubtractiveBlending,
-  "THREE.MultiplyBlending": THREE.MultiplyBlending,
+  'THREE.NoBlending': THREE.NoBlending,
+  'THREE.NormalBlending': THREE.NormalBlending,
+  'THREE.AdditiveBlending': THREE.AdditiveBlending,
+  'THREE.SubtractiveBlending': THREE.SubtractiveBlending,
+  'THREE.MultiplyBlending': THREE.MultiplyBlending,
 };
 
 export const getDefaultParticleSystemConfig = () =>
@@ -88,7 +89,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
       emitFrom: EmitFrom.VOLUME,
     },
   },
-  map: null,
+  map: undefined,
   renderer: {
     blending: THREE.NormalBlending,
     discardBackgroundColor: false,
@@ -166,7 +167,7 @@ const createFloat32Attributes = ({
       new Float32Array(
         Array.from(
           { length: maxParticles },
-          typeof factory === "function" ? factory : () => factory
+          typeof factory === 'function' ? factory : () => factory
         )
       ),
       1
@@ -268,7 +269,7 @@ const calculatePositionAndVelocity = (
 /**
  * @deprecated Since version 1.0.1. Will be deleted in version 1.1.0. Use particleSystem.dispose instead.
  */
-export const destroyParticleSystem = (particleSystem) => {
+export const destroyParticleSystem = (particleSystem: ParticleSystem) => {
   createdParticleSystems = createdParticleSystems.filter(
     ({ particleSystem: savedParticleSystem, wrapper }) => {
       if (
@@ -289,9 +290,9 @@ export const destroyParticleSystem = (particleSystem) => {
 };
 
 export const createParticleSystem = (
-  config = DEFAULT_PARTICLE_SYSTEM_CONFIG,
-  externalNow
-) => {
+  config: ParticleSystemConfig = DEFAULT_PARTICLE_SYSTEM_CONFIG,
+  externalNow?: number
+): ParticleSystem => {
   const now = externalNow || Date.now();
   const generalData = {
     distanceFromLastEmitByDistance: 0,
@@ -318,8 +319,8 @@ export const createParticleSystem = (
   );
 
   const bezierCompatibleProperties = [
-    "sizeOverLifetime",
-    "opacityOverLifetime",
+    'sizeOverLifetime',
+    'opacityOverLifetime',
   ];
   bezierCompatibleProperties.forEach((key) => {
     if (
@@ -357,7 +358,7 @@ export const createParticleSystem = (
     textureSheetAnimation,
   } = normalizedConfig;
 
-  if (typeof renderer.blending === "string")
+  if (typeof renderer.blending === 'string')
     renderer.blending = blendingMap[renderer.blending];
 
   const startPositions = Array.from(
@@ -389,7 +390,7 @@ export const createParticleSystem = (
     );
   }
 
-  const startValueKeys = ["startSize", "startOpacity"];
+  const startValueKeys = ['startSize', 'startOpacity'];
   startValueKeys.forEach((key) => {
     generalData.startValues[key] = Array.from({ length: maxParticles }, () =>
       THREE.MathUtils.randFloat(
@@ -399,7 +400,7 @@ export const createParticleSystem = (
     );
   });
 
-  const lifetimeValueKeys = ["rotationOverLifetime"];
+  const lifetimeValueKeys = ['rotationOverLifetime'];
   lifetimeValueKeys.forEach((key) => {
     if (normalizedConfig[key].isActive)
       generalData.lifetimeValues[key] = Array.from(
@@ -492,53 +493,53 @@ export const createParticleSystem = (
     });
   };
 
-  createFloat32AttributesRequest("isActive", false);
-  createFloat32AttributesRequest("lifetime", 0);
-  createFloat32AttributesRequest("startLifetime", () =>
+  createFloat32AttributesRequest('isActive', false);
+  createFloat32AttributesRequest('lifetime', 0);
+  createFloat32AttributesRequest('startLifetime', () =>
     THREE.MathUtils.randFloat(startLifetime.min, startLifetime.max)
   );
-  createFloat32AttributesRequest("startFrame", () =>
+  createFloat32AttributesRequest('startFrame', () =>
     THREE.MathUtils.randInt(
       textureSheetAnimation.startFrame.min,
       textureSheetAnimation.startFrame.max
     )
   );
 
-  createFloat32AttributesRequest("opacity", 0);
+  createFloat32AttributesRequest('opacity', 0);
 
-  createFloat32AttributesRequest("rotation", () =>
+  createFloat32AttributesRequest('rotation', () =>
     THREE.MathUtils.degToRad(
       THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
     )
   );
 
   createFloat32AttributesRequest(
-    "size",
+    'size',
     (_, index) => generalData.startValues.startSize[index]
   );
 
-  createFloat32AttributesRequest("rotation", 0);
+  createFloat32AttributesRequest('rotation', 0);
 
   const colorRandomRatio = Math.random();
   createFloat32AttributesRequest(
-    "colorR",
+    'colorR',
     () =>
       startColor.min.r +
       colorRandomRatio * (startColor.max.r - startColor.min.r)
   );
   createFloat32AttributesRequest(
-    "colorG",
+    'colorG',
     () =>
       startColor.min.g +
       colorRandomRatio * (startColor.max.g - startColor.min.g)
   );
   createFloat32AttributesRequest(
-    "colorB",
+    'colorB',
     () =>
       startColor.min.b +
       colorRandomRatio * (startColor.max.b - startColor.min.b)
   );
-  createFloat32AttributesRequest("colorA", 0);
+  createFloat32AttributesRequest('colorA', 0);
 
   const deactivateParticle = (particleIndex) => {
     geometry.attributes.isActive.array[particleIndex] = false;
