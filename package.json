@@ -48,6 +48,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.4",
+    "@types/three": "^0.171.0",
+    "prettier": "^3.4.2",
     "typescript": "^5.7.2"
   }
 }
