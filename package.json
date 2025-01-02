@@ -1,23 +1,33 @@
 {
   "name": "@newkrok/three-particles",
-  "version": "1.0.3",
-  "description": "Particle system for ThreeJS",
-  "main": "src/js/effects/three-particles.js",
-  "bin": {
-    "three-particles": "src/js/effects/three-particles.js"
-  },
+  "version": "2.0.0",
+  "description": "Three.js-based high-performance particle system library designed for creating visually stunning particle effects with ease. Perfect for game developers and 3D applications.",
+  "main": "dist/three-particles.js",
+  "types": "dist/three-particles.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NewKrok/three-particles.git"
+    "url": "https://github.com/NewKrok/three-particles.git"
   },
   "keywords": [
-    "threejs",
-    "particle",
+    "three",
+    "three.js",
     "particles",
-    "particle engine",
-    "effects",
+    "particle system",
+    "webgl",
     "3d",
-    "lib"
+    "visual effects",
+    "game development",
+    "3d applications",
+    "high performance",
+    "javascript",
+    "typescript",
+    "three-particles",
+    "threejs effects"
   ],
   "author": "Istvan Krisztian Somoracz",
   "license": "MIT",
@@ -26,12 +36,18 @@
   },
   "homepage": "https://github.com/NewKrok/three-particles#readme",
   "dependencies": {
+    "@newkrok/three-utils": "^1.0.0",
     "easing-functions": "1.0.1",
-    "three": "^0.155.0",
-    "three-noise": "1.1.2",
-    "@newkrok/three-utils": "^1.0.0"
+    "three": "^0.172.0",
+    "three-noise": "1.1.2"
   },
   "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.4",
+    "typescript": "^5.7.2"
   }
 }
