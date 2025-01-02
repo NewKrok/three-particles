@@ -676,7 +676,7 @@ export const createParticleSystem = (
   const calculatedCreationTime =
     now + THREE.MathUtils.randFloat(startDelay.min, startDelay.max) * 1000;
 
-  let wrapper;
+  let wrapper: Gyroscope;
   if (normalizedConfig.simulationSpace === SimulationSpace.WORLD) {
     wrapper = new Gyroscope();
     wrapper.add(particleSystem);

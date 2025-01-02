@@ -1,6 +1,7 @@
 {
   "name": "@newkrok/three-particles",
   "version": "2.0.0",
+  "type": "module",
   "description": "Three.js-based high-performance particle system library designed for creating visually stunning particle effects with ease. Perfect for game developers and 3D applications.",
   "main": "dist/three-particles.js",
   "types": "dist/three-particles.d.ts",

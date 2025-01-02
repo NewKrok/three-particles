@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
-    "moduleResolution": "NodeNext",
-    "target": "ES6",
     "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2020",
     "declaration": true,
-    "outDir": "dist",
-    "rootDir": "src",
+    "outDir": "./dist",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true
