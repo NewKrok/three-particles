@@ -22,9 +22,14 @@ import ParticleSystemFragmentShader from './three-particles/shaders/particle-sys
 import ParticleSystemVertexShader from './three-particles/shaders/particle-system-vertex-shader.glsl.js';
 import { applyModifiers } from './three-particles/three-particles-modifiers.js';
 import { createBezierCurveFunction } from './three-particles/three-particles-bezier';
-import { ParticleSystem, ParticleSystemConfig } from './types.js';
+import {
+  NormalizedParticleSystemConfig,
+  ParticleSystem,
+  ParticleSystemConfig,
+  ParticleSystemWrapper,
+} from './types.js';
 
-let createdParticleSystems = [];
+let createdParticleSystems: Array<ParticleSystemWrapper | ParticleSystem> = [];
 
 export const blendingMap = {
   'THREE.NoBlending': THREE.NoBlending,
@@ -37,7 +42,7 @@ export const blendingMap = {
 export const getDefaultParticleSystemConfig = () =>
   JSON.parse(JSON.stringify(DEFAULT_PARTICLE_SYSTEM_CONFIG));
 
-const DEFAULT_PARTICLE_SYSTEM_CONFIG = {
+const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   transform: {
     position: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0 },
@@ -160,6 +165,11 @@ const createFloat32Attributes = ({
   propertyName,
   maxParticles,
   factory,
+}: {
+  geometry: THREE.BufferGeometry;
+  propertyName: string;
+  maxParticles: number;
+  factory: ((index: number) => number) | number;
 }) => {
   geometry.setAttribute(
     propertyName,
@@ -294,7 +304,35 @@ export const createParticleSystem = (
   externalNow?: number
 ): ParticleSystem => {
   const now = externalNow || Date.now();
-  const generalData = {
+  const generalData: {
+    creationTimes: Array<number>;
+    distanceFromLastEmitByDistance: number;
+    lastWorldPosition: THREE.Vector3;
+    currentWorldPosition: THREE.Vector3;
+    worldPositionChange: THREE.Vector3;
+    wrapperQuaternion: THREE.Quaternion;
+    lastWorldQuaternion: THREE.Quaternion;
+    worldQuaternion: THREE.Quaternion;
+    worldEuler: THREE.Euler;
+    gravityVelocity: THREE.Vector3;
+    startValues: Record<string, Array<number>>;
+    hasOrbitalVelocity: boolean;
+    orbitalVelocityData: Array<{
+      speed: THREE.Vector3;
+      positionOffset: THREE.Vector3;
+    }>;
+    lifetimeValues: Record<string, Array<number>>;
+    noise?: {
+      isActive: boolean;
+      strength: number;
+      positionAmount: number;
+      rotationAmount: number;
+      sizeAmount: number;
+      sampler: FBM;
+      offsets: Array<number>;
+    };
+    isEnabled: boolean;
+  } = {
     distanceFromLastEmitByDistance: 0,
     lastWorldPosition: new THREE.Vector3(-99999),
     currentWorldPosition: new THREE.Vector3(-99999),
@@ -309,19 +347,16 @@ export const createParticleSystem = (
     orbitalVelocityData: [],
     lifetimeValues: {},
     creationTimes: [],
-    noise: null,
+    noise: undefined,
     isEnabled: true,
   };
 
-  const normalizedConfig = ObjectUtils.patchObject(
-    DEFAULT_PARTICLE_SYSTEM_CONFIG,
-    config
-  );
+  const normalizedConfig: NormalizedParticleSystemConfig =
+    ObjectUtils.patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
 
-  const bezierCompatibleProperties = [
-    'sizeOverLifetime',
-    'opacityOverLifetime',
-  ];
+  const bezierCompatibleProperties: Array<
+    keyof NormalizedParticleSystemConfig
+  > = ['sizeOverLifetime', 'opacityOverLifetime'];
   bezierCompatibleProperties.forEach((key) => {
     if (
       normalizedConfig[key].isActive &&
@@ -358,7 +393,7 @@ export const createParticleSystem = (
     textureSheetAnimation,
   } = normalizedConfig;
 
-  if (typeof renderer.blending === 'string')
+  if (typeof renderer?.blending === 'string')
     renderer.blending = blendingMap[renderer.blending];
 
   const startPositions = Array.from(
@@ -390,7 +425,10 @@ export const createParticleSystem = (
     );
   }
 
-  const startValueKeys = ['startSize', 'startOpacity'];
+  const startValueKeys: Array<keyof NormalizedParticleSystemConfig> = [
+    'startSize',
+    'startOpacity',
+  ];
   startValueKeys.forEach((key) => {
     generalData.startValues[key] = Array.from({ length: maxParticles }, () =>
       THREE.MathUtils.randFloat(
@@ -400,7 +438,9 @@ export const createParticleSystem = (
     );
   });
 
-  const lifetimeValueKeys = ['rotationOverLifetime'];
+  const lifetimeValueKeys: Array<keyof NormalizedParticleSystemConfig> = [
+    'rotationOverLifetime',
+  ];
   lifetimeValueKeys.forEach((key) => {
     if (normalizedConfig[key].isActive)
       generalData.lifetimeValues[key] = Array.from(

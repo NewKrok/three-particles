@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import {
   EmitFrom,
   Shape,
@@ -74,6 +75,16 @@ export type TextureSheetAnimation = {
   startFrame?: MinMaxNumber;
 };
 
+export type Renderer = {
+  blending: THREE.Blending;
+  discardBackgroundColor: boolean;
+  backgroundColorTolerance: 1.0;
+  backgroundColor: Rgb;
+  transparent: boolean;
+  depthTest: boolean;
+  depthWrite: boolean;
+};
+
 export type ParticleSystemConfig = {
   transform?: Transform;
   duration?: number;
@@ -91,20 +102,29 @@ export type ParticleSystemConfig = {
   emission?: Emission;
   shape?: ShapeConfig;
   map?: THREE.Texture;
-  renderer?: any;
+  renderer?: Renderer;
   velocityOverLifetime?: any;
   sizeOverLifetime?: any;
   opacityOverLifetime?: any;
   rotationOverLifetime?: any;
   noise?: any;
   textureSheetAnimation?: TextureSheetAnimation;
+  onUpdate?: (particle: THREE.Object3D, cycleData: CycleData) => void;
+  onComplete?: () => void;
 };
+
+export type NormalizedParticleSystemConfig = Required<ParticleSystemConfig>;
 
 export type ParticleSystem = {
   instance: THREE.Object3D;
   resumeEmitter: () => void;
   pauseEmitter: () => void;
   dispose: () => void;
+};
+
+export type ParticleSystemWrapper = {
+  particleSystem: ParticleSystem;
+  wrapper: Gyroscope;
 };
 
 export type CycleData = {
