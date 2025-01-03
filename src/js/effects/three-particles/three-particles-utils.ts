@@ -1,13 +1,18 @@
-import * as THREE from "three";
+import * as THREE from 'three';
 
-import { EmitFrom } from "./three-particles-enums.js";
+import { EmitFrom } from './three-particles-enums.js';
+import { MinMaxNumber, Point3D } from '../types.js';
 
 export const calculateRandomPositionAndVelocityOnSphere = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { radius, radiusThickness, arc }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  startSpeed: MinMaxNumber,
+  {
+    radius,
+    radiusThickness,
+    arc,
+  }: { radius: number; radiusThickness: number; arc: number }
 ) => {
   const u = Math.random() * (arc / 360);
   const v = Math.random();
@@ -34,8 +39,8 @@ export const calculateRandomPositionAndVelocityOnSphere = (
   position.applyQuaternion(quaternion);
 
   const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
+    startSpeed.min || 0,
+    startSpeed.max || 0
   );
   const speedMultiplierByPosition = 1 / position.length();
   velocity.set(
@@ -47,11 +52,21 @@ export const calculateRandomPositionAndVelocityOnSphere = (
 };
 
 export const calculateRandomPositionAndVelocityOnCone = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { radius, radiusThickness, arc, angle = 90 }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  startSpeed: MinMaxNumber,
+  {
+    radius,
+    radiusThickness,
+    arc,
+    angle = 90,
+  }: {
+    radius: number;
+    radiusThickness: number;
+    arc: number;
+    angle?: number;
+  }
 ) => {
   const theta = 2 * Math.PI * Math.random() * (arc / 360);
   const randomizedDistanceRatio = Math.random();
@@ -77,8 +92,8 @@ export const calculateRandomPositionAndVelocityOnCone = (
   const sinNormalizedAngle = Math.sin(normalizedAngle);
 
   const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
+    startSpeed.min || 0,
+    startSpeed.max || 0
   );
   const speedMultiplierByPosition = 1 / positionLength;
   velocity.set(
@@ -96,17 +111,18 @@ export const calculateRandomPositionAndVelocityOnCone = (
 };
 
 export const calculateRandomPositionAndVelocityOnBox = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { scale, emitFrom }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  startSpeed: MinMaxNumber,
+  { scale, emitFrom }: { scale: Point3D; emitFrom: EmitFrom }
 ) => {
+  const _scale = scale as Required<Point3D>;
   switch (emitFrom) {
     case EmitFrom.VOLUME:
-      position.x = Math.random() * scale.x - scale.x / 2;
-      position.y = Math.random() * scale.y - scale.y / 2;
-      position.z = Math.random() * scale.z - scale.z / 2;
+      position.x = Math.random() * _scale.x - _scale.x / 2;
+      position.y = Math.random() * _scale.y - _scale.y / 2;
+      position.z = Math.random() * _scale.z - _scale.z / 2;
       break;
 
     case EmitFrom.SHELL:
@@ -116,9 +132,9 @@ export const calculateRandomPositionAndVelocityOnBox = (
       shellResult[perpendicularAxis] = side > 2 ? 1 : 0;
       shellResult[(perpendicularAxis + 1) % 3] = Math.random();
       shellResult[(perpendicularAxis + 2) % 3] = Math.random();
-      position.x = shellResult[0] * scale.x - scale.x / 2;
-      position.y = shellResult[1] * scale.y - scale.y / 2;
-      position.z = shellResult[2] * scale.z - scale.z / 2;
+      position.x = shellResult[0] * _scale.x - _scale.x / 2;
+      position.y = shellResult[1] * _scale.y - _scale.y / 2;
+      position.z = shellResult[2] * _scale.z - _scale.z / 2;
       break;
 
     case EmitFrom.EDGE:
@@ -131,28 +147,32 @@ export const calculateRandomPositionAndVelocityOnBox = (
         edge < 2 ? Math.random() : edge - 2;
       edgeResult[(perpendicularAxis2 + 2) % 3] =
         edge < 2 ? edge : Math.random();
-      position.x = edgeResult[0] * scale.x - scale.x / 2;
-      position.y = edgeResult[1] * scale.y - scale.y / 2;
-      position.z = edgeResult[2] * scale.z - scale.z / 2;
+      position.x = edgeResult[0] * _scale.x - _scale.x / 2;
+      position.y = edgeResult[1] * _scale.y - _scale.y / 2;
+      position.z = edgeResult[2] * _scale.z - _scale.z / 2;
       break;
   }
 
   position.applyQuaternion(quaternion);
 
   const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
+    startSpeed.min || 0,
+    startSpeed.max || 0
   );
   velocity.set(0, 0, randomizedSpeed);
   velocity.applyQuaternion(quaternion);
 };
 
 export const calculateRandomPositionAndVelocityOnCircle = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { radius, radiusThickness, arc }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  startSpeed: MinMaxNumber,
+  {
+    radius,
+    radiusThickness,
+    arc,
+  }: { radius: number; radiusThickness: number; arc: number }
 ) => {
   const theta = 2 * Math.PI * Math.random() * (arc / 360);
   const randomizedDistanceRatio = Math.random();
@@ -172,8 +192,8 @@ export const calculateRandomPositionAndVelocityOnCircle = (
   position.applyQuaternion(quaternion);
 
   const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
+    startSpeed.min || 0,
+    startSpeed.max || 0
   );
 
   const positionLength = position.length();
@@ -187,16 +207,19 @@ export const calculateRandomPositionAndVelocityOnCircle = (
 };
 
 export const calculateRandomPositionAndVelocityOnRectangle = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { rotation, scale }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  startSpeed: MinMaxNumber,
+  { rotation, scale }: { rotation: Point3D; scale: Point3D }
 ) => {
-  const xOffset = Math.random() * scale.x - scale.x / 2;
-  const yOffset = Math.random() * scale.y - scale.y / 2;
-  const rotationX = THREE.MathUtils.degToRad(rotation.x);
-  const rotationY = THREE.MathUtils.degToRad(rotation.y);
+  const _scale = scale as Required<Point3D>;
+  const _rotation = rotation as Required<Point3D>;
+
+  const xOffset = Math.random() * _scale.x - _scale.x / 2;
+  const yOffset = Math.random() * _scale.y - _scale.y / 2;
+  const rotationX = THREE.MathUtils.degToRad(_rotation.x);
+  const rotationY = THREE.MathUtils.degToRad(_rotation.y);
   position.x = xOffset * Math.cos(rotationY);
   position.y = yOffset * Math.cos(rotationX);
   position.z = xOffset * Math.sin(rotationY) - yOffset * Math.sin(rotationX);
@@ -204,8 +227,8 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
   position.applyQuaternion(quaternion);
 
   const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
+    startSpeed.min || 0,
+    startSpeed.max || 0
   );
   velocity.set(0, 0, randomizedSpeed);
   velocity.applyQuaternion(quaternion);

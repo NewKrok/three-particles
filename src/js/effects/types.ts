@@ -5,7 +5,7 @@ import {
   Shape,
   SimulationSpace,
   TimeMode,
-} from './three-particles/three-particles-enums';
+} from './three-particles/three-particles-enums.js';
 
 export type Point3D = {
   x?: number;
@@ -132,10 +132,3 @@ export type CycleData = {
   delta: number;
   elapsed: number;
 };
-
-export function createParticleSystem(
-  config: ParticleSystemConfig,
-  externalNow?: number
-): ParticleSystem;
-
-export function updateParticleSystems(cycleData: CycleData): void;

@@ -21,12 +21,15 @@ import { ObjectUtils } from '@newkrok/three-utils';
 import ParticleSystemFragmentShader from './three-particles/shaders/particle-system-fragment-shader.glsl.js';
 import ParticleSystemVertexShader from './three-particles/shaders/particle-system-vertex-shader.glsl.js';
 import { applyModifiers } from './three-particles/three-particles-modifiers.js';
-import { createBezierCurveFunction } from './three-particles/three-particles-bezier';
+import { createBezierCurveFunction } from './three-particles/three-particles-bezier.js';
 import {
+  CycleData,
+  MinMaxNumber,
   NormalizedParticleSystemConfig,
   ParticleSystem,
   ParticleSystemConfig,
   ParticleSystemWrapper,
+  ShapeConfig,
 } from './types.js';
 
 let createdParticleSystems: Array<ParticleSystemWrapper | ParticleSystem> = [];
@@ -186,12 +189,19 @@ const createFloat32Attributes = ({
 };
 
 const calculatePositionAndVelocity = (
-  { shape, sphere, cone, circle, rectangle, box },
-  startSpeed,
-  position,
-  quaternion,
-  velocity,
-  velocityOverLifetime
+  { shape, sphere, cone, circle, rectangle, box }: ShapeConfig,
+  startSpeed: MinMaxNumber,
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  velocityOverLifetime: {
+    isActive: boolean;
+    linear: {
+      x: MinMaxNumber;
+      y: MinMaxNumber;
+      z: MinMaxNumber;
+    };
+  }
 ) => {
   switch (shape) {
     case Shape.SPHERE:
@@ -200,7 +210,7 @@ const calculatePositionAndVelocity = (
         quaternion,
         velocity,
         startSpeed,
-        sphere
+        sphere as Required<NonNullable<ShapeConfig['sphere']>>
       );
       break;
 
@@ -210,7 +220,7 @@ const calculatePositionAndVelocity = (
         quaternion,
         velocity,
         startSpeed,
-        cone
+        cone as Required<NonNullable<ShapeConfig['cone']>>
       );
       break;
 
@@ -220,7 +230,7 @@ const calculatePositionAndVelocity = (
         quaternion,
         velocity,
         startSpeed,
-        circle
+        circle as Required<NonNullable<ShapeConfig['circle']>>
       );
       break;
 
@@ -230,7 +240,7 @@ const calculatePositionAndVelocity = (
         quaternion,
         velocity,
         startSpeed,
-        rectangle
+        rectangle as Required<NonNullable<ShapeConfig['rectangle']>>
       );
       break;
 
@@ -240,7 +250,7 @@ const calculatePositionAndVelocity = (
         quaternion,
         velocity,
         startSpeed,
-        box
+        box as Required<NonNullable<ShapeConfig['box']>>
       );
       break;
   }
@@ -251,8 +261,8 @@ const calculatePositionAndVelocity = (
       velocityOverLifetime.linear.x.max !== 0
     ) {
       velocity.x += THREE.MathUtils.randFloat(
-        velocityOverLifetime.linear.x.min,
-        velocityOverLifetime.linear.x.max
+        velocityOverLifetime.linear.x.min || 0,
+        velocityOverLifetime.linear.x.max || 0
       );
     }
     if (
@@ -260,8 +270,8 @@ const calculatePositionAndVelocity = (
       velocityOverLifetime.linear.y.max !== 0
     ) {
       velocity.y += THREE.MathUtils.randFloat(
-        velocityOverLifetime.linear.y.min,
-        velocityOverLifetime.linear.y.max
+        velocityOverLifetime.linear.y.min || 0,
+        velocityOverLifetime.linear.y.max || 0
       );
     }
     if (
@@ -269,8 +279,8 @@ const calculatePositionAndVelocity = (
       velocityOverLifetime.linear.z.max !== 0
     ) {
       velocity.z += THREE.MathUtils.randFloat(
-        velocityOverLifetime.linear.z.min,
-        velocityOverLifetime.linear.z.max
+        velocityOverLifetime.linear.z.min || 0,
+        velocityOverLifetime.linear.z.max || 0
       );
     }
   }
@@ -328,8 +338,8 @@ export const createParticleSystem = (
       positionAmount: number;
       rotationAmount: number;
       sizeAmount: number;
-      sampler: FBM;
-      offsets: Array<number>;
+      sampler?: FBM;
+      offsets?: Array<number>;
     };
     isEnabled: boolean;
   } = {
@@ -351,8 +361,10 @@ export const createParticleSystem = (
     isEnabled: true,
   };
 
-  const normalizedConfig: NormalizedParticleSystemConfig =
-    ObjectUtils.patchObject(DEFAULT_PARTICLE_SYSTEM_CONFIG, config);
+  const normalizedConfig = ObjectUtils.patchObject(
+    DEFAULT_PARTICLE_SYSTEM_CONFIG as NormalizedParticleSystemConfig,
+    config
+  );
 
   const bezierCompatibleProperties: Array<
     keyof NormalizedParticleSystemConfig
@@ -465,10 +477,10 @@ export const createParticleSystem = (
           scale: noise.frequency,
           octaves: noise.octaves,
         })
-      : null,
+      : undefined,
     offsets: noise.useRandomOffset
       ? Array.from({ length: maxParticles }, () => Math.random() * 100)
-      : null,
+      : undefined,
   };
 
   const material = new THREE.ShaderMaterial({
@@ -754,7 +766,7 @@ export const createParticleSystem = (
   };
 };
 
-export const updateParticleSystems = ({ now, delta, elapsed }) => {
+export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
   createdParticleSystems.forEach((props) => {
     const {
       onUpdate,
