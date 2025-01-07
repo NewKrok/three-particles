@@ -350,7 +350,13 @@ export const createParticleSystem = (
     orbitalVelocityData: [],
     lifetimeValues: {},
     creationTimes: [],
-    noise: undefined,
+    noise: {
+      isActive: false,
+      strength: 0,
+      positionAmount: 0,
+      rotationAmount: 0,
+      sizeAmount: 0,
+    },
     isEnabled: true,
   };
 
@@ -524,12 +530,15 @@ export const createParticleSystem = (
     );
 
   geometry.setFromPoints(
-    Array.from({ length: maxParticles }, (_, index) => ({
-      ...startPositions[index],
-    }))
+    Array.from({ length: maxParticles }, (_, index) =>
+      startPositions[index].clone()
+    )
   );
 
-  const createFloat32AttributesRequest = (propertyName, factory) => {
+  const createFloat32AttributesRequest = (
+    propertyName: string,
+    factory: ((index: number) => number) | number
+  ) => {
     createFloat32Attributes({
       geometry,
       propertyName,
@@ -538,15 +547,15 @@ export const createParticleSystem = (
     });
   };
 
-  createFloat32AttributesRequest('isActive', false);
+  createFloat32AttributesRequest('isActive', 0);
   createFloat32AttributesRequest('lifetime', 0);
   createFloat32AttributesRequest('startLifetime', () =>
-    THREE.MathUtils.randFloat(startLifetime.min, startLifetime.max)
+    THREE.MathUtils.randFloat(startLifetime.min ?? 0, startLifetime.max ?? 0)
   );
   createFloat32AttributesRequest('startFrame', () =>
     THREE.MathUtils.randInt(
-      textureSheetAnimation.startFrame.min,
-      textureSheetAnimation.startFrame.max
+      textureSheetAnimation.startFrame?.min ?? 0,
+      textureSheetAnimation.startFrame?.max ?? 0
     )
   );
 
@@ -554,7 +563,7 @@ export const createParticleSystem = (
 
   createFloat32AttributesRequest('rotation', () =>
     THREE.MathUtils.degToRad(
-      THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
+      THREE.MathUtils.randFloat(startRotation.min ?? 0, startRotation.max ?? 0)
     )
   );
 
@@ -587,13 +596,13 @@ export const createParticleSystem = (
   createFloat32AttributesRequest('colorA', 0);
 
   const deactivateParticle = (particleIndex) => {
-    geometry.attributes.isActive.array[particleIndex] = false;
+    geometry.attributes.isActive.array[particleIndex] = 0;
     geometry.attributes.colorA.array[particleIndex] = 0;
     geometry.attributes.colorA.needsUpdate = true;
   };
 
   const activateParticle = ({ particleIndex, activationTime, position }) => {
-    geometry.attributes.isActive.array[particleIndex] = true;
+    geometry.attributes.isActive.array[particleIndex] = 1;
     generalData.creationTimes[particleIndex] = activationTime;
 
     if (generalData.noise.offsets)
