@@ -1,22 +1,31 @@
-import * as THREE from "three";
+import * as THREE from 'three';
 
-import { getCurveFunction } from "./three-particles-curves.js";
+import { getCurveFunction } from './three-particles-curves.js';
+import {
+  Noise,
+  NormalizedParticleSystemConfig,
+  ParticleSystemConfig,
+} from '../types.js';
 
 const ROTATION_CONVERTER = THREE.MathUtils.radToDeg(1);
 const noiseInput = new THREE.Vector3(0, 0, 0);
 const orbitalEuler = new THREE.Euler();
 
-const curveModifiers = [
+const curveModifiers: Array<{
+  key: keyof ParticleSystemConfig;
+  attributeKeys: Array<string>;
+  startValueKeys: Array<keyof ParticleSystemConfig>;
+}> = [
   // {key:"colorOverLifetime", attributeKeys:["colorR", "colorG", "colorB"]},
   {
-    key: "opacityOverLifetime",
-    attributeKeys: ["colorA"],
-    startValueKeys: ["startOpacity"],
+    key: 'opacityOverLifetime',
+    attributeKeys: ['colorA'],
+    startValueKeys: ['startOpacity'],
   },
   {
-    key: "sizeOverLifetime",
-    attributeKeys: ["size"],
-    startValueKeys: ["startSize"],
+    key: 'sizeOverLifetime',
+    attributeKeys: ['size'],
+    startValueKeys: ['startSize'],
   },
 ];
 
@@ -29,10 +38,24 @@ export const applyModifiers = ({
   orbitalVelocityData,
   normalizedConfig,
   attributes,
-  particleLifetime,
   particleLifetimePercentage,
   particleIndex,
   forceUpdate = false,
+}: {
+  delta: number;
+  noise: Noise;
+  startValues: Record<string, Array<number>>;
+  lifetimeValues: Record<string, Array<number>>;
+  hasOrbitalVelocity: boolean;
+  orbitalVelocityData: Array<{
+    speed: THREE.Vector3;
+    positionOffset: THREE.Vector3;
+  }>;
+  normalizedConfig: NormalizedParticleSystemConfig;
+  attributes: THREE.NormalBufferAttributes;
+  particleLifetimePercentage: number;
+  particleIndex: number;
+  forceUpdate?: boolean;
 }) => {
   if (hasOrbitalVelocity) {
     const positionIndex = particleIndex * 3;
@@ -103,7 +126,7 @@ export const applyModifiers = ({
     const noisePower = 0.15 * strength;
 
     noiseInput.set(noisePosition, 0, 0);
-    noiseOnPosition = sampler.get3(noiseInput);
+    noiseOnPosition = sampler!.get3(noiseInput);
     positionArr[positionIndex] += noiseOnPosition * noisePower * positionAmount;
 
     if (rotationAmount !== 0) {
@@ -119,12 +142,12 @@ export const applyModifiers = ({
     }
 
     noiseInput.set(noisePosition, noisePosition, 0);
-    noiseOnPosition = sampler.get3(noiseInput);
+    noiseOnPosition = sampler!.get3(noiseInput);
     positionArr[positionIndex + 1] +=
       noiseOnPosition * noisePower * positionAmount;
 
     noiseInput.set(noisePosition, noisePosition, noisePosition);
-    noiseOnPosition = sampler.get3(noiseInput);
+    noiseOnPosition = sampler!.get3(noiseInput);
     positionArr[positionIndex + 2] +=
       noiseOnPosition * noisePower * positionAmount;
 

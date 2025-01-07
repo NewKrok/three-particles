@@ -25,6 +25,7 @@ import { createBezierCurveFunction } from './three-particles/three-particles-bez
 import {
   CycleData,
   MinMaxNumber,
+  Noise,
   NormalizedParticleSystemConfig,
   ParticleSystem,
   ParticleSystemConfig,
@@ -332,15 +333,7 @@ export const createParticleSystem = (
       positionOffset: THREE.Vector3;
     }>;
     lifetimeValues: Record<string, Array<number>>;
-    noise?: {
-      isActive: boolean;
-      strength: number;
-      positionAmount: number;
-      rotationAmount: number;
-      sizeAmount: number;
-      sampler?: FBM;
-      offsets?: Array<number>;
-    };
+    noise: Noise;
     isEnabled: boolean;
   } = {
     distanceFromLastEmitByDistance: 0,
@@ -701,7 +694,6 @@ export const createParticleSystem = (
 
     applyModifiers({
       delta: 0,
-      elapsed: 0,
       noise: generalData.noise,
       startValues: generalData.startValues,
       lifetimeValues: generalData.lifetimeValues,
@@ -709,7 +701,6 @@ export const createParticleSystem = (
       orbitalVelocityData: generalData.orbitalVelocityData,
       normalizedConfig,
       attributes: particleSystem.geometry.attributes,
-      particleLifetime: 0,
       particleLifetimePercentage: 0,
       particleIndex,
       forceUpdate: true,
@@ -881,7 +872,6 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
             particleSystem.geometry.attributes.startLifetime.array[index];
           applyModifiers({
             delta,
-            elapsed,
             noise: generalData.noise,
             startValues: generalData.startValues,
             lifetimeValues: generalData.lifetimeValues,
@@ -889,7 +879,6 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
             orbitalVelocityData: generalData.orbitalVelocityData,
             normalizedConfig,
             attributes: particleSystem.geometry.attributes,
-            particleLifetime,
             particleLifetimePercentage,
             particleIndex: index,
           });

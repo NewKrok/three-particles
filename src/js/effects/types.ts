@@ -6,6 +6,7 @@ import {
   SimulationSpace,
   TimeMode,
 } from './three-particles/three-particles-enums.js';
+import { FBM } from 'three-noise/build/three-noise.module.js';
 
 export type Point3D = {
   x?: number;
@@ -83,6 +84,16 @@ export type Renderer = {
   transparent: boolean;
   depthTest: boolean;
   depthWrite: boolean;
+};
+
+export type Noise = {
+  isActive: boolean;
+  strength: number;
+  positionAmount: number;
+  rotationAmount: number;
+  sizeAmount: number;
+  sampler?: FBM;
+  offsets?: Array<number>;
 };
 
 export type ParticleSystemConfig = {
