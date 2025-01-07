@@ -1,41 +1,41 @@
-import Easing from "easing-functions";
+import Easing, { EasingFunction } from 'easing-functions';
 
-export const CurveFunction = {
-  BEZIER: "BEZIER",
-  LINEAR: "LINEAR",
-  QUADRATIC_IN: "QUADRATIC_IN",
-  QUADRATIC_OUT: "QUADRATIC_OUT",
-  QUADRATIC_IN_OUT: "QUADRATIC_IN_OUT",
-  CUBIC_IN: "CUBIC_IN",
-  CUBIC_OUT: "CUBIC_OUT",
-  CUBIC_IN_OUT: "CUBIC_IN_OUT",
-  QUARTIC_IN: "QUARTIC_IN",
-  QUARTIC_OUT: "QUARTIC_OUT",
-  QUARTIC_IN_OUT: "QUARTIC_IN_OUT",
-  QUINTIC_IN: "QUINTIC_IN",
-  QUINTIC_OUT: "QUINTIC_OUT",
-  QUINTIC_IN_OUT: "QUINTIC_IN_OUT",
-  SINUSOIDAL_IN: "SINUSOIDAL_IN",
-  SINUSOIDAL_OUT: "SINUSOIDAL_OUT",
-  SINUSOIDAL_IN_OUT: "SINUSOIDAL_IN_OUT",
-  EXPONENTIAL_IN: "EXPONENTIAL_IN",
-  EXPONENTIAL_OUT: "EXPONENTIAL_OUT",
-  EXPONENTIAL_IN_OUT: "EXPONENTIAL_IN_OUT",
-  CIRCULAR_IN: "CIRCULAR_IN",
-  CIRCULAR_OUT: "CIRCULAR_OUT",
-  CIRCULAR_IN_OUT: "CIRCULAR_IN_OUT",
-  ELASTIC_IN: "ELASTIC_IN",
-  ELASTIC_OUT: "ELASTIC_OUT",
-  ELASTIC_IN_OUT: "ELASTIC_IN_OUT",
-  BACK_IN: "BACK_IN",
-  BACK_OUT: "BACK_OUT",
-  BACK_IN_OUT: "BACK_IN_OUT",
-  BOUNCE_IN: "BOUNCE_IN",
-  BOUNCE_OUT: "BOUNCE_OUT",
-  BOUNCE_IN_OUT: "BOUNCE_IN_OUT",
-};
+export const enum CurveFunction {
+  BEZIER = 'BEZIER',
+  LINEAR = 'LINEAR',
+  QUADRATIC_IN = 'QUADRATIC_IN',
+  QUADRATIC_OUT = 'QUADRATIC_OUT',
+  QUADRATIC_IN_OUT = 'QUADRATIC_IN_OUT',
+  CUBIC_IN = 'CUBIC_IN',
+  CUBIC_OUT = 'CUBIC_OUT',
+  CUBIC_IN_OUT = 'CUBIC_IN_OUT',
+  QUARTIC_IN = 'QUARTIC_IN',
+  QUARTIC_OUT = 'QUARTIC_OUT',
+  QUARTIC_IN_OUT = 'QUARTIC_IN_OUT',
+  QUINTIC_IN = 'QUINTIC_IN',
+  QUINTIC_OUT = 'QUINTIC_OUT',
+  QUINTIC_IN_OUT = 'QUINTIC_IN_OUT',
+  SINUSOIDAL_IN = 'SINUSOIDAL_IN',
+  SINUSOIDAL_OUT = 'SINUSOIDAL_OUT',
+  SINUSOIDAL_IN_OUT = 'SINUSOIDAL_IN_OUT',
+  EXPONENTIAL_IN = 'EXPONENTIAL_IN',
+  EXPONENTIAL_OUT = 'EXPONENTIAL_OUT',
+  EXPONENTIAL_IN_OUT = 'EXPONENTIAL_IN_OUT',
+  CIRCULAR_IN = 'CIRCULAR_IN',
+  CIRCULAR_OUT = 'CIRCULAR_OUT',
+  CIRCULAR_IN_OUT = 'CIRCULAR_IN_OUT',
+  ELASTIC_IN = 'ELASTIC_IN',
+  ELASTIC_OUT = 'ELASTIC_OUT',
+  ELASTIC_IN_OUT = 'ELASTIC_IN_OUT',
+  BACK_IN = 'BACK_IN',
+  BACK_OUT = 'BACK_OUT',
+  BACK_IN_OUT = 'BACK_IN_OUT',
+  BOUNCE_IN = 'BOUNCE_IN',
+  BOUNCE_OUT = 'BOUNCE_OUT',
+  BOUNCE_IN_OUT = 'BOUNCE_IN_OUT',
+}
 
-const CurveFunctionMap = {
+const CurveFunctionMap: Partial<Record<CurveFunction, EasingFunction>> = {
   [CurveFunction.LINEAR]: Easing.Linear.None,
   [CurveFunction.QUADRATIC_IN]: Easing.Quadratic.In,
   [CurveFunction.QUADRATIC_OUT]: Easing.Quadratic.Out,
@@ -69,7 +69,9 @@ const CurveFunctionMap = {
   [CurveFunction.BOUNCE_IN_OUT]: Easing.Bounce.InOut,
 };
 
-export const getCurveFunction = (curveFunction) =>
-  typeof curveFunction === "function"
+export const getCurveFunction = (
+  curveFunction: EasingFunction | CurveFunction
+) =>
+  typeof curveFunction === 'function'
     ? curveFunction
     : CurveFunctionMap[curveFunction];

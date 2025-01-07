@@ -83,7 +83,7 @@ export const applyModifiers = ({
   curveModifiers.forEach(({ key, attributeKeys, startValueKeys }) => {
     const curveModifier = normalizedConfig[key];
     if (curveModifier.isActive) {
-      const multiplier = getCurveFunction(curveModifier.curveFunction)(
+      const multiplier = getCurveFunction(curveModifier!.curveFunction)!(
         particleLifetimePercentage
       );
       attributeKeys.forEach((attributeKey, index) => {
