@@ -15,9 +15,9 @@ export type Point3D = {
 };
 
 export type Transform = {
-  position?: Point3D;
-  rotation?: Point3D;
-  scale?: Point3D;
+  position?: THREE.Vector3;
+  rotation?: THREE.Vector3;
+  scale?: THREE.Vector3;
 };
 
 export type MinMaxNumber = {
@@ -126,16 +126,63 @@ export type ParticleSystemConfig = {
 
 export type NormalizedParticleSystemConfig = Required<ParticleSystemConfig>;
 
+export type GeneralData = {
+  creationTimes: Array<number>;
+  distanceFromLastEmitByDistance: number;
+  lastWorldPosition: THREE.Vector3;
+  currentWorldPosition: THREE.Vector3;
+  worldPositionChange: THREE.Vector3;
+  wrapperQuaternion: THREE.Quaternion;
+  lastWorldQuaternion: THREE.Quaternion;
+  worldQuaternion: THREE.Quaternion;
+  worldEuler: THREE.Euler;
+  gravityVelocity: THREE.Vector3;
+  startValues: Record<string, Array<number>>;
+  hasOrbitalVelocity: boolean;
+  orbitalVelocityData: Array<{
+    speed: THREE.Vector3;
+    positionOffset: THREE.Vector3;
+  }>;
+  lifetimeValues: Record<string, Array<number>>;
+  noise: Noise;
+  isEnabled: boolean;
+};
+
+export type ParticleSystemInstance = {
+  particleSystem: THREE.Points;
+  wrapper?: Gyroscope;
+  generalData: GeneralData;
+  onUpdate: (data: {
+    particleSystem: THREE.Points;
+    delta: number;
+    elapsed: number;
+    lifetime: number;
+    iterationCount: number;
+  }) => void;
+  onComplete: (data: { particleSystem: THREE.Points }) => void;
+  creationTime: number;
+  lastEmissionTime: number;
+  duration: number;
+  looping: boolean;
+  simulationSpace: SimulationSpace;
+  gravity: number;
+  emission: Emission;
+  normalizedConfig: NormalizedParticleSystemConfig;
+  iterationCount: number;
+  velocities: Array<THREE.Vector3>;
+  deactivateParticle: (particleIndex: number) => void;
+  activateParticle: (data: {
+    particleIndex: number;
+    activationTime: number;
+    position: Required<Point3D>;
+  }) => void;
+};
+
 export type ParticleSystem = {
-  instance: THREE.Object3D;
+  instance: THREE.Points | Gyroscope;
   resumeEmitter: () => void;
   pauseEmitter: () => void;
   dispose: () => void;
-};
-
-export type ParticleSystemWrapper = {
-  particleSystem: ParticleSystem;
-  wrapper: Gyroscope;
 };
 
 export type CycleData = {

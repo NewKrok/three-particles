@@ -24,16 +24,18 @@ import { applyModifiers } from './three-particles/three-particles-modifiers.js';
 import { createBezierCurveFunction } from './three-particles/three-particles-bezier.js';
 import {
   CycleData,
+  GeneralData,
   MinMaxNumber,
   Noise,
   NormalizedParticleSystemConfig,
   ParticleSystem,
   ParticleSystemConfig,
-  ParticleSystemWrapper,
+  ParticleSystemInstance,
+  Point3D,
   ShapeConfig,
 } from './types.js';
 
-let createdParticleSystems: Array<ParticleSystemWrapper | ParticleSystem> = [];
+let createdParticleSystems: Array<ParticleSystemInstance> = [];
 
 export const blendingMap = {
   'THREE.NoBlending': THREE.NoBlending,
@@ -173,7 +175,7 @@ const createFloat32Attributes = ({
   geometry: THREE.BufferGeometry;
   propertyName: string;
   maxParticles: number;
-  factory: ((index: number) => number) | number;
+  factory: ((value: never, index: number) => number) | number;
 }) => {
   geometry.setAttribute(
     propertyName,
@@ -287,22 +289,21 @@ const calculatePositionAndVelocity = (
   }
 };
 
-/**
- * @deprecated Since version 1.0.1. Will be deleted in version 1.1.0. Use particleSystem.dispose instead.
- */
-export const destroyParticleSystem = (particleSystem: ParticleSystem) => {
+const destroyParticleSystem = (particleSystem: THREE.Points) => {
   createdParticleSystems = createdParticleSystems.filter(
     ({ particleSystem: savedParticleSystem, wrapper }) => {
       if (
         savedParticleSystem !== particleSystem &&
-        wrapper !== particleSystem &&
-        particleSystem.instance !== particleSystem
+        wrapper !== particleSystem
       ) {
         return true;
       }
 
       savedParticleSystem.geometry.dispose();
-      savedParticleSystem.material.dispose();
+      if (Array.isArray(savedParticleSystem.material))
+        savedParticleSystem.material.forEach((material) => material.dispose());
+      else savedParticleSystem.material.dispose();
+
       if (savedParticleSystem.parent)
         savedParticleSystem.parent.remove(savedParticleSystem);
       return false;
@@ -315,27 +316,7 @@ export const createParticleSystem = (
   externalNow?: number
 ): ParticleSystem => {
   const now = externalNow || Date.now();
-  const generalData: {
-    creationTimes: Array<number>;
-    distanceFromLastEmitByDistance: number;
-    lastWorldPosition: THREE.Vector3;
-    currentWorldPosition: THREE.Vector3;
-    worldPositionChange: THREE.Vector3;
-    wrapperQuaternion: THREE.Quaternion;
-    lastWorldQuaternion: THREE.Quaternion;
-    worldQuaternion: THREE.Quaternion;
-    worldEuler: THREE.Euler;
-    gravityVelocity: THREE.Vector3;
-    startValues: Record<string, Array<number>>;
-    hasOrbitalVelocity: boolean;
-    orbitalVelocityData: Array<{
-      speed: THREE.Vector3;
-      positionOffset: THREE.Vector3;
-    }>;
-    lifetimeValues: Record<string, Array<number>>;
-    noise: Noise;
-    isEnabled: boolean;
-  } = {
+  const generalData: GeneralData = {
     distanceFromLastEmitByDistance: 0,
     lastWorldPosition: new THREE.Vector3(-99999),
     currentWorldPosition: new THREE.Vector3(-99999),
@@ -537,7 +518,7 @@ export const createParticleSystem = (
 
   const createFloat32AttributesRequest = (
     propertyName: string,
-    factory: ((index: number) => number) | number
+    factory: ((value: never, index: number) => number) | number
   ) => {
     createFloat32Attributes({
       geometry,
@@ -578,30 +559,38 @@ export const createParticleSystem = (
   createFloat32AttributesRequest(
     'colorR',
     () =>
-      startColor.min.r +
-      colorRandomRatio * (startColor.max.r - startColor.min.r)
+      startColor.min!.r! +
+      colorRandomRatio * (startColor.max!.r! - startColor.min!.r!)
   );
   createFloat32AttributesRequest(
     'colorG',
     () =>
-      startColor.min.g +
-      colorRandomRatio * (startColor.max.g - startColor.min.g)
+      startColor.min!.g! +
+      colorRandomRatio * (startColor.max!.g! - startColor.min!.g!)
   );
   createFloat32AttributesRequest(
     'colorB',
     () =>
-      startColor.min.b +
-      colorRandomRatio * (startColor.max.b - startColor.min.b)
+      startColor.min!.b! +
+      colorRandomRatio * (startColor.max!.b! - startColor.min!.b!)
   );
   createFloat32AttributesRequest('colorA', 0);
 
-  const deactivateParticle = (particleIndex) => {
+  const deactivateParticle = (particleIndex: number) => {
     geometry.attributes.isActive.array[particleIndex] = 0;
     geometry.attributes.colorA.array[particleIndex] = 0;
     geometry.attributes.colorA.needsUpdate = true;
   };
 
-  const activateParticle = ({ particleIndex, activationTime, position }) => {
+  const activateParticle = ({
+    particleIndex,
+    activationTime,
+    position,
+  }: {
+    particleIndex: number;
+    activationTime: number;
+    position: Required<Point3D>;
+  }) => {
     geometry.attributes.isActive.array[particleIndex] = 1;
     generalData.creationTimes[particleIndex] = activationTime;
 
@@ -611,39 +600,39 @@ export const createParticleSystem = (
     const colorRandomRatio = Math.random();
 
     geometry.attributes.colorR.array[particleIndex] =
-      startColor.min.r +
-      colorRandomRatio * (startColor.max.r - startColor.min.r);
+      startColor.min!.r! +
+      colorRandomRatio * (startColor.max!.r! - startColor.min!.r!);
     geometry.attributes.colorR.needsUpdate = true;
 
     geometry.attributes.colorG.array[particleIndex] =
-      startColor.min.g +
-      colorRandomRatio * (startColor.max.g - startColor.min.g);
+      startColor.min!.g! +
+      colorRandomRatio * (startColor.max!.g! - startColor.min!.g!);
     geometry.attributes.colorG.needsUpdate = true;
 
     geometry.attributes.colorB.array[particleIndex] =
-      startColor.min.b +
-      colorRandomRatio * (startColor.max.b - startColor.min.b);
+      startColor.min!.b! +
+      colorRandomRatio * (startColor.max!.b! - startColor.min!.b!);
     geometry.attributes.colorB.needsUpdate = true;
 
     geometry.attributes.startFrame.array[particleIndex] =
       THREE.MathUtils.randInt(
-        textureSheetAnimation.startFrame.min,
-        textureSheetAnimation.startFrame.max
+        textureSheetAnimation.startFrame!.min!,
+        textureSheetAnimation.startFrame!.max!
       );
     geometry.attributes.startFrame.needsUpdate = true;
 
     geometry.attributes.startLifetime.array[particleIndex] =
-      THREE.MathUtils.randFloat(startLifetime.min, startLifetime.max) * 1000;
+      THREE.MathUtils.randFloat(startLifetime.min!, startLifetime.max!) * 1000;
     geometry.attributes.startLifetime.needsUpdate = true;
 
     generalData.startValues.startSize[particleIndex] =
-      THREE.MathUtils.randFloat(startSize.min, startSize.max);
+      THREE.MathUtils.randFloat(startSize.min!, startSize.max!);
     generalData.startValues.startOpacity[particleIndex] =
-      THREE.MathUtils.randFloat(startOpacity.min, startOpacity.max);
+      THREE.MathUtils.randFloat(startOpacity.min!, startOpacity.max!);
 
     geometry.attributes.rotation.array[particleIndex] =
       THREE.MathUtils.degToRad(
-        THREE.MathUtils.randFloat(startRotation.min, startRotation.max)
+        THREE.MathUtils.randFloat(startRotation.min!, startRotation.max!)
       );
 
     if (normalizedConfig.rotationOverLifetime.isActive)
@@ -717,18 +706,17 @@ export const createParticleSystem = (
   };
 
   let particleSystem = new THREE.Points(geometry, material);
-  particleSystem.sortParticles = true;
 
-  particleSystem.position.copy(transform.position);
-  particleSystem.rotation.x = THREE.MathUtils.degToRad(transform.rotation.x);
-  particleSystem.rotation.y = THREE.MathUtils.degToRad(transform.rotation.y);
-  particleSystem.rotation.z = THREE.MathUtils.degToRad(transform.rotation.z);
-  particleSystem.scale.copy(transform.scale);
+  particleSystem.position.copy(transform!.position!);
+  particleSystem.rotation.x = THREE.MathUtils.degToRad(transform.rotation!.x);
+  particleSystem.rotation.y = THREE.MathUtils.degToRad(transform.rotation!.y);
+  particleSystem.rotation.z = THREE.MathUtils.degToRad(transform.rotation!.z);
+  particleSystem.scale.copy(transform.scale!);
 
   const calculatedCreationTime =
-    now + THREE.MathUtils.randFloat(startDelay.min, startDelay.max) * 1000;
+    now + THREE.MathUtils.randFloat(startDelay.min!, startDelay.max!) * 1000;
 
-  let wrapper: Gyroscope;
+  let wrapper: Gyroscope | undefined;
   if (normalizedConfig.simulationSpace === SimulationSpace.WORLD) {
     wrapper = new Gyroscope();
     wrapper.add(particleSystem);
