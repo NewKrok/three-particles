@@ -26,7 +26,6 @@ import {
   CycleData,
   GeneralData,
   MinMaxNumber,
-  Noise,
   NormalizedParticleSystemConfig,
   ParticleSystem,
   ParticleSystemConfig,
@@ -50,9 +49,9 @@ export const getDefaultParticleSystemConfig = () =>
 
 const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   transform: {
-    position: { x: 0, y: 0, z: 0 },
-    rotation: { x: 0, y: 0, z: 0 },
-    scale: { x: 1, y: 1, z: 1 },
+    position: new THREE.Vector3(),
+    rotation: new THREE.Vector3(),
+    scale: new THREE.Vector3(),
   },
   duration: 5.0,
   looping: true,
@@ -655,11 +654,11 @@ export const createParticleSystem = (
     );
     const positionIndex = Math.floor(particleIndex * 3);
     geometry.attributes.position.array[positionIndex] =
-      (position ? position.x : 0) + startPositions[particleIndex].x;
+      position.x + startPositions[particleIndex].x;
     geometry.attributes.position.array[positionIndex + 1] =
-      (position ? position.y : 0) + startPositions[particleIndex].y;
+      position.y + startPositions[particleIndex].y;
     geometry.attributes.position.array[positionIndex + 2] =
-      (position ? position.z : 0) + startPositions[particleIndex].z;
+      position.z + startPositions[particleIndex].z;
     geometry.attributes.position.needsUpdate = true;
 
     if (generalData.hasOrbitalVelocity) {
@@ -787,12 +786,22 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
       isEnabled,
     } = generalData;
 
-    if (wrapper) generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
+    if (wrapper?.parent)
+      generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
 
     const lastWorldPositionSnapshot = { ...lastWorldPosition };
 
     const lifetime = now - creationTime;
-    particleSystem.material.uniforms.elapsed.value = elapsed;
+
+    if (Array.isArray(particleSystem.material))
+      particleSystem.material.forEach((material) => {
+        if (material instanceof THREE.ShaderMaterial)
+          material.uniforms.elapsed.value = elapsed;
+      });
+    else {
+      if (particleSystem.material instanceof THREE.ShaderMaterial)
+        particleSystem.material.uniforms.elapsed.value = elapsed;
+    }
 
     particleSystem.getWorldPosition(currentWorldPosition);
     if (lastWorldPosition.x !== -99999) {
@@ -886,14 +895,14 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
     if (isEnabled && (looping || lifetime < duration * 1000)) {
       const emissionDelta = now - lastEmissionTime;
       const neededParticlesByTime = Math.floor(
-        emission.rateOverTime * (emissionDelta / 1000)
+        emission.rateOverTime! * (emissionDelta / 1000)
       );
       const neededParticlesByDistance =
-        emission.rateOverDistance > 0 &&
+        emission.rateOverDistance! > 0 &&
         generalData.distanceFromLastEmitByDistance > 0
           ? Math.floor(
               generalData.distanceFromLastEmitByDistance /
-                (1 / emission.rateOverDistance)
+                (1 / emission.rateOverDistance!)
             )
           : 0;
       const distanceStep =
@@ -912,7 +921,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
           : null;
       const neededParticles = neededParticlesByTime + neededParticlesByDistance;
 
-      if (emission.rateOverDistance > 0 && neededParticlesByDistance >= 1) {
+      if (emission.rateOverDistance! > 0 && neededParticlesByDistance >= 1) {
         generalData.distanceFromLastEmitByDistance = 0;
       }
 
@@ -936,16 +945,16 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
             particleIndex <
               particleSystem.geometry.attributes.isActive.array.length
           ) {
-            let position;
-            if (generatedParticlesByDistanceNeeds < neededParticlesByDistance) {
-              position =
-                generatedParticlesByDistanceNeeds < neededParticlesByDistance
-                  ? {
-                      x: distanceStep.x * generatedParticlesByDistanceNeeds,
-                      y: distanceStep.y * generatedParticlesByDistanceNeeds,
-                      z: distanceStep.z * generatedParticlesByDistanceNeeds,
-                    }
-                  : null;
+            let position: Required<Point3D> = { x: 0, y: 0, z: 0 };
+            if (
+              distanceStep &&
+              generatedParticlesByDistanceNeeds < neededParticlesByDistance
+            ) {
+              position = {
+                x: distanceStep.x * generatedParticlesByDistanceNeeds,
+                y: distanceStep.y * generatedParticlesByDistanceNeeds,
+                z: distanceStep.z * generatedParticlesByDistanceNeeds,
+              };
               generatedParticlesByDistanceNeeds++;
             }
             activateParticle({ particleIndex, activationTime: now, position });

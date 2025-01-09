@@ -120,7 +120,13 @@ export type ParticleSystemConfig = {
   rotationOverLifetime?: any;
   noise?: any;
   textureSheetAnimation?: TextureSheetAnimation;
-  onUpdate?: (particle: THREE.Object3D, cycleData: CycleData) => void;
+  onUpdate?: (data: {
+    particleSystem: THREE.Points;
+    delta: number;
+    elapsed: number;
+    lifetime: number;
+    iterationCount: number;
+  }) => void;
   onComplete?: () => void;
 };
 
