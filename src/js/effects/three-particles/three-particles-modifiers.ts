@@ -5,7 +5,7 @@ import {
   Noise,
   NormalizedParticleSystemConfig,
   ParticleSystemConfig,
-} from '../types.js';
+} from './types.js';
 
 const ROTATION_CONVERTER = THREE.MathUtils.radToDeg(1);
 const noiseInput = new THREE.Vector3(0, 0, 0);

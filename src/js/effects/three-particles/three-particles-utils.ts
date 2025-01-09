@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { EmitFrom } from './three-particles-enums.js';
-import { MinMaxNumber, Point3D } from '../types.js';
+import { MinMaxNumber, Point3D } from './types.js';
 
 export const calculateRandomPositionAndVelocityOnSphere = (
   position: THREE.Vector3,

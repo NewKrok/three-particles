@@ -5,7 +5,7 @@ import {
   Shape,
   SimulationSpace,
   TimeMode,
-} from './three-particles/three-particles-enums.js';
+} from './three-particles-enums.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 
 export type Point3D = {

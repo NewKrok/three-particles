@@ -5,23 +5,23 @@ import {
   Shape,
   SimulationSpace,
   TimeMode,
-} from './three-particles/three-particles-enums.js';
+} from './three-particles-enums.js';
 import {
   calculateRandomPositionAndVelocityOnBox,
   calculateRandomPositionAndVelocityOnCircle,
   calculateRandomPositionAndVelocityOnCone,
   calculateRandomPositionAndVelocityOnRectangle,
   calculateRandomPositionAndVelocityOnSphere,
-} from './three-particles/three-particles-utils.js';
+} from './three-particles-utils.js';
 
-import { CurveFunction } from './three-particles/three-particles-curves.js';
+import { CurveFunction } from './three-particles-curves.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { ObjectUtils } from '@newkrok/three-utils';
-import ParticleSystemFragmentShader from './three-particles/shaders/particle-system-fragment-shader.glsl.js';
-import ParticleSystemVertexShader from './three-particles/shaders/particle-system-vertex-shader.glsl.js';
-import { applyModifiers } from './three-particles/three-particles-modifiers.js';
-import { createBezierCurveFunction } from './three-particles/three-particles-bezier.js';
+import ParticleSystemFragmentShader from './shaders/particle-system-fragment-shader.glsl.js';
+import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.glsl.js';
+import { applyModifiers } from './three-particles-modifiers.js';
+import { createBezierCurveFunction } from './three-particles-bezier.js';
 import {
   CycleData,
   GeneralData,
@@ -33,6 +33,8 @@ import {
   Point3D,
   ShapeConfig,
 } from './types.js';
+
+export * from './types.js';
 
 let createdParticleSystems: Array<ParticleSystemInstance> = [];
 

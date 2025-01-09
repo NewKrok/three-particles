@@ -3,13 +3,23 @@
   "version": "2.0.0",
   "type": "module",
   "description": "Three.js-based high-performance particle system library designed for creating visually stunning particle effects with ease. Perfect for game developers and 3D applications.",
-  "main": "dist/three-particles.js",
-  "types": "dist/three-particles.d.ts",
+  "main": "dist/js/effects/three-particles/three-particles.js",
+  "types": "dist/js/effects/three-particles/three-particles.d.ts",
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
+  "exports": {
+    ".": {
+      "import": "./dist/js/effects/three-particles/index.js",
+      "types": "./dist/js/effects/three-particles/index.d.ts"
+    },
+    "./effects/three-particles": {
+      "import": "./dist/js/effects/three-particles/index.js",
+      "types": "./dist/js/effects/three-particles/index.d.ts"
+    }
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/NewKrok/three-particles.git"
