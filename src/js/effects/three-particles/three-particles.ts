@@ -53,7 +53,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   transform: {
     position: new THREE.Vector3(),
     rotation: new THREE.Vector3(),
-    scale: new THREE.Vector3(),
+    scale: new THREE.Vector3(1, 1, 1),
   },
   duration: 5.0,
   looping: true,
