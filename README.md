@@ -1,5 +1,11 @@
 # THREE Particles
 [![Run Tests](https://github.com/NewKrok/three-particles/actions/workflows/test.yml/badge.svg)](https://github.com/NewKrok/three-particles/actions/workflows/test.yml)
+[![NPM Version](https://img.shields.io/npm/v/@newkrok/three-particles.svg)](https://www.npmjs.com/package/@newkrok/three-particles)
+[![NPM Downloads](https://img.shields.io/npm/dw/@newkrok/three-particles.svg)](https://www.npmjs.com/package/@newkrok/three-particles)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@newkrok/three-particles)](https://bundlephobia.com/package/@newkrok/three-particles)
+
+
+
 
 Particle system for ThreeJS
 
