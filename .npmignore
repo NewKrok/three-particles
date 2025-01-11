@@ -1,0 +1,14 @@
+src/__tests__/
+*.test.ts
+
+coverage/
+*.log
+
+.vscode/
+.idea/
+.jest/
+.jest-cache/
+.jest-test-results.json
+
+jest.config.ts
+babel.config.json

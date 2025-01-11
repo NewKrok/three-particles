@@ -1,31 +1,21 @@
-# Node.js dependencies
-node_modules/
+coverage/
 
-# Output directories
-dist/
-build/
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# OS-specific files
-.DS_Store
-Thumbs.db
-
-# IDE/editor specific files
 .vscode/
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
+*.swp
 
-# Environment variables
-.env
+dist/
+node_modules/
+build/
+out/
+
+*.log
+
+.jest/
+.jest-cache/
+.jest-test-results.json
+
+.prettier-cache/
+.eslintcache
+
+tmp/
