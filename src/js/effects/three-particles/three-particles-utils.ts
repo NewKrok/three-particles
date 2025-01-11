@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 
 import { EmitFrom } from './three-particles-enums.js';
-import { MinMaxNumber, Point3D } from './types.js';
+import {
+  Constant,
+  MinMaxNumber,
+  Point3D,
+  RandomBetweenTwoConstants,
+} from './types.js';
 
 export const calculateRandomPositionAndVelocityOnSphere = (
   position: THREE.Vector3,
@@ -233,3 +238,10 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
   velocity.set(0, 0, randomizedSpeed);
   velocity.applyQuaternion(quaternion);
 };
+
+export const calculateValue = (
+  value: Constant | RandomBetweenTwoConstants
+): number =>
+  typeof value === 'number'
+    ? value
+    : THREE.MathUtils.randFloat(value.min ?? 0, value.max ?? 1);

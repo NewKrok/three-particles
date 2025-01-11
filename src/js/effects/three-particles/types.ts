@@ -8,6 +8,12 @@ import {
 } from './three-particles-enums.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 
+export type Constant = number;
+export type RandomBetweenTwoConstants = {
+  min?: number;
+  max?: number;
+};
+
 export type Point3D = {
   x?: number;
   y?: number;
@@ -100,7 +106,7 @@ export type ParticleSystemConfig = {
   transform?: Transform;
   duration?: number;
   looping?: boolean;
-  startDelay?: MinMaxNumber;
+  startDelay?: Constant | RandomBetweenTwoConstants;
   startLifetime?: MinMaxNumber;
   startSpeed?: MinMaxNumber;
   startSize?: MinMaxNumber;

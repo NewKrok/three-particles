@@ -12,3 +12,5 @@ coverage/
 
 jest.config.ts
 babel.config.json
+
+docs/

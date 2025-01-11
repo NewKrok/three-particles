@@ -12,6 +12,7 @@ import {
   calculateRandomPositionAndVelocityOnCone,
   calculateRandomPositionAndVelocityOnRectangle,
   calculateRandomPositionAndVelocityOnSphere,
+  calculateValue,
 } from './three-particles-utils.js';
 
 import { CurveFunction } from './three-particles-curves.js';
@@ -57,7 +58,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   },
   duration: 5.0,
   looping: true,
-  startDelay: { min: 0.0, max: 0.0 },
+  startDelay: 0,
   startLifetime: { min: 2.0, max: 2.0 },
   startSpeed: { min: 1.0, max: 1.0 },
   startSize: { min: 1.0, max: 1.0 },
@@ -341,7 +342,6 @@ export const createParticleSystem = (
     },
     isEnabled: true,
   };
-
   const normalizedConfig = ObjectUtils.patchObject(
     DEFAULT_PARTICLE_SYSTEM_CONFIG as NormalizedParticleSystemConfig,
     config
@@ -714,8 +714,7 @@ export const createParticleSystem = (
   particleSystem.rotation.z = THREE.MathUtils.degToRad(transform.rotation!.z);
   particleSystem.scale.copy(transform.scale!);
 
-  const calculatedCreationTime =
-    now + THREE.MathUtils.randFloat(startDelay.min!, startDelay.max!) * 1000;
+  const calculatedCreationTime = now + calculateValue(startDelay) * 1000;
 
   let wrapper: Gyroscope | undefined;
   if (normalizedConfig.simulationSpace === SimulationSpace.WORLD) {
