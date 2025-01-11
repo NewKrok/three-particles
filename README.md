@@ -1,4 +1,5 @@
 # THREE Particles
+[![Run Tests](https://github.com/NewKrok/three-particles/actions/workflows/test.yml/badge.svg)](https://github.com/NewKrok/three-particles/actions/workflows/test.yml)
 
 Particle system for ThreeJS
 
