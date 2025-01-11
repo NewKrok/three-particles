@@ -3,19 +3,16 @@ name: Generate and Deploy Typedoc
 on:
   push:
     branches:
-      - 2.0.0
+      - main
   pull_request:
     branches:
-      - 2.0.0
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Disable Jekyll
-        run: echo "" > docs/.nojekyll
-
       - name: Check out repository
         uses: actions/checkout@v3
 
@@ -29,6 +26,12 @@ jobs:
 
       - name: Generate Typedoc documentation
         run: npx typedoc
+
+      - name: Create docs directory if not exists
+        run: mkdir -p docs
+
+      - name: Disable Jekyll
+        run: echo "" > docs/.nojekyll
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
