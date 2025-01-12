@@ -8,7 +8,25 @@ import {
 } from './three-particles-enums.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 
+/**
+ * A fixed numerical value.
+ * Used for properties that require a constant value.
+ *
+ * @example
+ * const delay: Constant = 2; // Fixed delay of 2 seconds.
+ */
 export type Constant = number;
+
+/**
+ * An object that defines a range for random number generation.
+ * Contains `min` and `max` properties.
+ *
+ * @property min - The minimum value for the random range.
+ * @property max - The maximum value for the random range.
+ *
+ * @example
+ * const randomDelay: RandomBetweenTwoConstants = { min: 0.5, max: 2 }; // Random delay between 0.5 and 2 seconds.
+ */
 export type RandomBetweenTwoConstants = {
   min?: number;
   max?: number;
@@ -102,6 +120,17 @@ export type Noise = {
   offsets?: Array<number>;
 };
 
+/**
+ * Configuration object for the particle system.
+ *
+ * @property transform - Defines the position, rotation, and scale of the system.
+ * @property duration - Duration of the particle system in seconds. Must be a positive value.
+ * @default 0.5
+ * @property looping - Indicates whether the system should loop after finishing.
+ * @default true
+ * @property startDelay - The delay before the system starts emitting particles.
+ * @default 0
+ */
 export type ParticleSystemConfig = {
   transform?: Transform;
   /**
