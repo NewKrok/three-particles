@@ -122,59 +122,144 @@ export type Noise = {
 
 /**
  * Configuration object for the particle system.
- *
- * @property transform - Defines the position, rotation, and scale of the system.
- * @property duration - Duration of the particle system in seconds. Must be a positive value.
- * @default 0.5
- * @property looping - Indicates whether the system should loop after finishing.
- * @default true
- * @property startDelay - The delay before the system starts emitting particles.
- * @default 0
  */
 export type ParticleSystemConfig = {
+  /**
+   * Defines the position, rotation, and scale of the particle system.
+   */
   transform?: Transform;
+
   /**
    * Duration of the particle system in seconds.
-   * Only positive values are valid.
-   * Defines how long the system emits particles before stopping.
+   * Must be a positive value.
+   * @default 5.0
+   * @example
+   * const duration: number = 5; // System runs for 5 seconds.
    */
   duration?: number;
+
   /**
-   * Determines if the particle system should loop after finishing.
-   * - `true`: The system restarts after the `duration` ends.
-   * - `false`: Plays once and stops.
+   * Indicates whether the system should loop after finishing.
+   * @default true
+   * @example
+   * looping: true; // System loops continuously.
    */
   looping?: boolean;
+
   /**
    * Delay before the particle system starts emitting particles.
-   * - `Constant`: A fixed delay in seconds.
-   * - `RandomBetweenTwoConstants`: Generates a random delay between `min` and `max` values.
+   * Supports a fixed value (`Constant`) or a random range (`RandomBetweenTwoConstants`).
+   * @default 0
    * @example
-   * ```typescript
-   * startDelay: 2; // Fixed 2-second delay
-   * startDelay: { min: 0.5, max: 2 }; // Random delay between 0.5 and 2 seconds
-   * ```
+   * startDelay: 2; // Fixed 2-second delay.
+   * startDelay: { min: 0.5, max: 2 }; // Random delay between 0.5 and 2 seconds.
    */
   startDelay?: Constant | RandomBetweenTwoConstants;
+
+  /**
+   * Initial lifetime of the particles in seconds.
+   * @default 1
+   */
   startLifetime?: MinMaxNumber;
+
+  /**
+   * Initial speed of the particles.
+   * @default 1
+   */
   startSpeed?: MinMaxNumber;
+
+  /**
+   * Initial size of the particles.
+   * @default 1
+   */
   startSize?: MinMaxNumber;
+
+  /**
+   * Initial rotation of the particles in degrees.
+   * @default 0
+   */
   startRotation?: MinMaxNumber;
+
+  /**
+   * Initial color of the particles.
+   */
   startColor?: MinMaxColor;
+
+  /**
+   * Initial opacity of the particles.
+   * @default 1
+   */
   startOpacity?: MinMaxNumber;
+
+  /**
+   * Gravity affecting the particle system.
+   * @default 0
+   */
   gravity?: number;
+
+  /**
+   * Space where the simulation occurs (local or world).
+   */
   simulationSpace?: SimulationSpace;
+
+  /**
+   * Maximum number of particles in the system.
+   */
   maxParticles?: number;
+
+  /**
+   * Emission configuration for rate over time and distance.
+   */
   emission?: Emission;
+
+  /**
+   * Shape configuration for the particle emitter.
+   */
   shape?: ShapeConfig;
+
+  /**
+   * Texture for the particles.
+   */
   map?: THREE.Texture;
+
+  /**
+   * Renderer configuration for blending, transparency, and depth testing.
+   */
   renderer?: Renderer;
+
+  /**
+   * Defines how particle velocity changes over their lifetime.
+   */
   velocityOverLifetime?: any;
+
+  /**
+   * Defines how particle size changes over their lifetime.
+   */
   sizeOverLifetime?: any;
+
+  /**
+   * Defines how particle opacity changes over their lifetime.
+   */
   opacityOverLifetime?: any;
+
+  /**
+   * Defines how particle rotation changes over their lifetime.
+   */
   rotationOverLifetime?: any;
+
+  /**
+   * Noise configuration affecting position, rotation, and size.
+   */
   noise?: any;
+
+  /**
+   * Animation configuration for texture sheets.
+   */
   textureSheetAnimation?: TextureSheetAnimation;
+
+  /**
+   * Called on every update frame with data.
+   */
   onUpdate?: (data: {
     particleSystem: THREE.Points;
     delta: number;
@@ -182,6 +267,10 @@ export type ParticleSystemConfig = {
     lifetime: number;
     iterationCount: number;
   }) => void;
+
+  /**
+   * Called when the system completes an iteration.
+   */
   onComplete?: () => void;
 };
 
