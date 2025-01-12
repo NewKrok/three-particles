@@ -104,8 +104,28 @@ export type Noise = {
 
 export type ParticleSystemConfig = {
   transform?: Transform;
+  /**
+   * Duration of the particle system in seconds.
+   * Only positive values are valid.
+   * Defines how long the system emits particles before stopping.
+   */
   duration?: number;
+  /**
+   * Determines if the particle system should loop after finishing.
+   * - `true`: The system restarts after the `duration` ends.
+   * - `false`: Plays once and stops.
+   */
   looping?: boolean;
+  /**
+   * Delay before the particle system starts emitting particles.
+   * - `Constant`: A fixed delay in seconds.
+   * - `RandomBetweenTwoConstants`: Generates a random delay between `min` and `max` values.
+   * @example
+   * ```typescript
+   * startDelay: 2; // Fixed 2-second delay
+   * startDelay: { min: 0.5, max: 2 }; // Random delay between 0.5 and 2 seconds
+   * ```
+   */
   startDelay?: Constant | RandomBetweenTwoConstants;
   startLifetime?: MinMaxNumber;
   startSpeed?: MinMaxNumber;
