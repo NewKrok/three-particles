@@ -44,7 +44,7 @@ export const createBezierCurveFunction = (
       const n = stop - start;
       const calculatedPercentage =
         (percentage - (bezierPoints[start].percentage ?? 0)) /
-        ((bezierPoints[stop].percentage ?? 0) -
+        ((bezierPoints[stop].percentage ?? 1) -
           (bezierPoints[start].percentage ?? 0));
 
       let value = 0;

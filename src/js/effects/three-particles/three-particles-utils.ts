@@ -241,6 +241,7 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
   velocity.set(0, 0, randomizedSpeed);
   velocity.applyQuaternion(quaternion);
 };
+
 export const calculateValue = (
   particleSystemId: number,
   value: Constant | RandomBetweenTwoConstants | LifetimeCurve,
@@ -251,6 +252,9 @@ export const calculateValue = (
   }
 
   if ('min' in value && 'max' in value) {
+    if (value.min === value.max) {
+      return value.min ?? 0; // Constant value
+    }
     return THREE.MathUtils.randFloat(value.min ?? 0, value.max ?? 1); // Random range
   }
 
