@@ -21,3 +21,8 @@ export const enum TimeMode {
   LIFETIME = 'LIFETIME',
   FPS = 'FPS',
 }
+
+export const enum LifeTimeCurve {
+  BEZIER = 'BEZIER',
+  EASING = 'EASING',
+}

@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 
-import { EmitFrom } from './three-particles-enums.js';
+import { EmitFrom, LifeTimeCurve } from './three-particles-enums.js';
 import {
   Constant,
+  CurveFunction,
+  LifetimeCurve,
   MinMaxNumber,
   Point3D,
   RandomBetweenTwoConstants,
 } from './types.js';
+import { createBezierCurveFunction } from './three-particles-bezier.js';
 
 export const calculateRandomPositionAndVelocityOnSphere = (
   position: THREE.Vector3,
@@ -238,10 +241,33 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
   velocity.set(0, 0, randomizedSpeed);
   velocity.applyQuaternion(quaternion);
 };
-
 export const calculateValue = (
-  value: Constant | RandomBetweenTwoConstants
-): number =>
-  typeof value === 'number'
-    ? value
-    : THREE.MathUtils.randFloat(value.min ?? 0, value.max ?? 1);
+  particleSystemId: number,
+  value: Constant | RandomBetweenTwoConstants | LifetimeCurve,
+  time: number = 0
+): number => {
+  if (typeof value === 'number') {
+    return value; // Constant value
+  }
+
+  if ('min' in value && 'max' in value) {
+    return THREE.MathUtils.randFloat(value.min ?? 0, value.max ?? 1); // Random range
+  }
+
+  const lifeTimeCurve = value as LifetimeCurve;
+
+  if (lifeTimeCurve.type === LifeTimeCurve.BEZIER) {
+    return (
+      createBezierCurveFunction(
+        particleSystemId,
+        lifeTimeCurve.bezierPoints
+      )(time) * (lifeTimeCurve.scale ?? 1)
+    ); // Bézier curve
+  }
+
+  if (lifeTimeCurve.type === LifeTimeCurve.EASING) {
+    return lifeTimeCurve.curveFunction(time) * (lifeTimeCurve.scale ?? 1); // Easing curve
+  }
+
+  throw new Error('Unsupported value type');
+};

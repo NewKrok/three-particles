@@ -1,6 +1,7 @@
 import Easing, { EasingFunction } from 'easing-functions';
+import { CurveFunction } from './types.js';
 
-export const enum CurveFunction {
+export const enum CurveFunctionId {
   BEZIER = 'BEZIER',
   LINEAR = 'LINEAR',
   QUADRATIC_IN = 'QUADRATIC_IN',
@@ -35,43 +36,43 @@ export const enum CurveFunction {
   BOUNCE_IN_OUT = 'BOUNCE_IN_OUT',
 }
 
-const CurveFunctionMap: Partial<Record<CurveFunction, EasingFunction>> = {
-  [CurveFunction.LINEAR]: Easing.Linear.None,
-  [CurveFunction.QUADRATIC_IN]: Easing.Quadratic.In,
-  [CurveFunction.QUADRATIC_OUT]: Easing.Quadratic.Out,
-  [CurveFunction.QUADRATIC_IN_OUT]: Easing.Quadratic.InOut,
-  [CurveFunction.CUBIC_IN]: Easing.Cubic.In,
-  [CurveFunction.CUBIC_OUT]: Easing.Cubic.Out,
-  [CurveFunction.CUBIC_IN_OUT]: Easing.Cubic.InOut,
-  [CurveFunction.QUARTIC_IN]: Easing.Quartic.In,
-  [CurveFunction.QUARTIC_OUT]: Easing.Quartic.Out,
-  [CurveFunction.QUARTIC_IN_OUT]: Easing.Quartic.InOut,
-  [CurveFunction.QUINTIC_IN]: Easing.Quintic.In,
-  [CurveFunction.QUINTIC_OUT]: Easing.Quintic.Out,
-  [CurveFunction.QUINTIC_IN_OUT]: Easing.Quintic.InOut,
-  [CurveFunction.SINUSOIDAL_IN]: Easing.Sinusoidal.In,
-  [CurveFunction.SINUSOIDAL_OUT]: Easing.Sinusoidal.Out,
-  [CurveFunction.SINUSOIDAL_IN_OUT]: Easing.Sinusoidal.InOut,
-  [CurveFunction.EXPONENTIAL_IN]: Easing.Exponential.In,
-  [CurveFunction.EXPONENTIAL_OUT]: Easing.Exponential.Out,
-  [CurveFunction.EXPONENTIAL_IN_OUT]: Easing.Exponential.InOut,
-  [CurveFunction.CIRCULAR_IN]: Easing.Circular.In,
-  [CurveFunction.CIRCULAR_OUT]: Easing.Circular.Out,
-  [CurveFunction.CIRCULAR_IN_OUT]: Easing.Circular.InOut,
-  [CurveFunction.ELASTIC_IN]: Easing.Elastic.In,
-  [CurveFunction.ELASTIC_OUT]: Easing.Elastic.Out,
-  [CurveFunction.ELASTIC_IN_OUT]: Easing.Elastic.InOut,
-  [CurveFunction.BACK_IN]: Easing.Back.In,
-  [CurveFunction.BACK_OUT]: Easing.Back.Out,
-  [CurveFunction.BACK_IN_OUT]: Easing.Back.InOut,
-  [CurveFunction.BOUNCE_IN]: Easing.Bounce.In,
-  [CurveFunction.BOUNCE_OUT]: Easing.Bounce.Out,
-  [CurveFunction.BOUNCE_IN_OUT]: Easing.Bounce.InOut,
+const CurveFunctionIdMap: Partial<Record<CurveFunctionId, EasingFunction>> = {
+  [CurveFunctionId.LINEAR]: Easing.Linear.None,
+  [CurveFunctionId.QUADRATIC_IN]: Easing.Quadratic.In,
+  [CurveFunctionId.QUADRATIC_OUT]: Easing.Quadratic.Out,
+  [CurveFunctionId.QUADRATIC_IN_OUT]: Easing.Quadratic.InOut,
+  [CurveFunctionId.CUBIC_IN]: Easing.Cubic.In,
+  [CurveFunctionId.CUBIC_OUT]: Easing.Cubic.Out,
+  [CurveFunctionId.CUBIC_IN_OUT]: Easing.Cubic.InOut,
+  [CurveFunctionId.QUARTIC_IN]: Easing.Quartic.In,
+  [CurveFunctionId.QUARTIC_OUT]: Easing.Quartic.Out,
+  [CurveFunctionId.QUARTIC_IN_OUT]: Easing.Quartic.InOut,
+  [CurveFunctionId.QUINTIC_IN]: Easing.Quintic.In,
+  [CurveFunctionId.QUINTIC_OUT]: Easing.Quintic.Out,
+  [CurveFunctionId.QUINTIC_IN_OUT]: Easing.Quintic.InOut,
+  [CurveFunctionId.SINUSOIDAL_IN]: Easing.Sinusoidal.In,
+  [CurveFunctionId.SINUSOIDAL_OUT]: Easing.Sinusoidal.Out,
+  [CurveFunctionId.SINUSOIDAL_IN_OUT]: Easing.Sinusoidal.InOut,
+  [CurveFunctionId.EXPONENTIAL_IN]: Easing.Exponential.In,
+  [CurveFunctionId.EXPONENTIAL_OUT]: Easing.Exponential.Out,
+  [CurveFunctionId.EXPONENTIAL_IN_OUT]: Easing.Exponential.InOut,
+  [CurveFunctionId.CIRCULAR_IN]: Easing.Circular.In,
+  [CurveFunctionId.CIRCULAR_OUT]: Easing.Circular.Out,
+  [CurveFunctionId.CIRCULAR_IN_OUT]: Easing.Circular.InOut,
+  [CurveFunctionId.ELASTIC_IN]: Easing.Elastic.In,
+  [CurveFunctionId.ELASTIC_OUT]: Easing.Elastic.Out,
+  [CurveFunctionId.ELASTIC_IN_OUT]: Easing.Elastic.InOut,
+  [CurveFunctionId.BACK_IN]: Easing.Back.In,
+  [CurveFunctionId.BACK_OUT]: Easing.Back.Out,
+  [CurveFunctionId.BACK_IN_OUT]: Easing.Back.InOut,
+  [CurveFunctionId.BOUNCE_IN]: Easing.Bounce.In,
+  [CurveFunctionId.BOUNCE_OUT]: Easing.Bounce.Out,
+  [CurveFunctionId.BOUNCE_IN_OUT]: Easing.Bounce.InOut,
 };
 
 export const getCurveFunction = (
-  curveFunction: EasingFunction | CurveFunction
+  CurveFunctionId: EasingFunction | CurveFunction
 ) =>
-  typeof curveFunction === 'function'
-    ? curveFunction
-    : CurveFunctionMap[curveFunction];
+  typeof CurveFunctionId === 'function'
+    ? CurveFunctionId
+    : CurveFunctionIdMap[CurveFunctionId];

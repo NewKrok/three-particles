@@ -15,14 +15,17 @@ import {
   calculateValue,
 } from './three-particles-utils.js';
 
-import { CurveFunction } from './three-particles-curves.js';
+import { CurveFunctionId } from './three-particles-curves.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { ObjectUtils } from '@newkrok/three-utils';
 import ParticleSystemFragmentShader from './shaders/particle-system-fragment-shader.glsl.js';
 import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.glsl.js';
 import { applyModifiers } from './three-particles-modifiers.js';
-import { createBezierCurveFunction } from './three-particles-bezier.js';
+import {
+  createBezierCurveFunction,
+  removeBezierCurveFunction,
+} from './three-particles-bezier.js';
 import {
   CycleData,
   GeneralData,
@@ -37,6 +40,7 @@ import {
 
 export * from './types.js';
 
+let _particleSystemId = 0;
 let createdParticleSystems: Array<ParticleSystemInstance> = [];
 
 export const blendingMap = {
@@ -59,7 +63,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   duration: 5.0,
   looping: true,
   startDelay: 0,
-  startLifetime: { min: 2.0, max: 2.0 },
+  startLifetime: 5.0,
   startSpeed: { min: 1.0, max: 1.0 },
   startSize: { min: 1.0, max: 1.0 },
   startRotation: { min: 0.0, max: 0.0 },
@@ -127,7 +131,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   },
   sizeOverLifetime: {
     isActive: false,
-    curveFunction: CurveFunction.BEZIER,
+    curveFunction: CurveFunctionId.BEZIER,
     bezierPoints: [
       { x: 0, y: 0, percentage: 0 },
       { x: 1, y: 1, percentage: 1 },
@@ -135,11 +139,11 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   },
   /* colorOverLifetime: {
     isActive: false,
-    curveFunction: CurveFunction.LINEAR,
+    curveFunction: CurveFunctionId.LINEAR,
   }, */
   opacityOverLifetime: {
     isActive: false,
-    curveFunction: CurveFunction.BEZIER,
+    curveFunction: CurveFunctionId.BEZIER,
     bezierPoints: [
       { x: 0, y: 0, percentage: 0 },
       { x: 1, y: 1, percentage: 1 },
@@ -293,7 +297,11 @@ const calculatePositionAndVelocity = (
 
 const destroyParticleSystem = (particleSystem: THREE.Points) => {
   createdParticleSystems = createdParticleSystems.filter(
-    ({ particleSystem: savedParticleSystem, wrapper }) => {
+    ({
+      particleSystem: savedParticleSystem,
+      wrapper,
+      generalData: { particleSystemId },
+    }) => {
       if (
         savedParticleSystem !== particleSystem &&
         wrapper !== particleSystem
@@ -301,6 +309,7 @@ const destroyParticleSystem = (particleSystem: THREE.Points) => {
         return true;
       }
 
+      removeBezierCurveFunction(particleSystemId);
       savedParticleSystem.geometry.dispose();
       if (Array.isArray(savedParticleSystem.material))
         savedParticleSystem.material.forEach((material) => material.dispose());
@@ -319,6 +328,7 @@ export const createParticleSystem = (
 ): ParticleSystem => {
   const now = externalNow || Date.now();
   const generalData: GeneralData = {
+    particleSystemId: _particleSystemId++,
     distanceFromLastEmitByDistance: 0,
     lastWorldPosition: new THREE.Vector3(-99999),
     currentWorldPosition: new THREE.Vector3(-99999),
@@ -353,10 +363,11 @@ export const createParticleSystem = (
   bezierCompatibleProperties.forEach((key) => {
     if (
       normalizedConfig[key].isActive &&
-      normalizedConfig[key].curveFunction === CurveFunction.BEZIER &&
+      normalizedConfig[key].curveFunction === CurveFunctionId.BEZIER &&
       normalizedConfig[key].bezierPoints
     )
       normalizedConfig[key].curveFunction = createBezierCurveFunction(
+        generalData.particleSystemId,
         normalizedConfig[key].bezierPoints
       );
   });
@@ -531,8 +542,9 @@ export const createParticleSystem = (
 
   createFloat32AttributesRequest('isActive', 0);
   createFloat32AttributesRequest('lifetime', 0);
-  createFloat32AttributesRequest('startLifetime', () =>
-    THREE.MathUtils.randFloat(startLifetime.min ?? 0, startLifetime.max ?? 0)
+  createFloat32AttributesRequest(
+    'startLifetime',
+    () => calculateValue(generalData.particleSystemId, startLifetime, 0) * 1000
   );
   createFloat32AttributesRequest('startFrame', () =>
     THREE.MathUtils.randInt(
@@ -585,13 +597,20 @@ export const createParticleSystem = (
 
   const activateParticle = ({
     particleIndex,
+    normalizedLifetime,
     activationTime,
     position,
   }: {
     particleIndex: number;
+    normalizedLifetime: number;
     activationTime: number;
     position: Required<Point3D>;
   }) => {
+    const normalizedLifetimePercentage = Math.max(
+      Math.min(normalizedLifetime / (duration * 1000), 1),
+      0
+    );
+
     geometry.attributes.isActive.array[particleIndex] = 1;
     generalData.creationTimes[particleIndex] = activationTime;
 
@@ -623,7 +642,11 @@ export const createParticleSystem = (
     geometry.attributes.startFrame.needsUpdate = true;
 
     geometry.attributes.startLifetime.array[particleIndex] =
-      THREE.MathUtils.randFloat(startLifetime.min!, startLifetime.max!) * 1000;
+      calculateValue(
+        generalData.particleSystemId,
+        startLifetime,
+        normalizedLifetimePercentage
+      ) * 1000;
     geometry.attributes.startLifetime.needsUpdate = true;
 
     generalData.startValues.startSize[particleIndex] =
@@ -714,7 +737,8 @@ export const createParticleSystem = (
   particleSystem.rotation.z = THREE.MathUtils.degToRad(transform.rotation!.z);
   particleSystem.scale.copy(transform.scale!);
 
-  const calculatedCreationTime = now + calculateValue(startDelay) * 1000;
+  const calculatedCreationTime =
+    now + calculateValue(generalData.particleSystemId, startDelay) * 1000;
 
   let wrapper: Gyroscope | undefined;
   if (normalizedConfig.simulationSpace === SimulationSpace.WORLD) {
@@ -793,6 +817,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
     const lastWorldPositionSnapshot = { ...lastWorldPosition };
 
     const lifetime = now - creationTime;
+    const normalizedLifetime = lifetime % (duration * 1000);
 
     if (Array.isArray(particleSystem.material))
       particleSystem.material.forEach((material) => {
@@ -958,7 +983,12 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
               };
               generatedParticlesByDistanceNeeds++;
             }
-            activateParticle({ particleIndex, activationTime: now, position });
+            activateParticle({
+              particleIndex,
+              normalizedLifetime,
+              activationTime: now,
+              position,
+            });
             props.lastEmissionTime = now;
           }
         }
@@ -970,6 +1000,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
           delta,
           elapsed,
           lifetime,
+          normalizedLifetime,
           iterationCount: iterationCount + 1,
         });
     } else if (onComplete)

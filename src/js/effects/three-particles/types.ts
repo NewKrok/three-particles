@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import {
   EmitFrom,
+  LifeTimeCurve,
   Shape,
   SimulationSpace,
   TimeMode,
@@ -31,6 +32,73 @@ export type RandomBetweenTwoConstants = {
   min?: number;
   max?: number;
 };
+
+/**
+ * Base type for curves, containing common properties.
+ * @property scale - A scaling factor for the curve.
+ */
+export type CurveBase = {
+  scale?: number;
+};
+
+/**
+ * A function that defines how the value changes over time.
+ * @param time - A normalized value between 0 and 1 representing the progress of the curve.
+ * @returns The corresponding value based on the curve function.
+ */
+export type CurveFunction = (time: number) => number;
+
+/**
+ * A Bézier curve point representing a control point.
+ * @property x - The time (normalized between 0 and 1).
+ * @property y - The value at that point.
+ * @property percentage - (Optional) Normalized position within the curve (for additional flexibility).
+ */
+export type BezierPoint = {
+  x: number; // Time (0 to 1)
+  y: number; // Value
+  percentage?: number; // Optional normalized position
+};
+
+/**
+ * A Bézier curve representation for controlling particle properties.
+ * @property type - Specifies that this curve is of type `bezier`.
+ * @property bezierPoints - An array of control points defining the Bézier curve.
+ * @example
+ * {
+ *   type: LifeTimeCurve.BEZIER,
+ *   bezierPoints: [
+ *     { x: 0, y: 0.275, percentage: 0 },
+ *     { x: 0.1666, y: 0.4416 },
+ *     { x: 0.5066, y: 0.495, percentage: 0.5066 },
+ *     { x: 1, y: 1, percentage: 1 }
+ *   ]
+ * }
+ */
+export type BezierCurve = CurveBase & {
+  type: LifeTimeCurve.BEZIER;
+  bezierPoints: Array<BezierPoint>;
+};
+
+/**
+ * An easing curve representation using a custom function.
+ * @property type - Specifies that this curve is of type `easing`.
+ * @property curveFunction - A function defining how the value changes over time.
+ * @example
+ * {
+ *   type: LifeTimeCurve.EASING,
+ *   curveFunction: (time) => Math.sin(time * Math.PI) // Simple easing function
+ * }
+ */
+export type EasingCurve = CurveBase & {
+  type: LifeTimeCurve.EASING;
+  curveFunction: CurveFunction;
+};
+
+/**
+ * A flexible curve representation that supports Bézier curves and easing functions.
+ */
+export type LifetimeCurve = BezierCurve | EasingCurve;
 
 export type Point3D = {
   x?: number;
@@ -157,10 +225,29 @@ export type ParticleSystemConfig = {
   startDelay?: Constant | RandomBetweenTwoConstants;
 
   /**
-   * Initial lifetime of the particles in seconds.
-   * @default 1
+   * Initial lifetime of the particles.
+   * Supports constant value, random range, or curves (Bézier or easing).
+   * @default 5
+   * @example
+   * startLifetime: 3; // Constant 3 seconds.
+   * startLifetime: { min: 1, max: 4 }; // Random range between 1 and 4 seconds.
+   * startLifetime: {
+   *   type: LifeTimeCurve.BEZIER,
+   *   bezierPoints: [
+   *     { x: 0, y: 0.275, percentage: 0 },
+   *     { x: 0.5, y: 0.5 },
+   *     { x: 1, y: 1, percentage: 1 }
+   *   ],
+   *   scale: 2
+   * }; // Bézier curve example with scaling.
+   * startLifetime: {
+   *   type: LifeTimeCurve.EASING,
+   *   curveFunction: (time) => Math.sin(time * Math.PI),
+   *   scale: 0.5
+   * }; // Easing curve example with scaling.
    */
-  startLifetime?: MinMaxNumber;
+
+  startLifetime?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 
   /**
    * Initial speed of the particles.
@@ -277,6 +364,7 @@ export type ParticleSystemConfig = {
 export type NormalizedParticleSystemConfig = Required<ParticleSystemConfig>;
 
 export type GeneralData = {
+  particleSystemId: number;
   creationTimes: Array<number>;
   distanceFromLastEmitByDistance: number;
   lastWorldPosition: THREE.Vector3;
@@ -307,6 +395,7 @@ export type ParticleSystemInstance = {
     delta: number;
     elapsed: number;
     lifetime: number;
+    normalizedLifetime: number;
     iterationCount: number;
   }) => void;
   onComplete: (data: { particleSystem: THREE.Points }) => void;
@@ -323,6 +412,7 @@ export type ParticleSystemInstance = {
   deactivateParticle: (particleIndex: number) => void;
   activateParticle: (data: {
     particleIndex: number;
+    normalizedLifetime: number;
     activationTime: number;
     position: Required<Point3D>;
   }) => void;
