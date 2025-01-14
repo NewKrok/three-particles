@@ -77,3 +77,5 @@ export const removeBezierCurveFunction = (particleSystemId: number) => {
     if (entry.referencedBy.length === 0) cache.splice(index, 1);
   }
 };
+
+export const getBezierCacheSize = () => cache.length;
