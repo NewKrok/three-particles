@@ -71,8 +71,8 @@ const CurveFunctionIdMap: Partial<Record<CurveFunctionId, EasingFunction>> = {
 };
 
 export const getCurveFunction = (
-  CurveFunctionId: EasingFunction | CurveFunction
-) =>
-  typeof CurveFunctionId === 'function'
-    ? CurveFunctionId
-    : CurveFunctionIdMap[CurveFunctionId];
+  curveFunctionId: CurveFunctionId | CurveFunction
+): EasingFunction | CurveFunction =>
+  typeof curveFunctionId === 'function'
+    ? curveFunctionId
+    : CurveFunctionIdMap[curveFunctionId]!;

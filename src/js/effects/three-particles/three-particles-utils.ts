@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { EmitFrom, LifeTimeCurve } from './three-particles-enums.js';
 import {
   Constant,
-  CurveFunction,
   LifetimeCurve,
   MinMaxNumber,
   Point3D,

@@ -5,6 +5,61 @@ import {
   BezierCurve,
   EasingCurve,
 } from '../js/effects/three-particles/types.js';
+import { calculateRandomPositionAndVelocityOnSphere } from '../js/effects/three-particles/three-particles-utils.js';
+
+describe('calculateRandomPositionAndVelocityOnSphere', () => {
+  it('should calculate a random position on a sphere surface', () => {
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const velocity = new THREE.Vector3();
+
+    calculateRandomPositionAndVelocityOnSphere(
+      position,
+      quaternion,
+      velocity,
+      { min: 2, max: 5 },
+      { radius: 1, radiusThickness: 0, arc: 360 }
+    );
+
+    // The position should be normalized to the sphere radius.
+    expect(position.length()).toBeCloseTo(1);
+  });
+
+  it('should apply radius thickness correctly', () => {
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const velocity = new THREE.Vector3();
+
+    calculateRandomPositionAndVelocityOnSphere(
+      position,
+      quaternion,
+      velocity,
+      { min: 2, max: 5 },
+      { radius: 2, radiusThickness: 0.5, arc: 360 }
+    );
+
+    // The position length should be within the expected thickness range.
+    expect(position.length()).toBeLessThanOrEqual(2);
+    expect(position.length()).toBeGreaterThanOrEqual(1);
+  });
+
+  it('should calculate random velocity proportional to position', () => {
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const velocity = new THREE.Vector3();
+
+    calculateRandomPositionAndVelocityOnSphere(
+      position,
+      quaternion,
+      velocity,
+      { min: 2, max: 2 },
+      { radius: 1, radiusThickness: 0, arc: 360 }
+    );
+
+    // The velocity length should match the configured speed.
+    expect(velocity.length()).toBeCloseTo(2);
+  });
+});
 
 describe('calculateValue function tests', () => {
   it('returns the constant value', () => {
@@ -74,7 +129,7 @@ describe('calculateValue function tests', () => {
   });
 
   it('throws an error for unsupported value type', () => {
-    expect(() => calculateValue(1, {} as any)).toThrowError(
+    expect(() => calculateValue(1, {} as any)).toThrow(
       'Unsupported value type'
     );
   });
