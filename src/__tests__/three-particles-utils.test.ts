@@ -17,7 +17,7 @@ describe('calculateRandomPositionAndVelocityOnSphere', () => {
       position,
       quaternion,
       velocity,
-      { min: 2, max: 5 },
+      2,
       { radius: 1, radiusThickness: 0, arc: 360 }
     );
 
@@ -34,7 +34,7 @@ describe('calculateRandomPositionAndVelocityOnSphere', () => {
       position,
       quaternion,
       velocity,
-      { min: 2, max: 5 },
+      2,
       { radius: 2, radiusThickness: 0.5, arc: 360 }
     );
 
@@ -52,7 +52,7 @@ describe('calculateRandomPositionAndVelocityOnSphere', () => {
       position,
       quaternion,
       velocity,
-      { min: 2, max: 2 },
+      2,
       { radius: 1, radiusThickness: 0, arc: 360 }
     );
 

@@ -229,8 +229,13 @@ export type ParticleSystemConfig = {
    * Supports constant value, random range, or curves (Bézier or easing).
    * @default 5
    * @example
-   * startLifetime: 3; // Constant 3 seconds.
-   * startLifetime: { min: 1, max: 4 }; // Random range between 1 and 4 seconds.
+   * // Constant 3 seconds.
+   * startLifetime: 3;
+   *
+   * // Random range between 1 and 4 seconds.
+   * startLifetime: { min: 1, max: 4 };
+   *
+   * // Bézier curve example with scaling.
    * startLifetime: {
    *   type: LifeTimeCurve.BEZIER,
    *   bezierPoints: [
@@ -239,21 +244,48 @@ export type ParticleSystemConfig = {
    *     { x: 1, y: 1, percentage: 1 }
    *   ],
    *   scale: 2
-   * }; // Bézier curve example with scaling.
+   * };
+   *
+   * // Easing curve example with scaling.
    * startLifetime: {
    *   type: LifeTimeCurve.EASING,
    *   curveFunction: (time) => Math.sin(time * Math.PI),
    *   scale: 0.5
-   * }; // Easing curve example with scaling.
+   * };
    */
 
   startLifetime?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 
   /**
-   * Initial speed of the particles.
+   * Defines the initial speed of the particles.
+   * Supports constant values, random ranges, or curves (Bézier or easing).
    * @default 1
+   * @example
+   * // Constant value
+   * startSpeed: 3;
+   *
+   * // Random range
+   * startSpeed: { min: 1, max: 4 };
+   *
+   * // Bézier curve example with scaling.
+   * startSpeed: {
+   *   type: 'bezier',
+   *   bezierPoints: [
+   *     { x: 0, y: 0.275, percentage: 0 },
+   *     { x: 0.5, y: 0.5 },
+   *     { x: 1, y: 1, percentage: 1 }
+   *   ],
+   *   scale: 2
+   * };
+   *
+   * // Easing curve example with scaling.
+   * startSpeed: {
+   *   type: 'easing',
+   *   curveFunction: (time) => Math.sin(time * Math.PI),
+   *   scale: 1.5
+   * };
    */
-  startSpeed?: MinMaxNumber;
+  startSpeed?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 
   /**
    * Initial size of the particles.
@@ -365,6 +397,7 @@ export type NormalizedParticleSystemConfig = Required<ParticleSystemConfig>;
 
 export type GeneralData = {
   particleSystemId: number;
+  normalizedLifetimePercentage: number;
   creationTimes: Array<number>;
   distanceFromLastEmitByDistance: number;
   lastWorldPosition: THREE.Vector3;
@@ -412,7 +445,7 @@ export type ParticleSystemInstance = {
   deactivateParticle: (particleIndex: number) => void;
   activateParticle: (data: {
     particleIndex: number;
-    normalizedLifetime: number;
+    normalizedLifetimePercentage: number;
     activationTime: number;
     position: Required<Point3D>;
   }) => void;

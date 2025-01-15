@@ -14,7 +14,7 @@ export const calculateRandomPositionAndVelocityOnSphere = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,
   velocity: THREE.Vector3,
-  startSpeed: MinMaxNumber,
+  speed: number,
   {
     radius,
     radiusThickness,
@@ -45,15 +45,11 @@ export const calculateRandomPositionAndVelocityOnSphere = (
 
   position.applyQuaternion(quaternion);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min || 0,
-    startSpeed.max || 0
-  );
   const speedMultiplierByPosition = 1 / position.length();
   velocity.set(
-    position.x * speedMultiplierByPosition * randomizedSpeed,
-    position.y * speedMultiplierByPosition * randomizedSpeed,
-    position.z * speedMultiplierByPosition * randomizedSpeed
+    position.x * speedMultiplierByPosition * speed,
+    position.y * speedMultiplierByPosition * speed,
+    position.z * speedMultiplierByPosition * speed
   );
   velocity.applyQuaternion(quaternion);
 };
@@ -62,7 +58,7 @@ export const calculateRandomPositionAndVelocityOnCone = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,
   velocity: THREE.Vector3,
-  startSpeed: MinMaxNumber,
+  speed: number,
   {
     radius,
     radiusThickness,
@@ -98,21 +94,11 @@ export const calculateRandomPositionAndVelocityOnCone = (
   );
   const sinNormalizedAngle = Math.sin(normalizedAngle);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min || 0,
-    startSpeed.max || 0
-  );
   const speedMultiplierByPosition = 1 / positionLength;
   velocity.set(
-    position.x *
-      sinNormalizedAngle *
-      speedMultiplierByPosition *
-      randomizedSpeed,
-    position.y *
-      sinNormalizedAngle *
-      speedMultiplierByPosition *
-      randomizedSpeed,
-    Math.cos(normalizedAngle) * randomizedSpeed
+    position.x * sinNormalizedAngle * speedMultiplierByPosition * speed,
+    position.y * sinNormalizedAngle * speedMultiplierByPosition * speed,
+    Math.cos(normalizedAngle) * speed
   );
   velocity.applyQuaternion(quaternion);
 };
@@ -121,7 +107,7 @@ export const calculateRandomPositionAndVelocityOnBox = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,
   velocity: THREE.Vector3,
-  startSpeed: MinMaxNumber,
+  speed: number,
   { scale, emitFrom }: { scale: Point3D; emitFrom: EmitFrom }
 ) => {
   const _scale = scale as Required<Point3D>;
@@ -162,11 +148,7 @@ export const calculateRandomPositionAndVelocityOnBox = (
 
   position.applyQuaternion(quaternion);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min || 0,
-    startSpeed.max || 0
-  );
-  velocity.set(0, 0, randomizedSpeed);
+  velocity.set(0, 0, speed);
   velocity.applyQuaternion(quaternion);
 };
 
@@ -174,7 +156,7 @@ export const calculateRandomPositionAndVelocityOnCircle = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,
   velocity: THREE.Vector3,
-  startSpeed: MinMaxNumber,
+  speed: number,
   {
     radius,
     radiusThickness,
@@ -198,16 +180,11 @@ export const calculateRandomPositionAndVelocityOnCircle = (
 
   position.applyQuaternion(quaternion);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min || 0,
-    startSpeed.max || 0
-  );
-
   const positionLength = position.length();
   const speedMultiplierByPosition = 1 / positionLength;
   velocity.set(
-    position.x * speedMultiplierByPosition * randomizedSpeed,
-    position.y * speedMultiplierByPosition * randomizedSpeed,
+    position.x * speedMultiplierByPosition * speed,
+    position.y * speedMultiplierByPosition * speed,
     0
   );
   velocity.applyQuaternion(quaternion);
@@ -217,7 +194,7 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,
   velocity: THREE.Vector3,
-  startSpeed: MinMaxNumber,
+  speed: number,
   { rotation, scale }: { rotation: Point3D; scale: Point3D }
 ) => {
   const _scale = scale as Required<Point3D>;
@@ -233,11 +210,7 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
 
   position.applyQuaternion(quaternion);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min || 0,
-    startSpeed.max || 0
-  );
-  velocity.set(0, 0, randomizedSpeed);
+  velocity.set(0, 0, speed);
   velocity.applyQuaternion(quaternion);
 };
 

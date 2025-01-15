@@ -27,14 +27,17 @@ import {
   removeBezierCurveFunction,
 } from './three-particles-bezier.js';
 import {
+  Constant,
   CycleData,
   GeneralData,
+  LifetimeCurve,
   MinMaxNumber,
   NormalizedParticleSystemConfig,
   ParticleSystem,
   ParticleSystemConfig,
   ParticleSystemInstance,
   Point3D,
+  RandomBetweenTwoConstants,
   ShapeConfig,
 } from './types.js';
 
@@ -64,7 +67,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   looping: true,
   startDelay: 0,
   startLifetime: 5.0,
-  startSpeed: { min: 1.0, max: 1.0 },
+  startSpeed: 1.0,
   startSize: { min: 1.0, max: 1.0 },
   startRotation: { min: 0.0, max: 0.0 },
   startColor: {
@@ -198,10 +201,10 @@ const createFloat32Attributes = ({
 };
 
 const calculatePositionAndVelocity = (
+  generalData: GeneralData,
   { shape, sphere, cone, circle, rectangle, box }: ShapeConfig,
-  startSpeed: MinMaxNumber,
+  startSpeed: Constant | RandomBetweenTwoConstants | LifetimeCurve,
   position: THREE.Vector3,
-  quaternion: THREE.Quaternion,
   velocity: THREE.Vector3,
   velocityOverLifetime: {
     isActive: boolean;
@@ -212,13 +215,19 @@ const calculatePositionAndVelocity = (
     };
   }
 ) => {
+  const calculatedStartSpeed = calculateValue(
+    generalData.particleSystemId,
+    startSpeed,
+    generalData.normalizedLifetimePercentage
+  );
+
   switch (shape) {
     case Shape.SPHERE:
       calculateRandomPositionAndVelocityOnSphere(
         position,
-        quaternion,
+        generalData.wrapperQuaternion,
         velocity,
-        startSpeed,
+        calculatedStartSpeed,
         sphere as Required<NonNullable<ShapeConfig['sphere']>>
       );
       break;
@@ -226,9 +235,9 @@ const calculatePositionAndVelocity = (
     case Shape.CONE:
       calculateRandomPositionAndVelocityOnCone(
         position,
-        quaternion,
+        generalData.wrapperQuaternion,
         velocity,
-        startSpeed,
+        calculatedStartSpeed,
         cone as Required<NonNullable<ShapeConfig['cone']>>
       );
       break;
@@ -236,9 +245,9 @@ const calculatePositionAndVelocity = (
     case Shape.CIRCLE:
       calculateRandomPositionAndVelocityOnCircle(
         position,
-        quaternion,
+        generalData.wrapperQuaternion,
         velocity,
-        startSpeed,
+        calculatedStartSpeed,
         circle as Required<NonNullable<ShapeConfig['circle']>>
       );
       break;
@@ -246,9 +255,9 @@ const calculatePositionAndVelocity = (
     case Shape.RECTANGLE:
       calculateRandomPositionAndVelocityOnRectangle(
         position,
-        quaternion,
+        generalData.wrapperQuaternion,
         velocity,
-        startSpeed,
+        calculatedStartSpeed,
         rectangle as Required<NonNullable<ShapeConfig['rectangle']>>
       );
       break;
@@ -256,9 +265,9 @@ const calculatePositionAndVelocity = (
     case Shape.BOX:
       calculateRandomPositionAndVelocityOnBox(
         position,
-        quaternion,
+        generalData.wrapperQuaternion,
         velocity,
-        startSpeed,
+        calculatedStartSpeed,
         box as Required<NonNullable<ShapeConfig['box']>>
       );
       break;
@@ -329,6 +338,7 @@ export const createParticleSystem = (
   const now = externalNow || Date.now();
   const generalData: GeneralData = {
     particleSystemId: _particleSystemId++,
+    normalizedLifetimePercentage: 0,
     distanceFromLastEmitByDistance: 0,
     lastWorldPosition: new THREE.Vector3(-99999),
     currentWorldPosition: new THREE.Vector3(-99999),
@@ -514,10 +524,10 @@ export const createParticleSystem = (
 
   for (let i = 0; i < maxParticles; i++)
     calculatePositionAndVelocity(
+      generalData,
       shape,
       startSpeed,
       startPositions[i],
-      generalData.wrapperQuaternion,
       velocities[i],
       velocityOverLifetime
     );
@@ -597,20 +607,15 @@ export const createParticleSystem = (
 
   const activateParticle = ({
     particleIndex,
-    normalizedLifetime,
+    normalizedLifetimePercentage,
     activationTime,
     position,
   }: {
     particleIndex: number;
-    normalizedLifetime: number;
+    normalizedLifetimePercentage: number;
     activationTime: number;
     position: Required<Point3D>;
   }) => {
-    const normalizedLifetimePercentage = Math.max(
-      Math.min(normalizedLifetime / (duration * 1000), 1),
-      0
-    );
-
     geometry.attributes.isActive.array[particleIndex] = 1;
     generalData.creationTimes[particleIndex] = activationTime;
 
@@ -670,10 +675,10 @@ export const createParticleSystem = (
     geometry.attributes.colorB.needsUpdate = true;
 
     calculatePositionAndVelocity(
+      generalData,
       shape,
       startSpeed,
       startPositions[particleIndex],
-      generalData.wrapperQuaternion,
       velocities[particleIndex],
       velocityOverLifetime
     );
@@ -800,6 +805,14 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
       gravity,
     } = props;
 
+    const lifetime = now - creationTime;
+    const normalizedLifetime = lifetime % (duration * 1000);
+
+    generalData.normalizedLifetimePercentage = Math.max(
+      Math.min(normalizedLifetime / (duration * 1000), 1),
+      0
+    );
+
     const {
       lastWorldPosition,
       currentWorldPosition,
@@ -815,9 +828,6 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
       generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
 
     const lastWorldPositionSnapshot = { ...lastWorldPosition };
-
-    const lifetime = now - creationTime;
-    const normalizedLifetime = lifetime % (duration * 1000);
 
     if (Array.isArray(particleSystem.material))
       particleSystem.material.forEach((material) => {
@@ -985,7 +995,8 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
             }
             activateParticle({
               particleIndex,
-              normalizedLifetime,
+              normalizedLifetimePercentage:
+                generalData.normalizedLifetimePercentage,
               activationTime: now,
               position,
             });
