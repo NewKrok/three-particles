@@ -68,13 +68,13 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   startDelay: 0,
   startLifetime: 5.0,
   startSpeed: 1.0,
-  startSize: { min: 1.0, max: 1.0 },
+  startSize: 1.0,
+  startOpacity: 1.0,
   startRotation: { min: 0.0, max: 0.0 },
   startColor: {
     min: { r: 1.0, g: 1.0, b: 1.0 },
     max: { r: 1.0, g: 1.0, b: 1.0 },
   },
-  startOpacity: { min: 1.0, max: 1.0 },
   gravity: 0.0,
   simulationSpace: SimulationSpace.LOCAL,
   maxParticles: 100.0,
@@ -445,10 +445,7 @@ export const createParticleSystem = (
   ];
   startValueKeys.forEach((key) => {
     generalData.startValues[key] = Array.from({ length: maxParticles }, () =>
-      THREE.MathUtils.randFloat(
-        normalizedConfig[key].min,
-        normalizedConfig[key].max
-      )
+      calculateValue(generalData.particleSystemId, normalizedConfig[key], 0)
     );
   });
 
@@ -607,12 +604,10 @@ export const createParticleSystem = (
 
   const activateParticle = ({
     particleIndex,
-    normalizedLifetimePercentage,
     activationTime,
     position,
   }: {
     particleIndex: number;
-    normalizedLifetimePercentage: number;
     activationTime: number;
     position: Required<Point3D>;
   }) => {
@@ -650,14 +645,21 @@ export const createParticleSystem = (
       calculateValue(
         generalData.particleSystemId,
         startLifetime,
-        normalizedLifetimePercentage
+        generalData.normalizedLifetimePercentage
       ) * 1000;
     geometry.attributes.startLifetime.needsUpdate = true;
 
-    generalData.startValues.startSize[particleIndex] =
-      THREE.MathUtils.randFloat(startSize.min!, startSize.max!);
-    generalData.startValues.startOpacity[particleIndex] =
-      THREE.MathUtils.randFloat(startOpacity.min!, startOpacity.max!);
+    generalData.startValues.startSize[particleIndex] = calculateValue(
+      generalData.particleSystemId,
+      startSize,
+      generalData.normalizedLifetimePercentage
+    );
+
+    generalData.startValues.startOpacity[particleIndex] = calculateValue(
+      generalData.particleSystemId,
+      startOpacity,
+      generalData.normalizedLifetimePercentage
+    );
 
     geometry.attributes.rotation.array[particleIndex] =
       THREE.MathUtils.degToRad(
@@ -995,8 +997,6 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
             }
             activateParticle({
               particleIndex,
-              normalizedLifetimePercentage:
-                generalData.normalizedLifetimePercentage,
               activationTime: now,
               position,
             });

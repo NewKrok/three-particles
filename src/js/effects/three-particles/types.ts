@@ -227,7 +227,7 @@ export type ParticleSystemConfig = {
   /**
    * Initial lifetime of the particles.
    * Supports constant value, random range, or curves (Bézier or easing).
-   * @default 5
+   * @default 5.0
    * @example
    * // Constant 3 seconds.
    * startLifetime: 3;
@@ -259,7 +259,7 @@ export type ParticleSystemConfig = {
   /**
    * Defines the initial speed of the particles.
    * Supports constant values, random ranges, or curves (Bézier or easing).
-   * @default 1
+   * @default 1.0
    * @example
    * // Constant value
    * startSpeed: 3;
@@ -288,10 +288,66 @@ export type ParticleSystemConfig = {
   startSpeed?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 
   /**
-   * Initial size of the particles.
-   * @default 1
+   * Defines the initial size of the particles.
+   * Supports constant values, random ranges, or curves (Bézier or easing).
+   * @default 1.0
+   * @example
+   * // Constant value
+   * startSize: 3;
+   *
+   * // Random range
+   * startSize: { min: 1, max: 4 };
+   *
+   * // Bézier curve example with scaling.
+   * startSize: {
+   *   type: 'bezier',
+   *   bezierPoints: [
+   *     { x: 0, y: 0.275, percentage: 0 },
+   *     { x: 0.5, y: 0.5 },
+   *     { x: 1, y: 1, percentage: 1 }
+   *   ],
+   *   scale: 2
+   * };
+   *
+   * // Easing curve example with scaling.
+   * startSize: {
+   *   type: 'easing',
+   *   curveFunction: (time) => Math.sin(time * Math.PI),
+   *   scale: 1.5
+   * };
    */
-  startSize?: MinMaxNumber;
+  startSize?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+
+  /**
+   * Defines the initial opacity of the particles.
+   * Supports constant values, random ranges, or curves (Bézier or easing).
+   * @default 1.0
+   * @example
+   * // Constant value
+   * startOpacity: 3;
+   *
+   * // Random range
+   * startOpacity: { min: 1, max: 4 };
+   *
+   * // Bézier curve example with scaling.
+   * startOpacity: {
+   *   type: 'bezier',
+   *   bezierPoints: [
+   *     { x: 0, y: 0.275, percentage: 0 },
+   *     { x: 0.5, y: 0.5 },
+   *     { x: 1, y: 1, percentage: 1 }
+   *   ],
+   *   scale: 2
+   * };
+   *
+   * // Easing curve example with scaling.
+   * startOpacity: {
+   *   type: 'easing',
+   *   curveFunction: (time) => Math.sin(time * Math.PI),
+   *   scale: 1.5
+   * };
+   */
+  startOpacity?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 
   /**
    * Initial rotation of the particles in degrees.
@@ -303,12 +359,6 @@ export type ParticleSystemConfig = {
    * Initial color of the particles.
    */
   startColor?: MinMaxColor;
-
-  /**
-   * Initial opacity of the particles.
-   * @default 1
-   */
-  startOpacity?: MinMaxNumber;
 
   /**
    * Gravity affecting the particle system.
@@ -445,7 +495,6 @@ export type ParticleSystemInstance = {
   deactivateParticle: (particleIndex: number) => void;
   activateParticle: (data: {
     particleIndex: number;
-    normalizedLifetimePercentage: number;
     activationTime: number;
     position: Required<Point3D>;
   }) => void;
