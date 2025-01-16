@@ -350,10 +350,35 @@ export type ParticleSystemConfig = {
   startOpacity?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 
   /**
-   * Initial rotation of the particles in degrees.
-   * @default 0
+   * Defines the initial rotation of the particles in degrees.
+   * Supports constant values, random ranges, or curves (Bézier or easing).
+   * @default 0.0
+   * @example
+   * // Constant value
+   * startRotation: 3;
+   *
+   * // Random range
+   * startRotation: { min: 1, max: 4 };
+   *
+   * // Bézier curve example with scaling.
+   * startRotation: {
+   *   type: 'bezier',
+   *   bezierPoints: [
+   *     { x: 0, y: 0.275, percentage: 0 },
+   *     { x: 0.5, y: 0.5 },
+   *     { x: 1, y: 1, percentage: 1 }
+   *   ],
+   *   scale: 2
+   * };
+   *
+   * // Easing curve example with scaling.
+   * startRotation: {
+   *   type: 'easing',
+   *   curveFunction: (time) => Math.sin(time * Math.PI),
+   *   scale: 1.5
+   * };
    */
-  startRotation?: MinMaxNumber;
+  startRotation?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 
   /**
    * Initial color of the particles.

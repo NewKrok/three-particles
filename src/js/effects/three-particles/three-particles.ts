@@ -70,7 +70,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   startSpeed: 1.0,
   startSize: 1.0,
   startOpacity: 1.0,
-  startRotation: { min: 0.0, max: 0.0 },
+  startRotation: 0.0,
   startColor: {
     min: { r: 1.0, g: 1.0, b: 1.0 },
     max: { r: 1.0, g: 1.0, b: 1.0 },
@@ -560,12 +560,12 @@ export const createParticleSystem = (
     )
   );
 
-  createFloat32AttributesRequest('opacity', 0);
+  createFloat32AttributesRequest('opacity', () =>
+    calculateValue(generalData.particleSystemId, startOpacity, 0)
+  );
 
   createFloat32AttributesRequest('rotation', () =>
-    THREE.MathUtils.degToRad(
-      THREE.MathUtils.randFloat(startRotation.min ?? 0, startRotation.max ?? 0)
-    )
+    calculateValue(generalData.particleSystemId, startRotation, 0)
   );
 
   createFloat32AttributesRequest(
@@ -661,10 +661,11 @@ export const createParticleSystem = (
       generalData.normalizedLifetimePercentage
     );
 
-    geometry.attributes.rotation.array[particleIndex] =
-      THREE.MathUtils.degToRad(
-        THREE.MathUtils.randFloat(startRotation.min!, startRotation.max!)
-      );
+    geometry.attributes.rotation.array[particleIndex] = calculateValue(
+      generalData.particleSystemId,
+      startRotation,
+      generalData.normalizedLifetimePercentage
+    );
 
     if (normalizedConfig.rotationOverLifetime.isActive)
       generalData.lifetimeValues.rotationOverLifetime[particleIndex] =
