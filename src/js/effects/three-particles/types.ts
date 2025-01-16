@@ -128,9 +128,48 @@ export type MinMaxColor = {
   max?: Rgb;
 };
 
+/**
+ * Defines the emission behavior of the particles.
+ * Supports rates defined over time or distance using constant values, random ranges, or curves (Bézier or easing).
+ *
+ * @default
+ * rateOverTime: 10.0
+ * rateOverDistance: 0.0
+ *
+ * @example
+ * // Rate over time as a constant value
+ * rateOverTime: 10;
+ *
+ * // Rate over time as a random range
+ * rateOverTime: { min: 5, max: 15 };
+ *
+ * // Rate over time using a Bézier curve
+ * rateOverTime: {
+ *   type: 'bezier',
+ *   bezierPoints: [
+ *     { x: 0, y: 0, percentage: 0 },
+ *     { x: 0.5, y: 50 },
+ *     { x: 1, y: 100, percentage: 1 }
+ *   ],
+ *   scale: 1
+ * };
+ *
+ * // Rate over distance as a constant value
+ * rateOverDistance: 2;
+ *
+ * // Rate over distance as a random range
+ * rateOverDistance: { min: 1, max: 3 };
+ *
+ * // Rate over distance using an easing curve
+ * rateOverDistance: {
+ *   type: 'easing',
+ *   curveFunction: (distance) => Math.sin(distance),
+ *   scale: 0.5
+ * };
+ */
 export type Emission = {
-  rateOverTime?: number;
-  rateOverDistance?: number;
+  rateOverTime?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+  rateOverDistance?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 };
 
 export type ShapeConfig = {
@@ -385,10 +424,6 @@ export type ParticleSystemConfig = {
    */
   startColor?: MinMaxColor;
 
-  /**
-   * Gravity affecting the particle system.
-   * @default 0
-   */
   gravity?: number;
 
   /**

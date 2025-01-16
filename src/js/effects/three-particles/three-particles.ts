@@ -933,15 +933,29 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
 
     if (isEnabled && (looping || lifetime < duration * 1000)) {
       const emissionDelta = now - lastEmissionTime;
-      const neededParticlesByTime = Math.floor(
-        emission.rateOverTime! * (emissionDelta / 1000)
-      );
+      const neededParticlesByTime = emission.rateOverTime
+        ? Math.floor(
+            calculateValue(
+              generalData.particleSystemId,
+              emission.rateOverTime,
+              generalData.normalizedLifetimePercentage
+            ) *
+              (emissionDelta / 1000)
+          )
+        : 0;
+
+      const rateOverDistance = emission.rateOverDistance
+        ? calculateValue(
+            generalData.particleSystemId,
+            emission.rateOverDistance,
+            generalData.normalizedLifetimePercentage
+          )
+        : 0;
       const neededParticlesByDistance =
-        emission.rateOverDistance! > 0 &&
-        generalData.distanceFromLastEmitByDistance > 0
+        rateOverDistance > 0 && generalData.distanceFromLastEmitByDistance > 0
           ? Math.floor(
               generalData.distanceFromLastEmitByDistance /
-                (1 / emission.rateOverDistance!)
+                (1 / rateOverDistance!)
             )
           : 0;
       const distanceStep =
@@ -960,7 +974,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
           : null;
       const neededParticles = neededParticlesByTime + neededParticlesByDistance;
 
-      if (emission.rateOverDistance! > 0 && neededParticlesByDistance >= 1) {
+      if (rateOverDistance > 0 && neededParticlesByDistance >= 1) {
         generalData.distanceFromLastEmitByDistance = 0;
       }
 
@@ -974,7 +988,6 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
                 particleIndex = index;
                 return true;
               }
-
               return false;
             }
           );
