@@ -336,7 +336,7 @@ export type ParticleSystemConfig = {
   /**
    * Delay before the particle system starts emitting particles.
    * Supports a fixed value (`Constant`) or a random range (`RandomBetweenTwoConstants`).
-   * @default 0
+   * @default 0.0
    * @example
    * startDelay: 2; // Fixed 2-second delay.
    * startDelay: { min: 0.5, max: 2 }; // Random delay between 0.5 and 2 seconds.
@@ -372,7 +372,6 @@ export type ParticleSystemConfig = {
    *   scale: 0.5
    * };
    */
-
   startLifetime?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 
   /**
@@ -504,20 +503,67 @@ export type ParticleSystemConfig = {
    */
   startColor?: MinMaxColor;
 
-  gravity?: number;
+  /**
+   * Defines the gravity strength applied to particles.
+   * This value affects the downward acceleration of particles over time.
+   *
+   * @default 0.0
+   *
+   * @example
+   * // No gravity
+   * gravity: 0;
+   *
+   * // Moderate gravity
+   * gravity: 9.8; // Similar to Earth's gravity
+   *
+   * // Strong gravity
+   * gravity: 20.0;
+   */
+  gravity?: Constant;
 
   /**
-   * Space where the simulation occurs (local or world).
+   * Defines the simulation space in which particles are simulated.
+   * Determines whether the particles move relative to the local object space or the world space.
+   *
+   * @default SimulationSpace.LOCAL
+   *
+   * @example
+   * // Simulate particles in local space (default)
+   * simulationSpace: SimulationSpace.LOCAL;
+   *
+   * // Simulate particles in world space
+   * simulationSpace: SimulationSpace.WORLD;
    */
   simulationSpace?: SimulationSpace;
 
   /**
-   * Maximum number of particles in the system.
+   * Defines the maximum number of particles allowed in the system.
+   * This value limits the total number of active particles at any given time.
+   *
+   * @default 100.0
+   *
+   * @example
+   * // Default value
+   * maxParticles: 100.0;
+   *
+   * // Increase the maximum number of particles
+   * maxParticles: 500.0;
+   *
+   * // Limit to a small number of particles
+   * maxParticles: 10.0;
    */
-  maxParticles?: number;
+  maxParticles?: Constant;
 
   /**
-   * Emission configuration for rate over time and distance.
+   * Defines the particle emission settings.
+   * Configures the emission rate over time and distance.
+   *
+   * @see Emission
+   * @default
+   * emission: {
+   *   rateOverTime: 10.0,
+   *   rateOverDistance: 0.0,
+   * }
    */
   emission?: Emission;
 
@@ -527,7 +573,17 @@ export type ParticleSystemConfig = {
   shape?: ShapeConfig;
 
   /**
-   * Texture for the particles.
+   * Defines the texture used for rendering particles.
+   * This texture is applied to all particles in the system, and can be used to control their appearance.
+   *
+   * @default undefined
+   *
+   * @example
+   * // Using a predefined texture
+   * map: new THREE.TextureLoader().load('path/to/texture.png');
+   *
+   * // No texture (default behavior)
+   * map: undefined;
    */
   map?: THREE.Texture;
 
@@ -537,7 +593,24 @@ export type ParticleSystemConfig = {
   renderer?: Renderer;
 
   /**
-   * Defines how particle velocity changes over their lifetime.
+   * Defines the velocity settings of particles over their lifetime.
+   * Configures both linear and orbital velocity changes.
+   *
+   * @see VelocityOverLifetime
+   * @default
+   * velocityOverLifetime: {
+   *   isActive: false,
+   *   linear: {
+   *     x: 0,
+   *     y: 0,
+   *     z: 0,
+   *   },
+   *   orbital: {
+   *     x: 0,
+   *     y: 0,
+   *     z: 0,
+   *   },
+   * }
    */
   velocityOverLifetime?: VelocityOverLifetime;
 
@@ -562,7 +635,17 @@ export type ParticleSystemConfig = {
   noise?: any;
 
   /**
-   * Animation configuration for texture sheets.
+   * Configures the texture sheet animation settings for particles.
+   * Controls how textures are animated over the lifetime of particles.
+   *
+   * @see TextureSheetAnimation
+   * @default
+   * textureSheetAnimation: {
+   *   tiles: new THREE.Vector2(1.0, 1.0),
+   *   timeMode: TimeMode.LIFETIME,
+   *   fps: 30.0,
+   *   startFrame: 0,
+   * }
    */
   textureSheetAnimation?: TextureSheetAnimation;
 
