@@ -173,8 +173,8 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   textureSheetAnimation: {
     tiles: new THREE.Vector2(1.0, 1.0),
     timeMode: TimeMode.LIFETIME,
-    fps: 10.0,
-    startFrame: { min: 0.0, max: 0.0 },
+    fps: 30.0,
+    startFrame: 0,
   },
 };
 
@@ -595,16 +595,22 @@ export const createParticleSystem = (
   };
 
   createFloat32AttributesRequest('isActive', 0);
+
   createFloat32AttributesRequest('lifetime', 0);
+
   createFloat32AttributesRequest(
     'startLifetime',
     () => calculateValue(generalData.particleSystemId, startLifetime, 0) * 1000
   );
+
   createFloat32AttributesRequest('startFrame', () =>
-    THREE.MathUtils.randInt(
-      textureSheetAnimation.startFrame?.min ?? 0,
-      textureSheetAnimation.startFrame?.max ?? 0
-    )
+    textureSheetAnimation.startFrame
+      ? calculateValue(
+          generalData.particleSystemId,
+          textureSheetAnimation.startFrame,
+          0
+        )
+      : 0
   );
 
   createFloat32AttributesRequest('opacity', () =>
@@ -682,10 +688,13 @@ export const createParticleSystem = (
     geometry.attributes.colorB.needsUpdate = true;
 
     geometry.attributes.startFrame.array[particleIndex] =
-      THREE.MathUtils.randInt(
-        textureSheetAnimation.startFrame!.min!,
-        textureSheetAnimation.startFrame!.max!
-      );
+      textureSheetAnimation.startFrame
+        ? calculateValue(
+            generalData.particleSystemId,
+            textureSheetAnimation.startFrame,
+            0
+          )
+        : 0;
     geometry.attributes.startFrame.needsUpdate = true;
 
     geometry.attributes.startLifetime.array[particleIndex] =

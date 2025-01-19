@@ -112,11 +112,6 @@ export type Transform = {
   scale?: THREE.Vector3;
 };
 
-export type MinMaxNumber = {
-  min?: number;
-  max?: number;
-};
-
 export type Rgb = {
   r?: number;
   g?: number;
@@ -200,11 +195,38 @@ export type ShapeConfig = {
   };
 };
 
+/**
+ * Defines the texture sheet animation settings for particles.
+ * Allows configuring the animation frames, timing mode, frames per second, and the starting frame.
+ *
+ * @default
+ * tiles: new THREE.Vector2(1.0, 1.0)
+ * timeMode: TimeMode.LIFETIME
+ * fps: 30.0
+ * startFrame: 0
+ *
+ * @example
+ * // Basic configuration with default values
+ * textureSheetAnimation: {
+ *   tiles: new THREE.Vector2(1.0, 1.0),
+ *   timeMode: TimeMode.LIFETIME,
+ *   fps: 30.0,
+ *   startFrame: 0
+ * };
+ *
+ * // Custom configuration
+ * textureSheetAnimation: {
+ *   tiles: new THREE.Vector2(4, 4), // 4x4 grid of animation tiles
+ *   timeMode: TimeMode.SPEED,
+ *   fps: 60.0,
+ *   startFrame: { min: 0, max: 15 } // Random start frame between 0 and 15
+ * };
+ */
 export type TextureSheetAnimation = {
   tiles?: THREE.Vector2;
   timeMode?: TimeMode;
   fps?: number;
-  startFrame?: MinMaxNumber;
+  startFrame?: Constant | RandomBetweenTwoConstants;
 };
 
 export type Renderer = {
