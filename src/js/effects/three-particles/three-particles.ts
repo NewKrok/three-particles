@@ -13,6 +13,8 @@ import {
   calculateRandomPositionAndVelocityOnRectangle,
   calculateRandomPositionAndVelocityOnSphere,
   calculateValue,
+  getCurveFunctionFromConfig,
+  isLifeTimeCurve,
 } from './three-particles-utils.js';
 
 import { CurveFunctionId } from './three-particles-curves.js';
@@ -28,10 +30,10 @@ import {
 } from './three-particles-bezier.js';
 import {
   Constant,
+  CurveFunction,
   CycleData,
   GeneralData,
   LifetimeCurve,
-  MinMaxNumber,
   NormalizedParticleSystemConfig,
   ParticleSystem,
   ParticleSystemConfig,
@@ -39,6 +41,7 @@ import {
   Point3D,
   RandomBetweenTwoConstants,
   ShapeConfig,
+  VelocityOverLifetime,
 } from './types.js';
 
 export * from './types.js';
@@ -122,14 +125,14 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   velocityOverLifetime: {
     isActive: false,
     linear: {
-      x: { min: 0, max: 0 },
-      y: { min: 0, max: 0 },
-      z: { min: 0, max: 0 },
+      x: 0,
+      y: 0,
+      z: 0,
     },
     orbital: {
-      x: { min: 0, max: 0 },
-      y: { min: 0, max: 0 },
-      z: { min: 0, max: 0 },
+      x: 0,
+      y: 0,
+      z: 0,
     },
   },
   sizeOverLifetime: {
@@ -205,15 +208,7 @@ const calculatePositionAndVelocity = (
   { shape, sphere, cone, circle, rectangle, box }: ShapeConfig,
   startSpeed: Constant | RandomBetweenTwoConstants | LifetimeCurve,
   position: THREE.Vector3,
-  velocity: THREE.Vector3,
-  velocityOverLifetime: {
-    isActive: boolean;
-    linear: {
-      x: MinMaxNumber;
-      y: MinMaxNumber;
-      z: MinMaxNumber;
-    };
-  }
+  velocity: THREE.Vector3
 ) => {
   const calculatedStartSpeed = calculateValue(
     generalData.particleSystemId,
@@ -272,36 +267,6 @@ const calculatePositionAndVelocity = (
       );
       break;
   }
-
-  if (velocityOverLifetime.isActive) {
-    if (
-      velocityOverLifetime.linear.x.min !== 0 ||
-      velocityOverLifetime.linear.x.max !== 0
-    ) {
-      velocity.x += THREE.MathUtils.randFloat(
-        velocityOverLifetime.linear.x.min || 0,
-        velocityOverLifetime.linear.x.max || 0
-      );
-    }
-    if (
-      velocityOverLifetime.linear.y.min !== 0 ||
-      velocityOverLifetime.linear.y.max !== 0
-    ) {
-      velocity.y += THREE.MathUtils.randFloat(
-        velocityOverLifetime.linear.y.min || 0,
-        velocityOverLifetime.linear.y.max || 0
-      );
-    }
-    if (
-      velocityOverLifetime.linear.z.min !== 0 ||
-      velocityOverLifetime.linear.z.max !== 0
-    ) {
-      velocity.z += THREE.MathUtils.randFloat(
-        velocityOverLifetime.linear.z.min || 0,
-        velocityOverLifetime.linear.z.max || 0
-      );
-    }
-  }
 };
 
 const destroyParticleSystem = (particleSystem: THREE.Points) => {
@@ -349,8 +314,8 @@ export const createParticleSystem = (
     worldEuler: new THREE.Euler(),
     gravityVelocity: new THREE.Vector3(0, 0, 0),
     startValues: {},
-    hasOrbitalVelocity: false,
-    orbitalVelocityData: [],
+    linearVelocityData: undefined,
+    orbitalVelocityData: undefined,
     lifetimeValues: {},
     creationTimes: [],
     noise: {
@@ -420,20 +385,103 @@ export const createParticleSystem = (
   );
 
   generalData.creationTimes = Array.from({ length: maxParticles }, () => 0);
-  generalData.hasOrbitalVelocity =
-    normalizedConfig.velocityOverLifetime.isActive &&
-    (normalizedConfig.velocityOverLifetime.orbital.x.min !== 0 ||
-      normalizedConfig.velocityOverLifetime.orbital.x.max !== 0 ||
-      normalizedConfig.velocityOverLifetime.orbital.y.min !== 0 ||
-      normalizedConfig.velocityOverLifetime.orbital.y.max !== 0 ||
-      normalizedConfig.velocityOverLifetime.orbital.z.min !== 0 ||
-      normalizedConfig.velocityOverLifetime.orbital.z.max !== 0);
 
-  if (generalData.hasOrbitalVelocity) {
+  if (velocityOverLifetime.isActive) {
+    generalData.linearVelocityData = Array.from(
+      { length: maxParticles },
+      () => ({
+        speed: new THREE.Vector3(
+          velocityOverLifetime.linear.x
+            ? calculateValue(
+                generalData.particleSystemId,
+                velocityOverLifetime.linear.x,
+                0
+              )
+            : 0,
+          velocityOverLifetime.linear.y
+            ? calculateValue(
+                generalData.particleSystemId,
+                velocityOverLifetime.linear.y,
+                0
+              )
+            : 0,
+          velocityOverLifetime.linear.z
+            ? calculateValue(
+                generalData.particleSystemId,
+                velocityOverLifetime.linear.z,
+                0
+              )
+            : 0
+        ),
+        valueModifiers: {
+          x: isLifeTimeCurve(velocityOverLifetime.linear.x || 0)
+            ? getCurveFunctionFromConfig(
+                generalData.particleSystemId,
+                velocityOverLifetime.linear.x as LifetimeCurve
+              )
+            : undefined,
+          y: isLifeTimeCurve(velocityOverLifetime.linear.y || 0)
+            ? getCurveFunctionFromConfig(
+                generalData.particleSystemId,
+                velocityOverLifetime.linear.y as LifetimeCurve
+              )
+            : undefined,
+          z: isLifeTimeCurve(velocityOverLifetime.linear.z || 0)
+            ? getCurveFunctionFromConfig(
+                generalData.particleSystemId,
+                velocityOverLifetime.linear.z as LifetimeCurve
+              )
+            : undefined,
+        },
+      })
+    );
+
     generalData.orbitalVelocityData = Array.from(
       { length: maxParticles },
       () => ({
-        speed: new THREE.Vector3(),
+        speed: new THREE.Vector3(
+          velocityOverLifetime.orbital.x
+            ? calculateValue(
+                generalData.particleSystemId,
+                velocityOverLifetime.orbital.x,
+                0
+              )
+            : 0,
+          velocityOverLifetime.orbital.y
+            ? calculateValue(
+                generalData.particleSystemId,
+                velocityOverLifetime.orbital.y,
+                0
+              )
+            : 0,
+          velocityOverLifetime.orbital.z
+            ? calculateValue(
+                generalData.particleSystemId,
+                velocityOverLifetime.orbital.z,
+                0
+              )
+            : 0
+        ),
+        valueModifiers: {
+          x: isLifeTimeCurve(velocityOverLifetime.orbital.x || 0)
+            ? getCurveFunctionFromConfig(
+                generalData.particleSystemId,
+                velocityOverLifetime.orbital.x as LifetimeCurve
+              )
+            : undefined,
+          y: isLifeTimeCurve(velocityOverLifetime.orbital.y || 0)
+            ? getCurveFunctionFromConfig(
+                generalData.particleSystemId,
+                velocityOverLifetime.orbital.y as LifetimeCurve
+              )
+            : undefined,
+          z: isLifeTimeCurve(velocityOverLifetime.orbital.z || 0)
+            ? getCurveFunctionFromConfig(
+                generalData.particleSystemId,
+                velocityOverLifetime.orbital.z as LifetimeCurve
+              )
+            : undefined,
+        },
         positionOffset: new THREE.Vector3(),
       })
     );
@@ -525,8 +573,7 @@ export const createParticleSystem = (
       shape,
       startSpeed,
       startPositions[i],
-      velocities[i],
-      velocityOverLifetime
+      velocities[i]
     );
 
   geometry.setFromPoints(
@@ -682,8 +729,7 @@ export const createParticleSystem = (
       shape,
       startSpeed,
       startPositions[particleIndex],
-      velocities[particleIndex],
-      velocityOverLifetime
+      velocities[particleIndex]
     );
     const positionIndex = Math.floor(particleIndex * 3);
     geometry.attributes.position.array[positionIndex] =
@@ -694,23 +740,55 @@ export const createParticleSystem = (
       position.z + startPositions[particleIndex].z;
     geometry.attributes.position.needsUpdate = true;
 
-    if (generalData.hasOrbitalVelocity) {
+    if (generalData.linearVelocityData) {
+      generalData.linearVelocityData[particleIndex].speed.set(
+        normalizedConfig.velocityOverLifetime.linear.x
+          ? calculateValue(
+              generalData.particleSystemId,
+              normalizedConfig.velocityOverLifetime.linear.x,
+              0
+            )
+          : 0,
+        normalizedConfig.velocityOverLifetime.linear.y
+          ? calculateValue(
+              generalData.particleSystemId,
+              normalizedConfig.velocityOverLifetime.linear.y,
+              0
+            )
+          : 0,
+        normalizedConfig.velocityOverLifetime.linear.z
+          ? calculateValue(
+              generalData.particleSystemId,
+              normalizedConfig.velocityOverLifetime.linear.z,
+              0
+            )
+          : 0
+      );
+    }
+
+    if (generalData.orbitalVelocityData) {
       generalData.orbitalVelocityData[particleIndex].speed.set(
-        THREE.MathUtils.randFloat(
-          normalizedConfig.velocityOverLifetime.orbital.x.min,
-          normalizedConfig.velocityOverLifetime.orbital.x.max
-        ) *
-          (Math.PI / 180),
-        THREE.MathUtils.randFloat(
-          normalizedConfig.velocityOverLifetime.orbital.y.min,
-          normalizedConfig.velocityOverLifetime.orbital.y.max
-        ) *
-          (Math.PI / 180),
-        THREE.MathUtils.randFloat(
-          normalizedConfig.velocityOverLifetime.orbital.z.min,
-          normalizedConfig.velocityOverLifetime.orbital.z.max
-        ) *
-          (Math.PI / 180)
+        normalizedConfig.velocityOverLifetime.orbital.x
+          ? calculateValue(
+              generalData.particleSystemId,
+              normalizedConfig.velocityOverLifetime.orbital.x,
+              0
+            )
+          : 0,
+        normalizedConfig.velocityOverLifetime.orbital.y
+          ? calculateValue(
+              generalData.particleSystemId,
+              normalizedConfig.velocityOverLifetime.orbital.y,
+              0
+            )
+          : 0,
+        normalizedConfig.velocityOverLifetime.orbital.z
+          ? calculateValue(
+              generalData.particleSystemId,
+              normalizedConfig.velocityOverLifetime.orbital.z,
+              0
+            )
+          : 0
       );
       generalData.orbitalVelocityData[particleIndex].positionOffset.set(
         startPositions[particleIndex].x,
@@ -727,7 +805,7 @@ export const createParticleSystem = (
       noise: generalData.noise,
       startValues: generalData.startValues,
       lifetimeValues: generalData.lifetimeValues,
-      hasOrbitalVelocity: generalData.hasOrbitalVelocity,
+      linearVelocityData: generalData.linearVelocityData,
       orbitalVelocityData: generalData.orbitalVelocityData,
       normalizedConfig,
       attributes: particleSystem.geometry.attributes,
@@ -920,7 +998,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
             noise: generalData.noise,
             startValues: generalData.startValues,
             lifetimeValues: generalData.lifetimeValues,
-            hasOrbitalVelocity: generalData.hasOrbitalVelocity,
+            linearVelocityData: generalData.linearVelocityData,
             orbitalVelocityData: generalData.orbitalVelocityData,
             normalizedConfig,
             attributes: particleSystem.geometry.attributes,

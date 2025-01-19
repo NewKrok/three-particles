@@ -228,6 +228,64 @@ export type Noise = {
 };
 
 /**
+ * Defines the velocity of particles over their lifetime, allowing for linear and orbital velocity (in degrees) adjustments.
+ * Supports constant values, random ranges, or curves (Bézier or easing) for each axis.
+ *
+ * @default
+ * isActive: false
+ * linear: { x: 0.0, y: 0.0, z: 0.0 }
+ * orbital: { x: 0.0, y: 0.0, z: 0.0 }
+ *
+ * @example
+ * // Linear velocity with a constant value
+ * linear: { x: 1, y: 0, z: -0.5 };
+ *
+ * // Linear velocity with random ranges
+ * linear: {
+ *   x: { min: -1, max: 1 },
+ *   y: { min: 0, max: 2 }
+ * };
+ *
+ * // Linear velocity using a Bézier curve
+ * linear: {
+ *   z: {
+ *     type: 'bezier',
+ *     bezierPoints: [
+ *       { x: 0, y: 0, percentage: 0 },
+ *       { x: 0.5, y: 2 },
+ *       { x: 1, y: 10, percentage: 1 }
+ *     ],
+ *     scale: 2
+ *   }
+ * };
+ *
+ * // Orbital velocity with a constant value
+ * orbital: { x: 3, y: 5, z: 0 };
+ *
+ * // Orbital velocity using an easing curve
+ * orbital: {
+ *   x: {
+ *     type: 'easing',
+ *     curveFunction: (time) => Math.sin(time * Math.PI),
+ *     scale: 1.5
+ *   }
+ * };
+ */
+export type VelocityOverLifetime = {
+  isActive: boolean;
+  linear: {
+    x?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+    y?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+    z?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+  };
+  orbital: {
+    x?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+    y?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+    z?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+  };
+};
+
+/**
  * Configuration object for the particle system.
  */
 export type ParticleSystemConfig = {
@@ -459,7 +517,7 @@ export type ParticleSystemConfig = {
   /**
    * Defines how particle velocity changes over their lifetime.
    */
-  velocityOverLifetime?: any;
+  velocityOverLifetime?: VelocityOverLifetime;
 
   /**
    * Defines how particle size changes over their lifetime.
@@ -519,10 +577,22 @@ export type GeneralData = {
   worldEuler: THREE.Euler;
   gravityVelocity: THREE.Vector3;
   startValues: Record<string, Array<number>>;
-  hasOrbitalVelocity: boolean;
-  orbitalVelocityData: Array<{
+  linearVelocityData?: Array<{
+    speed: THREE.Vector3;
+    valueModifiers: {
+      x?: CurveFunction;
+      y?: CurveFunction;
+      z?: CurveFunction;
+    };
+  }>;
+  orbitalVelocityData?: Array<{
     speed: THREE.Vector3;
     positionOffset: THREE.Vector3;
+    valueModifiers: {
+      x?: CurveFunction;
+      y?: CurveFunction;
+      z?: CurveFunction;
+    };
   }>;
   lifetimeValues: Record<string, Array<number>>;
   noise: Noise;

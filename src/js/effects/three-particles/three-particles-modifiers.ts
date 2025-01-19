@@ -2,12 +2,12 @@ import * as THREE from 'three';
 
 import { getCurveFunction } from './three-particles-curves.js';
 import {
+  CurveFunction,
   Noise,
   NormalizedParticleSystemConfig,
   ParticleSystemConfig,
 } from './types.js';
 
-const ROTATION_CONVERTER = THREE.MathUtils.radToDeg(1);
 const noiseInput = new THREE.Vector3(0, 0, 0);
 const orbitalEuler = new THREE.Euler();
 
@@ -34,7 +34,7 @@ export const applyModifiers = ({
   noise,
   startValues,
   lifetimeValues,
-  hasOrbitalVelocity,
+  linearVelocityData,
   orbitalVelocityData,
   normalizedConfig,
   attributes,
@@ -46,10 +46,22 @@ export const applyModifiers = ({
   noise: Noise;
   startValues: Record<string, Array<number>>;
   lifetimeValues: Record<string, Array<number>>;
-  hasOrbitalVelocity: boolean;
-  orbitalVelocityData: Array<{
+  linearVelocityData?: Array<{
+    speed: THREE.Vector3;
+    valueModifiers: {
+      x?: CurveFunction;
+      y?: CurveFunction;
+      z?: CurveFunction;
+    };
+  }>;
+  orbitalVelocityData?: Array<{
     speed: THREE.Vector3;
     positionOffset: THREE.Vector3;
+    valueModifiers: {
+      x?: CurveFunction;
+      y?: CurveFunction;
+      z?: CurveFunction;
+    };
   }>;
   normalizedConfig: NormalizedParticleSystemConfig;
   attributes: THREE.NormalBufferAttributes;
@@ -57,19 +69,55 @@ export const applyModifiers = ({
   particleIndex: number;
   forceUpdate?: boolean;
 }) => {
-  if (hasOrbitalVelocity) {
-    const positionIndex = particleIndex * 3;
-    const positionArr = attributes.position.array;
-    const { speed, positionOffset } = orbitalVelocityData[particleIndex];
+  const positionIndex = particleIndex * 3;
+  const positionArr = attributes.position.array;
+
+  if (linearVelocityData) {
+    const { speed, valueModifiers } = linearVelocityData[particleIndex];
+
+    const normalizedXSpeed = valueModifiers.x
+      ? valueModifiers.x(particleLifetimePercentage)
+      : speed.x;
+
+    const normalizedYSpeed = valueModifiers.y
+      ? valueModifiers.y(particleLifetimePercentage)
+      : speed.y;
+
+    const normalizedZSpeed = valueModifiers.z
+      ? valueModifiers.z(particleLifetimePercentage)
+      : speed.z;
+
+    positionArr[positionIndex] += normalizedXSpeed * delta;
+    positionArr[positionIndex + 1] += normalizedYSpeed * delta;
+    positionArr[positionIndex + 2] += normalizedZSpeed * delta;
+
+    attributes.position.needsUpdate = true;
+  }
+
+  if (orbitalVelocityData) {
+    const { speed, positionOffset, valueModifiers } =
+      orbitalVelocityData[particleIndex];
 
     positionArr[positionIndex] -= positionOffset.x;
     positionArr[positionIndex + 1] -= positionOffset.y;
     positionArr[positionIndex + 2] -= positionOffset.z;
 
+    const normalizedXSpeed = valueModifiers.x
+      ? valueModifiers.x(particleLifetimePercentage)
+      : speed.x;
+
+    const normalizedYSpeed = valueModifiers.y
+      ? valueModifiers.y(particleLifetimePercentage)
+      : speed.y;
+
+    const normalizedZSpeed = valueModifiers.z
+      ? valueModifiers.z(particleLifetimePercentage)
+      : speed.z;
+
     orbitalEuler.set(
-      speed.x * ROTATION_CONVERTER * delta,
-      speed.z * ROTATION_CONVERTER * delta,
-      speed.y * ROTATION_CONVERTER * delta
+      normalizedXSpeed * delta,
+      normalizedZSpeed * delta,
+      normalizedYSpeed * delta
     );
     positionOffset.applyEuler(orbitalEuler);
 
@@ -115,8 +163,6 @@ export const applyModifiers = ({
       rotationAmount,
       sizeAmount,
     } = noise;
-    const positionIndex = particleIndex * 3;
-    const positionArr = attributes.position.array;
     let noiseOnPosition;
 
     const noisePosition =
