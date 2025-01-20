@@ -615,19 +615,61 @@ export type ParticleSystemConfig = {
   velocityOverLifetime?: VelocityOverLifetime;
 
   /**
-   * Defines how particle size changes over their lifetime.
+   * Controls the size of particles over their lifetime.
+   * The size can be adjusted using a lifetime curve (Bézier or other supported types).
+   *
+   * @default
+   * sizeOverLifetime: {
+   *   isActive: false,
+   *   lifetimeCurve: {
+   *     type: LifeTimeCurve.BEZIER,
+   *     scale: 1,
+   *     bezierPoints: [
+   *       { x: 0, y: 0, percentage: 0 },
+   *       { x: 1, y: 1, percentage: 1 },
+   *     ],
+   *   },
+   * }
    */
-  sizeOverLifetime?: any;
+  sizeOverLifetime?: {
+    isActive: boolean;
+    lifetimeCurve: LifetimeCurve;
+  };
 
   /**
-   * Defines how particle opacity changes over their lifetime.
+   * Controls the opacity of particles over their lifetime.
+   * The opacity can be adjusted using a lifetime curve (Bézier or other supported types).
+   *
+   * @default
+   * opacityOverLifetime: {
+   *   isActive: false,
+   *   lifetimeCurve: {
+   *     type: LifeTimeCurve.BEZIER,
+   *     scale: 1,
+   *     bezierPoints: [
+   *       { x: 0, y: 0, percentage: 0 },
+   *       { x: 1, y: 1, percentage: 1 },
+   *     ],
+   *   },
+   * }
    */
-  opacityOverLifetime?: any;
+  opacityOverLifetime?: {
+    isActive: boolean;
+    lifetimeCurve: LifetimeCurve;
+  };
 
   /**
-   * Defines how particle rotation changes over their lifetime.
+   * Controls the rotation of particles over their lifetime.
+   * The rotation can be randomized between two constants, and the feature can be toggled on or off.
+   *
+   * @default
+   * rotationOverLifetime: {
+   *   isActive: false,
+   *   min: 0.0,
+   *   max: 0.0,
+   * }
    */
-  rotationOverLifetime?: any;
+  rotationOverLifetime?: { isActive: boolean } & RandomBetweenTwoConstants;
 
   /**
    * Noise configuration affecting position, rotation, and size.

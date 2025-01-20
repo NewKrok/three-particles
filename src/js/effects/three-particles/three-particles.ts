@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import {
   EmitFrom,
+  LifeTimeCurve,
   Shape,
   SimulationSpace,
   TimeMode,
@@ -17,20 +18,15 @@ import {
   isLifeTimeCurve,
 } from './three-particles-utils.js';
 
-import { CurveFunctionId } from './three-particles-curves.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { ObjectUtils } from '@newkrok/three-utils';
 import ParticleSystemFragmentShader from './shaders/particle-system-fragment-shader.glsl.js';
 import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.glsl.js';
 import { applyModifiers } from './three-particles-modifiers.js';
-import {
-  createBezierCurveFunction,
-  removeBezierCurveFunction,
-} from './three-particles-bezier.js';
+import { removeBezierCurveFunction } from './three-particles-bezier.js';
 import {
   Constant,
-  CurveFunction,
   CycleData,
   GeneralData,
   LifetimeCurve,
@@ -41,7 +37,6 @@ import {
   Point3D,
   RandomBetweenTwoConstants,
   ShapeConfig,
-  VelocityOverLifetime,
 } from './types.js';
 
 export * from './types.js';
@@ -137,23 +132,33 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   },
   sizeOverLifetime: {
     isActive: false,
-    curveFunction: CurveFunctionId.BEZIER,
-    bezierPoints: [
-      { x: 0, y: 0, percentage: 0 },
-      { x: 1, y: 1, percentage: 1 },
-    ],
+    lifetimeCurve: {
+      type: LifeTimeCurve.BEZIER,
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 0, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
+    },
   },
   /* colorOverLifetime: {
     isActive: false,
-    curveFunction: CurveFunctionId.LINEAR,
+    lifetimeCurve: {
+      type: LifeTimeCurve.EASING,
+      scale: 1,
+      curveFunction: CurveFunctionId.LINEAR,
+    },
   }, */
   opacityOverLifetime: {
     isActive: false,
-    curveFunction: CurveFunctionId.BEZIER,
-    bezierPoints: [
-      { x: 0, y: 0, percentage: 0 },
-      { x: 1, y: 1, percentage: 1 },
-    ],
+    lifetimeCurve: {
+      type: LifeTimeCurve.BEZIER,
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 0, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
+    },
   },
   rotationOverLifetime: {
     isActive: false,
@@ -331,21 +336,6 @@ export const createParticleSystem = (
     DEFAULT_PARTICLE_SYSTEM_CONFIG as NormalizedParticleSystemConfig,
     config
   );
-
-  const bezierCompatibleProperties: Array<
-    keyof NormalizedParticleSystemConfig
-  > = ['sizeOverLifetime', 'opacityOverLifetime'];
-  bezierCompatibleProperties.forEach((key) => {
-    if (
-      normalizedConfig[key].isActive &&
-      normalizedConfig[key].curveFunction === CurveFunctionId.BEZIER &&
-      normalizedConfig[key].bezierPoints
-    )
-      normalizedConfig[key].curveFunction = createBezierCurveFunction(
-        generalData.particleSystemId,
-        normalizedConfig[key].bezierPoints
-      );
-  });
 
   const {
     transform,
@@ -710,28 +700,32 @@ export const createParticleSystem = (
       startSize,
       generalData.normalizedLifetimePercentage
     );
+    geometry.attributes.size.array[particleIndex] =
+      generalData.startValues.startSize[particleIndex];
+    geometry.attributes.size.needsUpdate = true;
 
     generalData.startValues.startOpacity[particleIndex] = calculateValue(
       generalData.particleSystemId,
       startOpacity,
       generalData.normalizedLifetimePercentage
     );
+    geometry.attributes.colorA.array[particleIndex] =
+      generalData.startValues.startOpacity[particleIndex];
+    geometry.attributes.colorA.needsUpdate = true;
 
     geometry.attributes.rotation.array[particleIndex] = calculateValue(
       generalData.particleSystemId,
       startRotation,
       generalData.normalizedLifetimePercentage
     );
+    geometry.attributes.rotation.needsUpdate = true;
 
     if (normalizedConfig.rotationOverLifetime.isActive)
       generalData.lifetimeValues.rotationOverLifetime[particleIndex] =
         THREE.MathUtils.randFloat(
-          normalizedConfig.rotationOverLifetime.min,
-          normalizedConfig.rotationOverLifetime.max
+          normalizedConfig.rotationOverLifetime.min!,
+          normalizedConfig.rotationOverLifetime.max!
         );
-
-    geometry.attributes.rotation.needsUpdate = true;
-    geometry.attributes.colorB.needsUpdate = true;
 
     calculatePositionAndVelocity(
       generalData,
@@ -811,16 +805,11 @@ export const createParticleSystem = (
 
     applyModifiers({
       delta: 0,
-      noise: generalData.noise,
-      startValues: generalData.startValues,
-      lifetimeValues: generalData.lifetimeValues,
-      linearVelocityData: generalData.linearVelocityData,
-      orbitalVelocityData: generalData.orbitalVelocityData,
+      generalData,
       normalizedConfig,
       attributes: particleSystem.geometry.attributes,
       particleLifetimePercentage: 0,
       particleIndex,
-      forceUpdate: true,
     });
   };
 
@@ -1004,11 +993,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
             particleSystem.geometry.attributes.startLifetime.array[index];
           applyModifiers({
             delta,
-            noise: generalData.noise,
-            startValues: generalData.startValues,
-            lifetimeValues: generalData.lifetimeValues,
-            linearVelocityData: generalData.linearVelocityData,
-            orbitalVelocityData: generalData.orbitalVelocityData,
+            generalData,
             normalizedConfig,
             attributes: particleSystem.geometry.attributes,
             particleLifetimePercentage,

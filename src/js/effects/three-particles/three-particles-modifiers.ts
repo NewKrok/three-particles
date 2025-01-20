@@ -1,74 +1,35 @@
 import * as THREE from 'three';
 
-import { getCurveFunction } from './three-particles-curves.js';
-import {
-  CurveFunction,
-  Noise,
-  NormalizedParticleSystemConfig,
-  ParticleSystemConfig,
-} from './types.js';
+import { GeneralData, NormalizedParticleSystemConfig } from './types.js';
+import { calculateValue } from './three-particles-utils.js';
 
 const noiseInput = new THREE.Vector3(0, 0, 0);
 const orbitalEuler = new THREE.Euler();
 
-const curveModifiers: Array<{
-  key: keyof ParticleSystemConfig;
-  attributeKeys: Array<string>;
-  startValueKeys: Array<keyof ParticleSystemConfig>;
-}> = [
-  // {key:"colorOverLifetime", attributeKeys:["colorR", "colorG", "colorB"]},
-  {
-    key: 'opacityOverLifetime',
-    attributeKeys: ['colorA'],
-    startValueKeys: ['startOpacity'],
-  },
-  {
-    key: 'sizeOverLifetime',
-    attributeKeys: ['size'],
-    startValueKeys: ['startSize'],
-  },
-];
-
 export const applyModifiers = ({
   delta,
-  noise,
-  startValues,
-  lifetimeValues,
-  linearVelocityData,
-  orbitalVelocityData,
+  generalData,
   normalizedConfig,
   attributes,
   particleLifetimePercentage,
   particleIndex,
-  forceUpdate = false,
 }: {
   delta: number;
-  noise: Noise;
-  startValues: Record<string, Array<number>>;
-  lifetimeValues: Record<string, Array<number>>;
-  linearVelocityData?: Array<{
-    speed: THREE.Vector3;
-    valueModifiers: {
-      x?: CurveFunction;
-      y?: CurveFunction;
-      z?: CurveFunction;
-    };
-  }>;
-  orbitalVelocityData?: Array<{
-    speed: THREE.Vector3;
-    positionOffset: THREE.Vector3;
-    valueModifiers: {
-      x?: CurveFunction;
-      y?: CurveFunction;
-      z?: CurveFunction;
-    };
-  }>;
+  generalData: GeneralData;
   normalizedConfig: NormalizedParticleSystemConfig;
   attributes: THREE.NormalBufferAttributes;
   particleLifetimePercentage: number;
   particleIndex: number;
-  forceUpdate?: boolean;
 }) => {
+  const {
+    particleSystemId,
+    startValues,
+    lifetimeValues,
+    linearVelocityData,
+    orbitalVelocityData,
+    noise,
+  } = generalData;
+
   const positionIndex = particleIndex * 3;
   const positionArr = attributes.position.array;
 
@@ -128,25 +89,27 @@ export const applyModifiers = ({
     attributes.position.needsUpdate = true;
   }
 
-  curveModifiers.forEach(({ key, attributeKeys, startValueKeys }) => {
-    const curveModifier = normalizedConfig[key];
-    if (curveModifier.isActive) {
-      const multiplier = getCurveFunction(curveModifier!.curveFunction)!(
-        particleLifetimePercentage
-      );
-      attributeKeys.forEach((attributeKey, index) => {
-        attributes[attributeKey].array[particleIndex] =
-          startValues[startValueKeys[index]][particleIndex] * multiplier;
-        attributes[attributeKey].needsUpdate = true;
-      });
-    } else if (forceUpdate) {
-      attributeKeys.forEach((attributeKey, index) => {
-        attributes[attributeKey].array[particleIndex] =
-          startValues[startValueKeys[index]][particleIndex];
-        attributes[attributeKey].needsUpdate = true;
-      });
-    }
-  });
+  if (normalizedConfig.sizeOverLifetime.isActive) {
+    const multiplier = calculateValue(
+      particleSystemId,
+      normalizedConfig.sizeOverLifetime.lifetimeCurve,
+      particleLifetimePercentage
+    );
+    attributes.size.array[particleIndex] =
+      startValues.startSize[particleIndex] * multiplier;
+    attributes.size.needsUpdate = true;
+  }
+
+  if (normalizedConfig.opacityOverLifetime.isActive) {
+    const multiplier = calculateValue(
+      particleSystemId,
+      normalizedConfig.opacityOverLifetime.lifetimeCurve,
+      particleLifetimePercentage
+    );
+    attributes.colorA.array[particleIndex] =
+      startValues.startOpacity[particleIndex] * multiplier;
+    attributes.colorA.needsUpdate = true;
+  }
 
   if (lifetimeValues.rotationOverLifetime) {
     attributes.rotation.array[particleIndex] +=

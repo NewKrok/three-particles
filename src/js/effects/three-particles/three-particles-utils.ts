@@ -234,7 +234,7 @@ export const getCurveFunctionFromConfig = (
     return lifeTimeCurve.curveFunction; // Easing curve
   }
 
-  throw new Error('Unsupported value type');
+  throw new Error(`Unsupported value type: ${lifeTimeCurve}`);
 };
 
 export const calculateValue = (

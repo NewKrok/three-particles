@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { applyModifiers } from '../js/effects/three-particles/three-particles-modifiers.js';
 import {
+  GeneralData,
   Noise,
   NormalizedParticleSystemConfig,
 } from '../js/effects/three-particles/types.js';
+import { LifeTimeCurve } from '../js/effects/three-particles/three-particles-enums.js';
 
 describe('applyModifiers', () => {
   let attributes: THREE.NormalBufferAttributes;
@@ -18,8 +20,22 @@ describe('applyModifiers', () => {
     } as unknown as THREE.NormalBufferAttributes;
 
     normalizedConfig = {
-      opacityOverLifetime: { isActive: false, curveFunction: () => 1 },
-      sizeOverLifetime: { isActive: false, curveFunction: () => 1 },
+      opacityOverLifetime: {
+        isActive: false,
+        lifetimeCurve: {
+          type: LifeTimeCurve.EASING,
+          curveFunction: () => 1,
+          scale: 1,
+        },
+      },
+      sizeOverLifetime: {
+        isActive: false,
+        lifetimeCurve: {
+          type: LifeTimeCurve.EASING,
+          curveFunction: () => 1,
+          scale: 1,
+        },
+      },
     } as unknown as NormalizedParticleSystemConfig;
   });
 
@@ -33,10 +49,12 @@ describe('applyModifiers', () => {
 
     applyModifiers({
       delta: 1,
-      noise: { isActive: false } as Noise,
-      startValues: {},
-      lifetimeValues: {},
-      linearVelocityData,
+      generalData: {
+        noise: { isActive: false } as Noise,
+        startValues: {},
+        lifetimeValues: {},
+        linearVelocityData,
+      } as GeneralData,
       normalizedConfig,
       attributes,
       particleLifetimePercentage: 0.5,
@@ -65,11 +83,13 @@ describe('applyModifiers', () => {
 
     applyModifiers({
       delta: 1,
-      noise: { isActive: false } as Noise,
-      startValues: {},
-      lifetimeValues: {},
-      linearVelocityData,
-      orbitalVelocityData: undefined,
+      generalData: {
+        noise: { isActive: false } as Noise,
+        startValues: {},
+        lifetimeValues: {},
+        linearVelocityData,
+        orbitalVelocityData: undefined,
+      } as GeneralData,
       normalizedConfig,
       attributes: attributes as any,
       particleLifetimePercentage: 0.5,
@@ -91,11 +111,13 @@ describe('applyModifiers', () => {
 
     applyModifiers({
       delta: 1,
-      noise: { isActive: false } as Noise,
-      startValues: {},
-      lifetimeValues: {},
-      linearVelocityData: undefined,
-      orbitalVelocityData,
+      generalData: {
+        noise: { isActive: false } as Noise,
+        startValues: {},
+        lifetimeValues: {},
+        linearVelocityData: undefined,
+        orbitalVelocityData,
+      } as GeneralData,
       normalizedConfig,
       attributes: attributes as any,
       particleLifetimePercentage: 0.5,
@@ -130,11 +152,13 @@ describe('applyModifiers', () => {
 
     applyModifiers({
       delta: 1,
-      noise: { isActive: false } as Noise,
-      startValues: {},
-      lifetimeValues: {},
-      linearVelocityData: undefined,
-      orbitalVelocityData,
+      generalData: {
+        noise: { isActive: false } as Noise,
+        startValues: {},
+        lifetimeValues: {},
+        linearVelocityData: undefined,
+        orbitalVelocityData,
+      } as GeneralData,
       normalizedConfig,
       attributes: _attributes as any,
       particleLifetimePercentage: 0.5,
@@ -173,11 +197,13 @@ describe('applyModifiers', () => {
 
     applyModifiers({
       delta: 1,
-      noise: { isActive: false } as Noise,
-      startValues: {},
-      lifetimeValues: {},
-      linearVelocityData: undefined,
-      orbitalVelocityData,
+      generalData: {
+        noise: { isActive: false } as Noise,
+        startValues: {},
+        lifetimeValues: {},
+        linearVelocityData: undefined,
+        orbitalVelocityData,
+      } as GeneralData,
       normalizedConfig,
       attributes: attributes as any,
       particleLifetimePercentage: 0.5,
@@ -199,9 +225,12 @@ describe('applyModifiers', () => {
 
     applyModifiers({
       delta: 1,
-      noise: { isActive: false } as Noise,
-      startValues: { startOpacity: [1] },
-      lifetimeValues: {},
+      generalData: {
+        noise: { isActive: false } as Noise,
+        startValues: { startOpacity: [1] },
+        lifetimeValues: {},
+        linearVelocityData: undefined,
+      } as unknown as GeneralData,
       normalizedConfig,
       attributes,
       particleLifetimePercentage: 0.5,
@@ -224,9 +253,11 @@ describe('applyModifiers', () => {
 
     applyModifiers({
       delta: 1,
-      noise,
-      startValues: {},
-      lifetimeValues: {},
+      generalData: {
+        noise,
+        startValues: {},
+        lifetimeValues: {},
+      } as GeneralData,
       normalizedConfig,
       attributes,
       particleLifetimePercentage: 0.5,
@@ -258,9 +289,11 @@ describe('applyModifiers', () => {
 
     applyModifiers({
       delta: 1,
-      noise,
-      startValues: {},
-      lifetimeValues: {},
+      generalData: {
+        noise,
+        startValues: {},
+        lifetimeValues: {},
+      } as GeneralData,
       normalizedConfig,
       attributes,
       particleLifetimePercentage: 0.5,
@@ -271,35 +304,6 @@ describe('applyModifiers', () => {
       new Float32Array([0.075, 0.075, 0.075])
     );
     expect(attributes.position.needsUpdate).toBe(true);
-  });
-
-  test('should update attributes with forceUpdate enabled even if curveModifier is inactive', () => {
-    const _attributes = {
-      ...attributes,
-      colorA: { array: new Float32Array([0.5]), needsUpdate: false },
-    };
-
-    const startValues = {
-      startOpacity: [1.0],
-      startSize: [1.0],
-    };
-
-    applyModifiers({
-      delta: 1,
-      noise: { isActive: false } as Noise,
-      startValues,
-      lifetimeValues: {},
-      linearVelocityData: undefined,
-      orbitalVelocityData: undefined,
-      normalizedConfig,
-      attributes: _attributes as any,
-      particleLifetimePercentage: 0.5,
-      particleIndex: 0,
-      forceUpdate: true,
-    });
-
-    expect(_attributes.colorA.array[0]).toBe(1.0);
-    expect(_attributes.colorA.needsUpdate).toBe(true);
   });
 
   test('should update rotation with rotationOverLifetime', () => {
@@ -314,11 +318,13 @@ describe('applyModifiers', () => {
 
     applyModifiers({
       delta: 1,
-      noise: { isActive: false } as Noise,
-      startValues: {},
-      lifetimeValues,
-      linearVelocityData: undefined,
-      orbitalVelocityData: undefined,
+      generalData: {
+        noise: { isActive: false } as Noise,
+        startValues: {},
+        lifetimeValues,
+        linearVelocityData: undefined,
+        orbitalVelocityData: undefined,
+      } as unknown as GeneralData,
       normalizedConfig,
       attributes: _attributes as any,
       particleLifetimePercentage: 0.5,
@@ -327,42 +333,5 @@ describe('applyModifiers', () => {
 
     expect(_attributes.rotation.array[0]).toBeCloseTo(5 * 1 * 0.02, 5);
     expect(_attributes.rotation.needsUpdate).toBe(true);
-  });
-
-  test('should apply curve modifiers with forceUpdate enabled', () => {
-    const _attributes = {
-      ...attributes,
-      colorA: { array: new Float32Array([0.5]), needsUpdate: false },
-    };
-
-    const startValues = {
-      startOpacity: [1.0],
-      startSize: [1.0],
-    };
-
-    const _normalizedConfig = {
-      ...normalizedConfig,
-      opacityOverLifetime: {
-        isActive: true,
-        curveFunction: (t: number) => t * 2,
-      },
-    } as unknown as NormalizedParticleSystemConfig;
-
-    applyModifiers({
-      delta: 1,
-      noise: { isActive: false } as Noise,
-      startValues,
-      lifetimeValues: {},
-      linearVelocityData: undefined,
-      orbitalVelocityData: undefined,
-      normalizedConfig: _normalizedConfig,
-      attributes: _attributes as any,
-      particleLifetimePercentage: 0.5,
-      particleIndex: 0,
-      forceUpdate: true,
-    });
-
-    expect(_attributes.colorA.array[0]).toBe(1.0);
-    expect(_attributes.colorA.needsUpdate).toBe(true);
   });
 });
