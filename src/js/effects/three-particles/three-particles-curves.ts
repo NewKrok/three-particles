@@ -1,4 +1,4 @@
-import Easing, { EasingFunction } from 'easing-functions';
+import Easing from 'easing-functions';
 import { CurveFunction } from './types.js';
 
 export const enum CurveFunctionId {
@@ -36,7 +36,7 @@ export const enum CurveFunctionId {
   BOUNCE_IN_OUT = 'BOUNCE_IN_OUT',
 }
 
-const CurveFunctionIdMap: Partial<Record<CurveFunctionId, EasingFunction>> = {
+const CurveFunctionIdMap: Partial<Record<CurveFunctionId, CurveFunction>> = {
   [CurveFunctionId.LINEAR]: Easing.Linear.None,
   [CurveFunctionId.QUADRATIC_IN]: Easing.Quadratic.In,
   [CurveFunctionId.QUADRATIC_OUT]: Easing.Quadratic.Out,
@@ -72,7 +72,7 @@ const CurveFunctionIdMap: Partial<Record<CurveFunctionId, EasingFunction>> = {
 
 export const getCurveFunction = (
   curveFunctionId: CurveFunctionId | CurveFunction
-): EasingFunction | CurveFunction =>
+): CurveFunction =>
   typeof curveFunctionId === 'function'
     ? curveFunctionId
     : CurveFunctionIdMap[curveFunctionId]!;

@@ -16,8 +16,20 @@ describe('getCurveFunction', () => {
     expect(func).toBe(customFunc);
   });
 
-  it('should return undefined for an invalid CurveFunctionId', () => {
-    const func = getCurveFunction('INVALID_ID' as any);
-    expect(func).toBeUndefined();
+  it('should return undefined for an invalid param', () => {
+    const funcInvalidString = getCurveFunction('INVALID_ID' as any);
+    expect(funcInvalidString).toBeUndefined();
+
+    const funcObject = getCurveFunction({} as any);
+    expect(funcObject).toBeUndefined();
+
+    const funcNumber = getCurveFunction(1 as any);
+    expect(funcNumber).toBeUndefined();
+
+    const funcBool = getCurveFunction(true as any);
+    expect(funcBool).toBeUndefined();
+
+    const funcArr = getCurveFunction([1, 2, 3] as any);
+    expect(funcArr).toBeUndefined();
   });
 });
