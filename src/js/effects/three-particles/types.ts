@@ -100,12 +100,54 @@ export type EasingCurve = CurveBase & {
  */
 export type LifetimeCurve = BezierCurve | EasingCurve;
 
+/**
+ * Represents a point in 3D space with optional x, y, and z coordinates.
+ * Each coordinate is a number and is optional, allowing for partial definitions.
+ *
+ * @example
+ * // A point with all coordinates defined
+ * const point: Point3D = { x: 10, y: 20, z: 30 };
+ *
+ * @example
+ * // A point with only one coordinate defined
+ * const point: Point3D = { x: 10 };
+ *
+ * @default
+ * // Default values are undefined for all coordinates.
+ * const point: Point3D = {};
+ */
 export type Point3D = {
   x?: number;
   y?: number;
   z?: number;
 };
 
+/**
+ * Represents a transform in 3D space, including position, rotation, and scale.
+ * Each property is optional and represented as a THREE.Vector3 instance.
+ *
+ * - `position`: Defines the translation of an object in 3D space.
+ * - `rotation`: Defines the rotation of an object in radians for each axis (x, y, z).
+ * - `scale`: Defines the scale of an object along each axis.
+ *
+ * @example
+ * // A transform with all properties defined
+ * const transform: Transform = {
+ *   position: new THREE.Vector3(10, 20, 30),
+ *   rotation: new THREE.Vector3(Math.PI / 2, 0, 0),
+ *   scale: new THREE.Vector3(1, 1, 1),
+ * };
+ *
+ * @example
+ * // A transform with only position defined
+ * const transform: Transform = {
+ *   position: new THREE.Vector3(5, 5, 5),
+ * };
+ *
+ * @default
+ * // Default values are undefined for all properties.
+ * const transform: Transform = {};
+ */
 export type Transform = {
   position?: THREE.Vector3;
   rotation?: THREE.Vector3;
@@ -167,32 +209,131 @@ export type Emission = {
   rateOverDistance?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
 };
 
+/**
+ * Configuration for a sphere shape used in particle systems.
+ *
+ * @property radius - The radius of the sphere.
+ * @property radiusThickness - The thickness of the sphere's shell (0 to 1, where 1 is solid).
+ * @property arc - The angular arc of the sphere (in radians).
+ *
+ * @example
+ * const sphere: Sphere = {
+ *   radius: 5,
+ *   radiusThickness: 0.8,
+ *   arc: Math.PI,
+ * };
+ */
+export type Sphere = {
+  radius?: number;
+  radiusThickness?: number;
+  arc?: number;
+};
+
+/**
+ * Configuration for a cone shape used in particle systems.
+ *
+ * @property angle - The angle of the cone (in radians).
+ * @property radius - The radius of the cone's base.
+ * @property radiusThickness - The thickness of the cone's base (0 to 1, where 1 is solid).
+ * @property arc - The angular arc of the cone's base (in radians).
+ *
+ * @example
+ * const cone: Cone = {
+ *   angle: Math.PI / 4,
+ *   radius: 10,
+ *   radiusThickness: 0.5,
+ *   arc: Math.PI * 2,
+ * };
+ */
+export type Cone = {
+  angle?: number;
+  radius?: number;
+  radiusThickness?: number;
+  arc?: number;
+};
+
+/**
+ * Configuration for a circle shape used in particle systems.
+ *
+ * @property radius - The radius of the circle.
+ * @property radiusThickness - The thickness of the circle's shell (0 to 1, where 1 is solid).
+ * @property arc - The angular arc of the circle (in radians).
+ *
+ * @example
+ * const circle: Circle = {
+ *   radius: 10,
+ *   radiusThickness: 0.5,
+ *   arc: Math.PI,
+ * };
+ */
+export type Circle = {
+  radius?: number;
+  radiusThickness?: number;
+  arc?: number;
+};
+
+/**
+ * Configuration for a rectangle shape used in particle systems.
+ *
+ * @property rotation - The rotation of the rectangle as a 3D point (in radians for each axis).
+ * @property scale - The scale of the rectangle as a 3D point.
+ *
+ * @example
+ * const rectangle: Rectangle = {
+ *   rotation: { x: Math.PI / 4, y: 0, z: 0 },
+ *   scale: { x: 10, y: 5, z: 1 },
+ * };
+ */
+export type Rectangle = {
+  rotation?: Point3D;
+  scale?: Point3D;
+};
+
+/**
+ * Configuration for a box shape used in particle systems.
+ *
+ * @property scale - The scale of the box as a 3D point.
+ * @property emitFrom - Specifies where particles are emitted from within the box.
+ *
+ * @example
+ * const box: Box = {
+ *   scale: { x: 10, y: 10, z: 10 },
+ *   emitFrom: EmitFrom.EDGE,
+ * };
+ */
+export type Box = {
+  scale?: Point3D;
+  emitFrom?: EmitFrom;
+};
+
+/**
+ * Configuration for defining a 3D shape used in particle systems.
+ * Specifies the shape type and its parameters, including spheres, cones, circles, rectangles, and boxes.
+ *
+ * @property shape - The type of the shape to be used.
+ * @property sphere - Configuration for a sphere shape.
+ * @property cone - Configuration for a cone shape.
+ * @property circle - Configuration for a circle shape.
+ * @property rectangle - Configuration for a rectangle shape.
+ * @property box - Configuration for a box shape.
+ *
+ * @example
+ * const shapeConfig: ShapeConfig = {
+ *   shape: Shape.SPHERE,
+ *   sphere: {
+ *     radius: 5,
+ *     radiusThickness: 0.8,
+ *     arc: Math.PI,
+ *   },
+ * };
+ */
 export type ShapeConfig = {
   shape?: Shape;
-  sphere?: {
-    radius?: number;
-    radiusThickness?: number;
-    arc?: number;
-  };
-  cone?: {
-    angle?: number;
-    radius?: number;
-    radiusThickness?: number;
-    arc?: number;
-  };
-  circle?: {
-    radius?: number;
-    radiusThickness?: number;
-    arc?: number;
-  };
-  rectangle?: {
-    rotation?: Point3D;
-    scale?: Point3D;
-  };
-  box?: {
-    scale?: Point3D;
-    emitFrom?: EmitFrom;
-  };
+  sphere?: Sphere;
+  cone?: Cone;
+  circle?: Circle;
+  rectangle?: Rectangle;
+  box?: Box;
 };
 
 /**
@@ -229,16 +370,87 @@ export type TextureSheetAnimation = {
   startFrame?: Constant | RandomBetweenTwoConstants;
 };
 
+/**
+ * Configuration for the particle system renderer, controlling blending, transparency, depth, and background color behavior.
+ *
+ * @property blending - Defines the blending mode for the particle system (e.g., additive blending).
+ * @property discardBackgroundColor - Whether to discard particles that match the background color.
+ * @property backgroundColorTolerance - The tolerance for matching the background color when `discardBackgroundColor` is true.
+ * @property backgroundColor - The background color as an RGB value, used when `discardBackgroundColor` is enabled.
+ * @property transparent - Whether the particle system uses transparency.
+ * @property depthTest - Whether to enable depth testing for particles (determines if particles are rendered behind or in front of other objects).
+ * @property depthWrite - Whether to write depth information for the particles (affects sorting and rendering order).
+ *
+ * @example
+ * // A renderer configuration with additive blending and transparent particles
+ * const renderer: Renderer = {
+ *   blending: THREE.AdditiveBlending,
+ *   discardBackgroundColor: true,
+ *   backgroundColorTolerance: 0.1,
+ *   backgroundColor: { r: 0, g: 0, b: 0 },
+ *   transparent: true,
+ *   depthTest: true,
+ *   depthWrite: false,
+ * };
+ *
+ * @default
+ * // Default values for the renderer configuration
+ * const renderer: Renderer = {
+ *   blending: THREE.NormalBlending,
+ *   discardBackgroundColor: false,
+ *   backgroundColorTolerance: 1.0,
+ *   backgroundColor: { r: 0, g: 0, b: 0 },
+ *   transparent: false,
+ *   depthTest: true,
+ *   depthWrite: true,
+ * };
+ */
 export type Renderer = {
   blending: THREE.Blending;
   discardBackgroundColor: boolean;
-  backgroundColorTolerance: 1.0;
+  backgroundColorTolerance: number;
   backgroundColor: Rgb;
   transparent: boolean;
   depthTest: boolean;
   depthWrite: boolean;
 };
 
+/**
+ * Configuration for noise effects applied to particles in a particle system.
+ * Noise can affect particle position, rotation, and size dynamically.
+ *
+ * @property isActive - Whether noise is enabled for the particle system.
+ * @property strength - The overall strength of the noise effect.
+ * @property positionAmount - The amount of noise applied to particle positions.
+ * @property rotationAmount - The amount of noise applied to particle rotations.
+ * @property sizeAmount - The amount of noise applied to particle sizes.
+ * @property sampler - An optional noise sampler (e.g., FBM for fractal Brownian motion) to generate noise values.
+ * @property offsets - An optional array of offsets to randomize noise generation per particle.
+ *
+ * @example
+ * // A noise configuration with position and rotation noise
+ * const noise: Noise = {
+ *   isActive: true,
+ *   strength: 0.5,
+ *   positionAmount: 1.0,
+ *   rotationAmount: 0.3,
+ *   sizeAmount: 0.0,
+ *   sampler: new FBM(),
+ *   offsets: [0.1, 0.2, 0.3],
+ * };
+ *
+ * @default
+ * // Default values for noise configuration
+ * const noise: Noise = {
+ *   isActive: false,
+ *   strength: 1.0,
+ *   positionAmount: 0.0,
+ *   rotationAmount: 0.0,
+ *   sizeAmount: 0.0,
+ *   sampler: undefined,
+ *   offsets: undefined,
+ * };
+ */
 export type Noise = {
   isActive: boolean;
   strength: number;
@@ -247,6 +459,17 @@ export type Noise = {
   sizeAmount: number;
   sampler?: FBM;
   offsets?: Array<number>;
+};
+
+export type NoiseConfig = {
+  isActive: boolean;
+  useRandomOffset: boolean;
+  strength: number;
+  frequency: number;
+  octaves: number;
+  positionAmount: number;
+  rotationAmount: number;
+  sizeAmount: number;
 };
 
 /**
@@ -309,10 +532,19 @@ export type VelocityOverLifetime = {
 
 /**
  * Configuration object for the particle system.
+ * Defines all aspects of the particle system, including its appearance, behavior, and runtime events.
  */
 export type ParticleSystemConfig = {
   /**
    * Defines the position, rotation, and scale of the particle system.
+   *
+   * @see Transform
+   * @default
+   * transform: {
+   *   position: new THREE.Vector3(),
+   *   rotation: new THREE.Vector3(),
+   *   scale: new THREE.Vector3(1, 1, 1),
+   * }
    */
   transform?: Transform;
 
@@ -500,6 +732,13 @@ export type ParticleSystemConfig = {
 
   /**
    * Initial color of the particles.
+   * Supports a min-max range for color interpolation.
+   *
+   * @default
+   * startColor: {
+   *   min: { r: 1.0, g: 1.0, b: 1.0 },
+   *   max: { r: 1.0, g: 1.0, b: 1.0 },
+   * }
    */
   startColor?: MinMaxColor;
 
@@ -568,7 +807,10 @@ export type ParticleSystemConfig = {
   emission?: Emission;
 
   /**
-   * Shape configuration for the particle emitter.
+   * Configuration for the emitter shape.
+   * Determines the shape and parameters for particle emission.
+   *
+   * @see ShapeConfig
    */
   shape?: ShapeConfig;
 
@@ -589,6 +831,18 @@ export type ParticleSystemConfig = {
 
   /**
    * Renderer configuration for blending, transparency, and depth testing.
+   *
+   * @see Renderer
+   * @default
+   * renderer: {
+   *   blending: THREE.NormalBlending,
+   *   discardBackgroundColor: false,
+   *   backgroundColorTolerance: 1.0,
+   *   backgroundColor: { r: 1.0, g: 1.0, b: 1.0 },
+   *   transparent: true,
+   *   depthTest: true,
+   *   depthWrite: false
+   * }
    */
   renderer?: Renderer;
 
@@ -673,8 +927,21 @@ export type ParticleSystemConfig = {
 
   /**
    * Noise configuration affecting position, rotation, and size.
+   *
+   * @see NoiseConfig
+   * @default
+   * noise: {
+   *   isActive: false,
+   *   useRandomOffset: false,
+   *   strength: 1.0,
+   *   frequency: 0.5,
+   *   octaves: 1,
+   *   positionAmount: 1.0,
+   *   rotationAmount: 0.0,
+   *   sizeAmount: 0.0,
+   * }
    */
-  noise?: any;
+  noise?: NoiseConfig;
 
   /**
    * Configures the texture sheet animation settings for particles.
@@ -692,7 +959,7 @@ export type ParticleSystemConfig = {
   textureSheetAnimation?: TextureSheetAnimation;
 
   /**
-   * Called on every update frame with data.
+   * Called on every update frame with particle system data.
    */
   onUpdate?: (data: {
     particleSystem: THREE.Points;

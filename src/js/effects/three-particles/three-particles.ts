@@ -483,7 +483,14 @@ export const createParticleSystem = (
   ];
   startValueKeys.forEach((key) => {
     generalData.startValues[key] = Array.from({ length: maxParticles }, () =>
-      calculateValue(generalData.particleSystemId, normalizedConfig[key], 0)
+      calculateValue(
+        generalData.particleSystemId,
+        normalizedConfig[key] as
+          | Constant
+          | RandomBetweenTwoConstants
+          | LifetimeCurve,
+        0
+      )
     );
   });
 
@@ -491,14 +498,13 @@ export const createParticleSystem = (
     'rotationOverLifetime',
   ];
   lifetimeValueKeys.forEach((key) => {
-    if (normalizedConfig[key].isActive)
+    const value = normalizedConfig[key] as {
+      isActive: boolean;
+    } & RandomBetweenTwoConstants;
+    if (value.isActive)
       generalData.lifetimeValues[key] = Array.from(
         { length: maxParticles },
-        () =>
-          THREE.MathUtils.randFloat(
-            normalizedConfig[key].min,
-            normalizedConfig[key].max
-          )
+        () => THREE.MathUtils.randFloat(value.min!, value.max!)
       );
   });
 
