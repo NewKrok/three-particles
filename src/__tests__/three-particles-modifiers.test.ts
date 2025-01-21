@@ -24,7 +24,7 @@ describe('applyModifiers', () => {
         isActive: false,
         lifetimeCurve: {
           type: LifeTimeCurve.EASING,
-          curveFunction: () => 1,
+          curveFunction: () => 1.5,
           scale: 1,
         },
       },
@@ -32,7 +32,7 @@ describe('applyModifiers', () => {
         isActive: false,
         lifetimeCurve: {
           type: LifeTimeCurve.EASING,
-          curveFunction: () => 1,
+          curveFunction: () => 2,
           scale: 1,
         },
       },
@@ -222,12 +222,13 @@ describe('applyModifiers', () => {
 
   test('applies curve modifiers when active', () => {
     normalizedConfig.opacityOverLifetime.isActive = true;
+    normalizedConfig.sizeOverLifetime.isActive = true;
 
     applyModifiers({
       delta: 1,
       generalData: {
         noise: { isActive: false } as Noise,
-        startValues: { startOpacity: [1] },
+        startValues: { startOpacity: [1], startSize: [1] },
         lifetimeValues: {},
         linearVelocityData: undefined,
       } as unknown as GeneralData,
@@ -237,8 +238,11 @@ describe('applyModifiers', () => {
       particleIndex: 0,
     });
 
-    expect(attributes.colorA.array[0]).toBe(1);
+    expect(attributes.colorA.array[0]).toBe(1.5);
     expect(attributes.colorA.needsUpdate).toBe(true);
+
+    expect(attributes.size.array[0]).toBe(2);
+    expect(attributes.size.needsUpdate).toBe(true);
   });
 
   test('applies noise to attributes', () => {
