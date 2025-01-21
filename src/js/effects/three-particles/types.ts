@@ -1044,6 +1044,26 @@ export type ParticleSystemInstance = {
   }) => void;
 };
 
+/**
+ * Represents a particle system instance, providing methods to control and manage its lifecycle.
+ *
+ * @property instance - The underlying Three.js `Points` object or a `Gyroscope` used for particle rendering.
+ * @property resumeEmitter - Resumes the particle emitter, allowing particles to be emitted again.
+ * @property pauseEmitter - Pauses the particle emitter, stopping any new particles from being emitted.
+ * @property dispose - Disposes of the particle system, cleaning up resources to free memory.
+ *
+ * @example
+ * const particleSystem: ParticleSystem = {
+ *   instance: new THREE.Points(geometry, material),
+ *   resumeEmitter: () => { /* resume logic * / },
+ *   pauseEmitter: () => { /* pause logic * / },
+ *   dispose: () => { /* cleanup logic * / },
+ * };
+ *
+ * particleSystem.pauseEmitter(); // Stop particle emission
+ * particleSystem.resumeEmitter(); // Resume particle emission
+ * particleSystem.dispose(); // Cleanup the particle system
+ */
 export type ParticleSystem = {
   instance: THREE.Points | Gyroscope;
   resumeEmitter: () => void;
@@ -1051,6 +1071,20 @@ export type ParticleSystem = {
   dispose: () => void;
 };
 
+/**
+ * Data representing the current cycle of the particle system's update loop.
+ *
+ * @property now - The current timestamp in milliseconds.
+ * @property delta - The time elapsed since the last update, in seconds.
+ * @property elapsed - The total time elapsed since the particle system started, in seconds.
+ *
+ * @example
+ * const cycleData: CycleData = {
+ *   now: performance.now(),
+ *   delta: 0.016, // 16ms frame time
+ *   elapsed: 1.25, // 1.25 seconds since start
+ * };
+ */
 export type CycleData = {
   now: number;
   delta: number;
