@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { createBezierCurveFunction } from './three-particles-bezier.js';
 import { EmitFrom, LifeTimeCurve } from './three-particles-enums.js';
 import {
   Constant,
@@ -7,7 +8,6 @@ import {
   Point3D,
   RandomBetweenTwoConstants,
 } from './types.js';
-import { createBezierCurveFunction } from './three-particles-bezier.js';
 
 export const calculateRandomPositionAndVelocityOnSphere = (
   position: THREE.Vector3,

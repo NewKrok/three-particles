@@ -1,11 +1,11 @@
 import * as THREE from 'three';
+import { LifeTimeCurve } from '../js/effects/three-particles/three-particles-enums.js';
 import { applyModifiers } from '../js/effects/three-particles/three-particles-modifiers.js';
 import {
   GeneralData,
   Noise,
   NormalizedParticleSystemConfig,
 } from '../js/effects/three-particles/types.js';
-import { LifeTimeCurve } from '../js/effects/three-particles/three-particles-enums.js';
 
 describe('applyModifiers', () => {
   let attributes: THREE.NormalBufferAttributes;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
+import { FBM } from 'three-noise/build/three-noise.module.js';
 import {
   EmitFrom,
   LifeTimeCurve,
@@ -7,7 +8,6 @@ import {
   SimulationSpace,
   TimeMode,
 } from './three-particles-enums.js';
-import { FBM } from 'three-noise/build/three-noise.module.js';
 
 /**
  * A fixed numerical value.

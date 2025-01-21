@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { calculateValue } from '../js/effects/three-particles/three-particles-utils.js';
 import { LifeTimeCurve } from '../js/effects/three-particles/three-particles-enums.js';
+import { calculateValue } from '../js/effects/three-particles/three-particles-utils.js';
+import { calculateRandomPositionAndVelocityOnSphere } from '../js/effects/three-particles/three-particles-utils.js';
 import {
   BezierCurve,
   EasingCurve,
 } from '../js/effects/three-particles/types.js';
-import { calculateRandomPositionAndVelocityOnSphere } from '../js/effects/three-particles/three-particles-utils.js';
 
 describe('calculateRandomPositionAndVelocityOnSphere', () => {
   it('should calculate a random position on a sphere surface', () => {
@@ -129,8 +129,6 @@ describe('calculateValue function tests', () => {
   });
 
   it('throws an error for unsupported value type', () => {
-    expect(() => calculateValue(1, {} as any)).toThrow(
-      'Unsupported value type'
-    );
+    expect(() => calculateValue(1, {})).toThrow('Unsupported value type');
   });
 });

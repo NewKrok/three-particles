@@ -1,5 +1,10 @@
+import { ObjectUtils } from '@newkrok/three-utils';
 import * as THREE from 'three';
-
+import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
+import { FBM } from 'three-noise/build/three-noise.module.js';
+import ParticleSystemFragmentShader from './shaders/particle-system-fragment-shader.glsl.js';
+import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.glsl.js';
+import { removeBezierCurveFunction } from './three-particles-bezier.js';
 import {
   EmitFrom,
   LifeTimeCurve,
@@ -7,6 +12,7 @@ import {
   SimulationSpace,
   TimeMode,
 } from './three-particles-enums.js';
+import { applyModifiers } from './three-particles-modifiers.js';
 import {
   calculateRandomPositionAndVelocityOnBox,
   calculateRandomPositionAndVelocityOnCircle,
@@ -17,14 +23,6 @@ import {
   getCurveFunctionFromConfig,
   isLifeTimeCurve,
 } from './three-particles-utils.js';
-
-import { FBM } from 'three-noise/build/three-noise.module.js';
-import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
-import { ObjectUtils } from '@newkrok/three-utils';
-import ParticleSystemFragmentShader from './shaders/particle-system-fragment-shader.glsl.js';
-import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.glsl.js';
-import { applyModifiers } from './three-particles-modifiers.js';
-import { removeBezierCurveFunction } from './three-particles-bezier.js';
 import {
   Constant,
   CycleData,
@@ -937,9 +935,9 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
     particleSystem.getWorldQuaternion(worldQuaternion);
     if (
       lastWorldQuaternion.x === -99999 ||
-      lastWorldQuaternion.x != worldQuaternion.x ||
-      lastWorldQuaternion.y != worldQuaternion.y ||
-      lastWorldQuaternion.z != worldQuaternion.z
+      lastWorldQuaternion.x !== worldQuaternion.x ||
+      lastWorldQuaternion.y !== worldQuaternion.y ||
+      lastWorldQuaternion.z !== worldQuaternion.z
     ) {
       worldEuler.setFromQuaternion(worldQuaternion);
       lastWorldQuaternion.copy(worldQuaternion);

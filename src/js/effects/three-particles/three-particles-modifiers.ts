@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-import { GeneralData, NormalizedParticleSystemConfig } from './types.js';
 import { calculateValue } from './three-particles-utils.js';
+import { GeneralData, NormalizedParticleSystemConfig } from './types.js';
 
 const noiseInput = new THREE.Vector3(0, 0, 0);
 const orbitalEuler = new THREE.Euler();
