@@ -4,30 +4,39 @@
 [![NPM Downloads](https://img.shields.io/npm/dw/@newkrok/three-particles.svg)](https://www.npmjs.com/package/@newkrok/three-particles)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/@newkrok/three-particles)](https://bundlephobia.com/package/@newkrok/three-particles)
 
-
-
-
-Particle system for ThreeJS
+Particle system for ThreeJS.
 
 # THREE Particles Editor
 
-You can create your own particle effects with it's editor https://github.com/NewKrok/three-particles-editor
+You can create your own particle effects with its editor: [https://github.com/NewKrok/three-particles-editor](https://github.com/NewKrok/three-particles-editor)
 
 # Video
 
-- Projectiles: https://youtu.be/Q352JuxON04
-- First preview: https://youtu.be/dtN_bndvoGU
+- Projectiles: [https://youtu.be/Q352JuxON04](https://youtu.be/Q352JuxON04)
+- First preview: [https://youtu.be/dtN_bndvoGU](https://youtu.be/dtN_bndvoGU)
 
-# Live demo
+# Live Demo
 
-https://newkrok.com/three-particles-editor/index.html
+[https://newkrok.com/three-particles-editor/index.html](https://newkrok.com/three-particles-editor/index.html)
+
+# Documentation
+
+Automatically generated TypeDoc: [https://newkrok.github.io/three-particles/](https://newkrok.github.io/three-particles/)
 
 # Install
 
-npm package https://www.npmjs.com/package/@newkrok/three-particles
+NPM package: [https://www.npmjs.com/package/@newkrok/three-particles](https://www.npmjs.com/package/@newkrok/three-particles)
 
-Install with npm
-`npm i @newkrok/three-particles`
+Install with npm:
+```bash
+npm i @newkrok/three-particles
+```
 
-Add as a package.json dependency
-`"dependencies": { ... "@newkrok/three-particles": "0.7.0" ... }, `
+Add as a `package.json` dependency:
+```json
+"dependencies": {
+  ...
+  "@newkrok/three-particles": "2.0.0"
+  ...
+}
+```
