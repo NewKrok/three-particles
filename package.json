@@ -56,14 +56,14 @@
     "three-noise": "1.1.2"
   },
   "peerDependencies": {
-    "three": "^0.172.0"
+    "three": "^0.175.0"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.26.0",
     "@babel/preset-typescript": "^7.26.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.4",
-    "@types/three": "^0.172.0",
+    "@types/three": "^0.175.0",
     "@typescript-eslint/eslint-plugin": "^8.21.0",
     "@typescript-eslint/parser": "^8.21.0",
     "babel-jest": "^29.7.0",
