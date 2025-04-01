@@ -1,0 +1,36 @@
+name: Bundle Size Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  analyze-bundle:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build project
+      run: npm run build
+
+    - name: Generate bundle report
+      run: |
+        npm run build
+        cat dist/bundle-report.json
+
+    - name: Post bundle size comment
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        path: dist/bundle-report.json

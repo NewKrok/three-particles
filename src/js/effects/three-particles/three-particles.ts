@@ -11,7 +11,7 @@ import {
   Shape,
   SimulationSpace,
   TimeMode,
-} from './three-particles-enums.js';
+} from './three-particles-enums';
 import { applyModifiers } from './three-particles-modifiers.js';
 import {
   calculateRandomPositionAndVelocityOnBox,
@@ -23,6 +23,7 @@ import {
   getCurveFunctionFromConfig,
   isLifeTimeCurve,
 } from './three-particles-utils.js';
+
 import {
   Constant,
   CycleData,
