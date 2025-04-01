@@ -1,23 +1,41 @@
 {
   "name": "@newkrok/three-particles",
-  "version": "1.0.3",
-  "description": "Particle system for ThreeJS",
-  "main": "src/js/effects/three-particles.js",
-  "bin": {
-    "three-particles": "src/js/effects/three-particles.js"
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Three.js-based high-performance particle system library designed for creating visually stunning particle effects with ease. Perfect for game developers and 3D applications.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "dist/three-particles.d.ts",
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NewKrok/three-particles.git"
+    "url": "https://github.com/NewKrok/three-particles.git"
   },
   "keywords": [
-    "threejs",
-    "particle",
+    "three",
+    "three.js",
     "particles",
-    "particle engine",
-    "effects",
+    "particle system",
+    "webgl",
     "3d",
-    "lib"
+    "visual effects",
+    "game development",
+    "3d applications",
+    "high performance",
+    "javascript",
+    "typescript",
+    "three-particles",
+    "threejs effects"
   ],
   "author": "Istvan Krisztian Somoracz",
   "license": "MIT",
@@ -25,13 +43,45 @@
     "url": "https://github.com/NewKrok/three-particles/issues"
   },
   "homepage": "https://github.com/NewKrok/three-particles#readme",
-  "dependencies": {
-    "easing-functions": "1.0.1",
-    "three": "^0.155.0",
-    "three-noise": "1.1.2",
-    "@newkrok/three-utils": "^1.0.0"
-  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "rmdir /s /q dist && tsc && webpack --config webpack.config.js",
+    "prepublishOnly": "npm run build",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@newkrok/three-utils": "^1.0.0",
+    "easing-functions": "1.0.1",
+    "three-noise": "1.1.2"
+  },
+  "peerDependencies": {
+    "three": "^0.175.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.26.0",
+    "@babel/preset-typescript": "^7.26.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.4",
+    "@types/three": "^0.175.0",
+    "@typescript-eslint/eslint-plugin": "^8.21.0",
+    "@typescript-eslint/parser": "^8.21.0",
+    "babel-jest": "^29.7.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-prettier": "^5.2.3",
+    "jest": "^29.7.0",
+    "madge": "^8.0.0",
+    "prettier": "^3.4.2",
+    "terser-webpack-plugin": "^5.3.11",
+    "ts-jest": "^29.2.5",
+    "ts-loader": "^9.5.2",
+    "ts-node": "^10.9.2",
+    "typedoc": "^0.27.6",
+    "typescript": "^5.7.3",
+    "webpack": "^5.97.1",
+    "webpack-bundle-analyzer": "^4.10.2",
+    "webpack-cli": "^6.0.1"
   }
 }

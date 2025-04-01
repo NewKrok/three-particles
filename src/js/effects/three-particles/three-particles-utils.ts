@@ -1,13 +1,24 @@
-import * as THREE from "three";
+import * as THREE from 'three';
 
-import { EmitFrom } from "./three-particles-enums.js";
+import { createBezierCurveFunction } from './three-particles-bezier.js';
+import { EmitFrom, LifeTimeCurve } from './three-particles-enums.js';
+import {
+  Constant,
+  LifetimeCurve,
+  Point3D,
+  RandomBetweenTwoConstants,
+} from './types.js';
 
 export const calculateRandomPositionAndVelocityOnSphere = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { radius, radiusThickness, arc }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  speed: number,
+  {
+    radius,
+    radiusThickness,
+    arc,
+  }: { radius: number; radiusThickness: number; arc: number }
 ) => {
   const u = Math.random() * (arc / 360);
   const v = Math.random();
@@ -33,25 +44,31 @@ export const calculateRandomPositionAndVelocityOnSphere = (
 
   position.applyQuaternion(quaternion);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
-  );
   const speedMultiplierByPosition = 1 / position.length();
   velocity.set(
-    position.x * speedMultiplierByPosition * randomizedSpeed,
-    position.y * speedMultiplierByPosition * randomizedSpeed,
-    position.z * speedMultiplierByPosition * randomizedSpeed
+    position.x * speedMultiplierByPosition * speed,
+    position.y * speedMultiplierByPosition * speed,
+    position.z * speedMultiplierByPosition * speed
   );
   velocity.applyQuaternion(quaternion);
 };
 
 export const calculateRandomPositionAndVelocityOnCone = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { radius, radiusThickness, arc, angle = 90 }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  speed: number,
+  {
+    radius,
+    radiusThickness,
+    arc,
+    angle = 90,
+  }: {
+    radius: number;
+    radiusThickness: number;
+    arc: number;
+    angle?: number;
+  }
 ) => {
   const theta = 2 * Math.PI * Math.random() * (arc / 360);
   const randomizedDistanceRatio = Math.random();
@@ -76,37 +93,28 @@ export const calculateRandomPositionAndVelocityOnCone = (
   );
   const sinNormalizedAngle = Math.sin(normalizedAngle);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
-  );
   const speedMultiplierByPosition = 1 / positionLength;
   velocity.set(
-    position.x *
-      sinNormalizedAngle *
-      speedMultiplierByPosition *
-      randomizedSpeed,
-    position.y *
-      sinNormalizedAngle *
-      speedMultiplierByPosition *
-      randomizedSpeed,
-    Math.cos(normalizedAngle) * randomizedSpeed
+    position.x * sinNormalizedAngle * speedMultiplierByPosition * speed,
+    position.y * sinNormalizedAngle * speedMultiplierByPosition * speed,
+    Math.cos(normalizedAngle) * speed
   );
   velocity.applyQuaternion(quaternion);
 };
 
 export const calculateRandomPositionAndVelocityOnBox = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { scale, emitFrom }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  speed: number,
+  { scale, emitFrom }: { scale: Point3D; emitFrom: EmitFrom }
 ) => {
+  const _scale = scale as Required<Point3D>;
   switch (emitFrom) {
     case EmitFrom.VOLUME:
-      position.x = Math.random() * scale.x - scale.x / 2;
-      position.y = Math.random() * scale.y - scale.y / 2;
-      position.z = Math.random() * scale.z - scale.z / 2;
+      position.x = Math.random() * _scale.x - _scale.x / 2;
+      position.y = Math.random() * _scale.y - _scale.y / 2;
+      position.z = Math.random() * _scale.z - _scale.z / 2;
       break;
 
     case EmitFrom.SHELL:
@@ -116,9 +124,9 @@ export const calculateRandomPositionAndVelocityOnBox = (
       shellResult[perpendicularAxis] = side > 2 ? 1 : 0;
       shellResult[(perpendicularAxis + 1) % 3] = Math.random();
       shellResult[(perpendicularAxis + 2) % 3] = Math.random();
-      position.x = shellResult[0] * scale.x - scale.x / 2;
-      position.y = shellResult[1] * scale.y - scale.y / 2;
-      position.z = shellResult[2] * scale.z - scale.z / 2;
+      position.x = shellResult[0] * _scale.x - _scale.x / 2;
+      position.y = shellResult[1] * _scale.y - _scale.y / 2;
+      position.z = shellResult[2] * _scale.z - _scale.z / 2;
       break;
 
     case EmitFrom.EDGE:
@@ -131,28 +139,28 @@ export const calculateRandomPositionAndVelocityOnBox = (
         edge < 2 ? Math.random() : edge - 2;
       edgeResult[(perpendicularAxis2 + 2) % 3] =
         edge < 2 ? edge : Math.random();
-      position.x = edgeResult[0] * scale.x - scale.x / 2;
-      position.y = edgeResult[1] * scale.y - scale.y / 2;
-      position.z = edgeResult[2] * scale.z - scale.z / 2;
+      position.x = edgeResult[0] * _scale.x - _scale.x / 2;
+      position.y = edgeResult[1] * _scale.y - _scale.y / 2;
+      position.z = edgeResult[2] * _scale.z - _scale.z / 2;
       break;
   }
 
   position.applyQuaternion(quaternion);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
-  );
-  velocity.set(0, 0, randomizedSpeed);
+  velocity.set(0, 0, speed);
   velocity.applyQuaternion(quaternion);
 };
 
 export const calculateRandomPositionAndVelocityOnCircle = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { radius, radiusThickness, arc }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  speed: number,
+  {
+    radius,
+    radiusThickness,
+    arc,
+  }: { radius: number; radiusThickness: number; arc: number }
 ) => {
   const theta = 2 * Math.PI * Math.random() * (arc / 360);
   const randomizedDistanceRatio = Math.random();
@@ -171,42 +179,83 @@ export const calculateRandomPositionAndVelocityOnCircle = (
 
   position.applyQuaternion(quaternion);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
-  );
-
   const positionLength = position.length();
   const speedMultiplierByPosition = 1 / positionLength;
   velocity.set(
-    position.x * speedMultiplierByPosition * randomizedSpeed,
-    position.y * speedMultiplierByPosition * randomizedSpeed,
+    position.x * speedMultiplierByPosition * speed,
+    position.y * speedMultiplierByPosition * speed,
     0
   );
   velocity.applyQuaternion(quaternion);
 };
 
 export const calculateRandomPositionAndVelocityOnRectangle = (
-  position,
-  quaternion,
-  velocity,
-  startSpeed,
-  { rotation, scale }
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  velocity: THREE.Vector3,
+  speed: number,
+  { rotation, scale }: { rotation: Point3D; scale: Point3D }
 ) => {
-  const xOffset = Math.random() * scale.x - scale.x / 2;
-  const yOffset = Math.random() * scale.y - scale.y / 2;
-  const rotationX = THREE.MathUtils.degToRad(rotation.x);
-  const rotationY = THREE.MathUtils.degToRad(rotation.y);
+  const _scale = scale as Required<Point3D>;
+  const _rotation = rotation as Required<Point3D>;
+
+  const xOffset = Math.random() * _scale.x - _scale.x / 2;
+  const yOffset = Math.random() * _scale.y - _scale.y / 2;
+  const rotationX = THREE.MathUtils.degToRad(_rotation.x);
+  const rotationY = THREE.MathUtils.degToRad(_rotation.y);
   position.x = xOffset * Math.cos(rotationY);
   position.y = yOffset * Math.cos(rotationX);
   position.z = xOffset * Math.sin(rotationY) - yOffset * Math.sin(rotationX);
 
   position.applyQuaternion(quaternion);
 
-  const randomizedSpeed = THREE.MathUtils.randFloat(
-    startSpeed.min,
-    startSpeed.max
-  );
-  velocity.set(0, 0, randomizedSpeed);
+  velocity.set(0, 0, speed);
   velocity.applyQuaternion(quaternion);
+};
+
+export const isLifeTimeCurve = (
+  value: Constant | RandomBetweenTwoConstants | LifetimeCurve
+): value is LifetimeCurve => {
+  return typeof value !== 'number' && 'type' in value;
+};
+
+export const getCurveFunctionFromConfig = (
+  particleSystemId: number,
+  lifeTimeCurve: LifetimeCurve
+) => {
+  if (lifeTimeCurve.type === LifeTimeCurve.BEZIER) {
+    return createBezierCurveFunction(
+      particleSystemId,
+      lifeTimeCurve.bezierPoints
+    ); // Bézier curve
+  }
+
+  if (lifeTimeCurve.type === LifeTimeCurve.EASING) {
+    return lifeTimeCurve.curveFunction; // Easing curve
+  }
+
+  throw new Error(`Unsupported value type: ${lifeTimeCurve}`);
+};
+
+export const calculateValue = (
+  particleSystemId: number,
+  value: Constant | RandomBetweenTwoConstants | LifetimeCurve,
+  time: number = 0
+): number => {
+  if (typeof value === 'number') {
+    return value; // Constant value
+  }
+
+  if ('min' in value && 'max' in value) {
+    if (value.min === value.max) {
+      return value.min ?? 0; // Constant value
+    }
+    return THREE.MathUtils.randFloat(value.min ?? 0, value.max ?? 1); // Random range
+  }
+
+  const lifeTimeCurve = value as LifetimeCurve;
+  return (
+    getCurveFunctionFromConfig(particleSystemId, lifeTimeCurve)(time) *
+    (lifeTimeCurve.scale ?? 1)
+  );
 };
