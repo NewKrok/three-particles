@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default {
-  entry: './dist/js/effects/three-particles/index.js',
+  entry: './dist/index.js',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'three-particles.min.js',

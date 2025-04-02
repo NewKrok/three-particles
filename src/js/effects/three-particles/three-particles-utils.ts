@@ -213,6 +213,42 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
   velocity.applyQuaternion(quaternion);
 };
 
+/**
+ * Creates a default white circle texture using CanvasTexture.
+ * @returns {THREE.CanvasTexture | null} The generated texture or null if context fails.
+ */
+export const createDefaultParticleTexture = (): THREE.CanvasTexture | null => {
+  try {
+    const canvas = document.createElement('canvas');
+    const size = 64;
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d');
+    if (context) {
+      const centerX = size / 2;
+      const centerY = size / 2;
+      const radius = size / 2 - 2; // Small padding
+
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
+      context.fillStyle = 'white';
+      context.fill();
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      return texture;
+    } else {
+      console.warn(
+        'Could not get 2D context to generate default particle texture.'
+      );
+      return null;
+    }
+  } catch (error) {
+    // Handle potential errors (e.g., document not available in non-browser env)
+    console.warn('Error creating default particle texture:', error);
+    return null;
+  }
+};
+
 export const isLifeTimeCurve = (
   value: Constant | RandomBetweenTwoConstants | LifetimeCurve
 ): value is LifetimeCurve => {
