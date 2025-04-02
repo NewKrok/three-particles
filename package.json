@@ -5,7 +5,7 @@
   "description": "Three.js-based high-performance particle system library designed for creating visually stunning particle effects with ease. Perfect for game developers and 3D applications.",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "types": "dist/three-particles.d.ts",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist/",
     "README.md",
