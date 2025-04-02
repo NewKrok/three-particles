@@ -22,6 +22,7 @@ import {
   calculateValue,
   getCurveFunctionFromConfig,
   isLifeTimeCurve,
+  createDefaultParticleTexture,
 } from './three-particles-utils.js';
 
 import {
@@ -336,6 +337,9 @@ export const createParticleSystem = (
     config
   );
 
+  let particleMap: THREE.Texture | null =
+    normalizedConfig.map || createDefaultParticleTexture();
+
   const {
     transform,
     duration,
@@ -352,7 +356,6 @@ export const createParticleSystem = (
     maxParticles,
     emission,
     shape,
-    map,
     renderer,
     noise,
     velocityOverLifetime,
@@ -531,7 +534,7 @@ export const createParticleSystem = (
         value: 0.0,
       },
       map: {
-        value: map,
+        value: particleMap,
       },
       tiles: {
         value: textureSheetAnimation.tiles,
