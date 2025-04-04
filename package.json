@@ -44,7 +44,7 @@
   },
   "homepage": "https://github.com/NewKrok/three-particles#readme",
   "scripts": {
-    "build": "rmdir /s /q dist && tsc && webpack --config webpack.config.js",
+    "build": "rimraf dist && tsc && webpack --config webpack.config.js",
     "prepublishOnly": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -78,6 +78,7 @@
     "jest": "^29.7.0",
     "madge": "^8.0.0",
     "prettier": "^3.4.2",
+    "rimraf": "^6.0.1",
     "terser-webpack-plugin": "^5.3.11",
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.2",
