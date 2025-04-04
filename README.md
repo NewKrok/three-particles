@@ -6,37 +6,58 @@
 
 Particle system for ThreeJS.
 
-# THREE Particles Editor
+# Features
 
-You can create your own particle effects with its editor: [https://github.com/NewKrok/three-particles-editor](https://github.com/NewKrok/three-particles-editor)
+*   Easy integration with Three.js.
+*   Visual editor for creating and fine-tuning effects: [THREE Particles Editor](https://github.com/NewKrok/three-particles-editor)
+*   Highly customizable particle properties (position, velocity, size, color, alpha, rotation, etc.).
+*   Support for various emitter shapes and parameters.
+*   TypeDoc API documentation available.
 
-# Video
+# Live Demo & Examples
 
-- Projectiles: [https://youtu.be/Q352JuxON04](https://youtu.be/Q352JuxON04)
-- First preview: [https://youtu.be/dtN_bndvoGU](https://youtu.be/dtN_bndvoGU)
+*   **Editor & Live Demo:** [https://newkrok.com/three-particles-editor/index.html](https://newkrok.com/three-particles-editor/index.html)
+*   **CodePen Basic Example:** [https://codepen.io/NewKrok/pen/GgRzEmP](https://codepen.io/NewKrok/pen/GgRzEmP)
+*   **Video - Projectiles:** [https://youtu.be/Q352JuxON04](https://youtu.be/Q352JuxON04)
+*   **Video - First Preview:** [https://youtu.be/dtN_bndvoGU](https://youtu.be/dtN_bndvoGU)
 
-# Live Demo
+# Installation
 
-[https://newkrok.com/three-particles-editor/index.html](https://newkrok.com/three-particles-editor/index.html)
+## NPM
+
+```bash
+npm install @newkrok/three-particles
+```
+
+## CDN (Browser)
+
+Include the script directly in your HTML:
+
+```html
+<!-- Please verify this path points to the correct UMD/IIFE bundle -->
+<script src="https://cdn.jsdelivr.net/npm/@newkrok/three-particles@latest/dist/three-particles.min.js"></script>
+<!-- or -->
+<script src="https://unpkg.com/@newkrok/three-particles@latest/dist/three-particles.min.js"></script>
+```
+
+# Usage
+
+Here's a basic example of how to load and use a particle system:
+
+```javascript
+// Create a particle system
+const effect = {
+  // Your effect configuration here
+  // It can be empty to use default settings
+};
+const { instance } = createParticleSystem(effect);
+scene.add(instance);
+
+// Update the particle system in your animation loop
+// Pass the current time, delta time, and elapsed time
+updateParticleSystems({now, delta, elapsed});
+```
 
 # Documentation
 
 Automatically generated TypeDoc: [https://newkrok.github.io/three-particles/](https://newkrok.github.io/three-particles/)
-
-# Install
-
-NPM package: [https://www.npmjs.com/package/@newkrok/three-particles](https://www.npmjs.com/package/@newkrok/three-particles)
-
-Install with npm:
-```bash
-npm i @newkrok/three-particles
-```
-
-Add as a `package.json` dependency:
-```json
-"dependencies": {
-  ...
-  "@newkrok/three-particles": "2.0.0"
-  ...
-}
-```

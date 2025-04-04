@@ -1,0 +1,31 @@
+name: Publish Package to npm
+
+on:
+  release:
+    types: [published] # Trigger only when a release is published
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest # Use the latest Ubuntu runner
+    permissions:
+      contents: read # Allow reading repository content
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Action to check out the repository code
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18' # Specify your desired Node.js version
+          registry-url: 'https://registry.npmjs.org/' # Point to the npm registry
+
+      - name: Install dependencies
+        run: npm ci # Use 'ci' for clean installs in CI
+
+      - name: Build package
+        run: npm run build # Run your build script
+
+      - name: Publish to npm
+        run: npm publish --access public # Publish with public access for scoped packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # Use the secret token for authentication

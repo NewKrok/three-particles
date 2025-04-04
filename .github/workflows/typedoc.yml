@@ -3,10 +3,10 @@ name: Generate and Deploy Typedoc
 on:
   push:
     branches:
-      - 2.0.0
+      - master
   pull_request:
     branches:
-      - 2.0.0
+      - master
 
 jobs:
   build:

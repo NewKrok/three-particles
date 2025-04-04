@@ -3,7 +3,7 @@ name: Bundle Size Check
 on:
   pull_request:
     branches:
-      - main
+      - master
 
 jobs:
   analyze-bundle:
