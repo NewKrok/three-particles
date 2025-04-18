@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/images/logo.svg" alt="THREE Particles Logo" width="150" />
+</p>
+
 # THREE Particles
 [![Run Tests](https://github.com/NewKrok/three-particles/actions/workflows/test.yml/badge.svg)](https://github.com/NewKrok/three-particles/actions/workflows/test.yml)
 [![NPM Version](https://img.shields.io/npm/v/@newkrok/three-particles.svg)](https://www.npmjs.com/package/@newkrok/three-particles)
