@@ -332,11 +332,11 @@ export const createParticleSystem = (
     },
     isEnabled: true,
   };
-  const normalizedConfig = ObjectUtils.patchObject(
+  const normalizedConfig = ObjectUtils.deepMerge(
     DEFAULT_PARTICLE_SYSTEM_CONFIG as NormalizedParticleSystemConfig,
-    config
-  );
-
+    config,
+    { applyToFirstObject: false, skippedProperties: [] }
+  ) as NormalizedParticleSystemConfig;
   let particleMap: THREE.Texture | null =
     normalizedConfig.map || createDefaultParticleTexture();
 
@@ -385,44 +385,44 @@ export const createParticleSystem = (
         speed: new THREE.Vector3(
           velocityOverLifetime.linear.x
             ? calculateValue(
-                generalData.particleSystemId,
-                velocityOverLifetime.linear.x,
-                0
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.linear.x,
+              0
+            )
             : 0,
           velocityOverLifetime.linear.y
             ? calculateValue(
-                generalData.particleSystemId,
-                velocityOverLifetime.linear.y,
-                0
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.linear.y,
+              0
+            )
             : 0,
           velocityOverLifetime.linear.z
             ? calculateValue(
-                generalData.particleSystemId,
-                velocityOverLifetime.linear.z,
-                0
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.linear.z,
+              0
+            )
             : 0
         ),
         valueModifiers: {
           x: isLifeTimeCurve(velocityOverLifetime.linear.x || 0)
             ? getCurveFunctionFromConfig(
-                generalData.particleSystemId,
-                velocityOverLifetime.linear.x as LifetimeCurve
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.linear.x as LifetimeCurve
+            )
             : undefined,
           y: isLifeTimeCurve(velocityOverLifetime.linear.y || 0)
             ? getCurveFunctionFromConfig(
-                generalData.particleSystemId,
-                velocityOverLifetime.linear.y as LifetimeCurve
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.linear.y as LifetimeCurve
+            )
             : undefined,
           z: isLifeTimeCurve(velocityOverLifetime.linear.z || 0)
             ? getCurveFunctionFromConfig(
-                generalData.particleSystemId,
-                velocityOverLifetime.linear.z as LifetimeCurve
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.linear.z as LifetimeCurve
+            )
             : undefined,
         },
       })
@@ -434,44 +434,44 @@ export const createParticleSystem = (
         speed: new THREE.Vector3(
           velocityOverLifetime.orbital.x
             ? calculateValue(
-                generalData.particleSystemId,
-                velocityOverLifetime.orbital.x,
-                0
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.orbital.x,
+              0
+            )
             : 0,
           velocityOverLifetime.orbital.y
             ? calculateValue(
-                generalData.particleSystemId,
-                velocityOverLifetime.orbital.y,
-                0
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.orbital.y,
+              0
+            )
             : 0,
           velocityOverLifetime.orbital.z
             ? calculateValue(
-                generalData.particleSystemId,
-                velocityOverLifetime.orbital.z,
-                0
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.orbital.z,
+              0
+            )
             : 0
         ),
         valueModifiers: {
           x: isLifeTimeCurve(velocityOverLifetime.orbital.x || 0)
             ? getCurveFunctionFromConfig(
-                generalData.particleSystemId,
-                velocityOverLifetime.orbital.x as LifetimeCurve
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.orbital.x as LifetimeCurve
+            )
             : undefined,
           y: isLifeTimeCurve(velocityOverLifetime.orbital.y || 0)
             ? getCurveFunctionFromConfig(
-                generalData.particleSystemId,
-                velocityOverLifetime.orbital.y as LifetimeCurve
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.orbital.y as LifetimeCurve
+            )
             : undefined,
           z: isLifeTimeCurve(velocityOverLifetime.orbital.z || 0)
             ? getCurveFunctionFromConfig(
-                generalData.particleSystemId,
-                velocityOverLifetime.orbital.z as LifetimeCurve
-              )
+              generalData.particleSystemId,
+              velocityOverLifetime.orbital.z as LifetimeCurve
+            )
             : undefined,
         },
         positionOffset: new THREE.Vector3(),
@@ -488,9 +488,9 @@ export const createParticleSystem = (
       calculateValue(
         generalData.particleSystemId,
         normalizedConfig[key] as
-          | Constant
-          | RandomBetweenTwoConstants
-          | LifetimeCurve,
+        | Constant
+        | RandomBetweenTwoConstants
+        | LifetimeCurve,
         0
       )
     );
@@ -518,10 +518,10 @@ export const createParticleSystem = (
     sizeAmount: noise.sizeAmount,
     sampler: noise.isActive
       ? new FBM({
-          seed: Math.random(),
-          scale: noise.frequency,
-          octaves: noise.octaves,
-        })
+        seed: Math.random(),
+        scale: noise.frequency,
+        octaves: noise.octaves,
+      })
       : undefined,
     offsets: noise.useRandomOffset
       ? Array.from({ length: maxParticles }, () => Math.random() * 100)
@@ -604,10 +604,10 @@ export const createParticleSystem = (
   createFloat32AttributesRequest('startFrame', () =>
     textureSheetAnimation.startFrame
       ? calculateValue(
-          generalData.particleSystemId,
-          textureSheetAnimation.startFrame,
-          0
-        )
+        generalData.particleSystemId,
+        textureSheetAnimation.startFrame,
+        0
+      )
       : 0
   );
 
@@ -688,10 +688,10 @@ export const createParticleSystem = (
     geometry.attributes.startFrame.array[particleIndex] =
       textureSheetAnimation.startFrame
         ? calculateValue(
-            generalData.particleSystemId,
-            textureSheetAnimation.startFrame,
-            0
-          )
+          generalData.particleSystemId,
+          textureSheetAnimation.startFrame,
+          0
+        )
         : 0;
     geometry.attributes.startFrame.needsUpdate = true;
 
@@ -755,24 +755,24 @@ export const createParticleSystem = (
       generalData.linearVelocityData[particleIndex].speed.set(
         normalizedConfig.velocityOverLifetime.linear.x
           ? calculateValue(
-              generalData.particleSystemId,
-              normalizedConfig.velocityOverLifetime.linear.x,
-              0
-            )
+            generalData.particleSystemId,
+            normalizedConfig.velocityOverLifetime.linear.x,
+            0
+          )
           : 0,
         normalizedConfig.velocityOverLifetime.linear.y
           ? calculateValue(
-              generalData.particleSystemId,
-              normalizedConfig.velocityOverLifetime.linear.y,
-              0
-            )
+            generalData.particleSystemId,
+            normalizedConfig.velocityOverLifetime.linear.y,
+            0
+          )
           : 0,
         normalizedConfig.velocityOverLifetime.linear.z
           ? calculateValue(
-              generalData.particleSystemId,
-              normalizedConfig.velocityOverLifetime.linear.z,
-              0
-            )
+            generalData.particleSystemId,
+            normalizedConfig.velocityOverLifetime.linear.z,
+            0
+          )
           : 0
       );
     }
@@ -781,24 +781,24 @@ export const createParticleSystem = (
       generalData.orbitalVelocityData[particleIndex].speed.set(
         normalizedConfig.velocityOverLifetime.orbital.x
           ? calculateValue(
-              generalData.particleSystemId,
-              normalizedConfig.velocityOverLifetime.orbital.x,
-              0
-            )
+            generalData.particleSystemId,
+            normalizedConfig.velocityOverLifetime.orbital.x,
+            0
+          )
           : 0,
         normalizedConfig.velocityOverLifetime.orbital.y
           ? calculateValue(
-              generalData.particleSystemId,
-              normalizedConfig.velocityOverLifetime.orbital.y,
-              0
-            )
+            generalData.particleSystemId,
+            normalizedConfig.velocityOverLifetime.orbital.y,
+            0
+          )
           : 0,
         normalizedConfig.velocityOverLifetime.orbital.z
           ? calculateValue(
-              generalData.particleSystemId,
-              normalizedConfig.velocityOverLifetime.orbital.z,
-              0
-            )
+            generalData.particleSystemId,
+            normalizedConfig.velocityOverLifetime.orbital.z,
+            0
+          )
           : 0
       );
       generalData.orbitalVelocityData[particleIndex].positionOffset.set(
@@ -1015,42 +1015,42 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
       const emissionDelta = now - lastEmissionTime;
       const neededParticlesByTime = emission.rateOverTime
         ? Math.floor(
-            calculateValue(
-              generalData.particleSystemId,
-              emission.rateOverTime,
-              generalData.normalizedLifetimePercentage
-            ) *
-              (emissionDelta / 1000)
-          )
+          calculateValue(
+            generalData.particleSystemId,
+            emission.rateOverTime,
+            generalData.normalizedLifetimePercentage
+          ) *
+          (emissionDelta / 1000)
+        )
         : 0;
 
       const rateOverDistance = emission.rateOverDistance
         ? calculateValue(
-            generalData.particleSystemId,
-            emission.rateOverDistance,
-            generalData.normalizedLifetimePercentage
-          )
+          generalData.particleSystemId,
+          emission.rateOverDistance,
+          generalData.normalizedLifetimePercentage
+        )
         : 0;
       const neededParticlesByDistance =
         rateOverDistance > 0 && generalData.distanceFromLastEmitByDistance > 0
           ? Math.floor(
-              generalData.distanceFromLastEmitByDistance /
-                (1 / rateOverDistance!)
-            )
+            generalData.distanceFromLastEmitByDistance /
+            (1 / rateOverDistance!)
+          )
           : 0;
       const distanceStep =
         neededParticlesByDistance > 0
           ? {
-              x:
-                (currentWorldPosition.x - lastWorldPositionSnapshot.x) /
-                neededParticlesByDistance,
-              y:
-                (currentWorldPosition.y - lastWorldPositionSnapshot.y) /
-                neededParticlesByDistance,
-              z:
-                (currentWorldPosition.z - lastWorldPositionSnapshot.z) /
-                neededParticlesByDistance,
-            }
+            x:
+              (currentWorldPosition.x - lastWorldPositionSnapshot.x) /
+              neededParticlesByDistance,
+            y:
+              (currentWorldPosition.y - lastWorldPositionSnapshot.y) /
+              neededParticlesByDistance,
+            z:
+              (currentWorldPosition.z - lastWorldPositionSnapshot.z) /
+              neededParticlesByDistance,
+          }
           : null;
       const neededParticles = neededParticlesByTime + neededParticlesByDistance;
 
@@ -1075,7 +1075,7 @@ export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
           if (
             particleIndex !== -1 &&
             particleIndex <
-              particleSystem.geometry.attributes.isActive.array.length
+            particleSystem.geometry.attributes.isActive.array.length
           ) {
             let position: Required<Point3D> = { x: 0, y: 0, z: 0 };
             if (
