@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <path fill="#FF4500" d="M0,0 L256,0 L0,256 z" />
-  <path fill="#FF4500" d="M256,0 L384,128 L256,128 z" />
-  <path fill="#FF4500" d="M384,128 L512,256 L384,256 z" />
-  <path fill="#FF4500" d="M256,128 L384,256 L256,256 z" />
-  <path fill="#FF4500" d="M256,256 L384,384 L256,384 z" />
+  <!-- Dark background -->
+  <rect width="512" height="512" fill="#1E2329" />
+  
+  <!-- Main large triangle -->
+  <path fill="#FF4500" d="M40,40 L280,40 L40,280 z" />
+  
+  <!-- Top right triangles -->
+  <path fill="#FF4500" d="M320,120 L400,120 L320,200 z" />
+  <path fill="#FF4500" d="M420,160 L470,160 L420,210 z" />
+  
+  <!-- Bottom right triangles -->
+  <path fill="#FF4500" d="M320,240 L400,240 L320,320 z" />
+  <path fill="#FF4500" d="M360,340 L440,340 L360,420 z" />
 </svg>
