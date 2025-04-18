@@ -22,6 +22,8 @@ Particle system for ThreeJS.
 
 *   **Editor & Live Demo:** [https://newkrok.com/three-particles-editor/index.html](https://newkrok.com/three-particles-editor/index.html)
 *   **CodePen Basic Example:** [https://codepen.io/NewKrok/pen/GgRzEmP](https://codepen.io/NewKrok/pen/GgRzEmP)
+*   **CodePen Fire Animation:** [https://codepen.io/NewKrok/pen/ByabNRJ](https://codepen.io/NewKrok/pen/ByabNRJ)
+*   **CodePen Projectile Simulation:** [https://codepen.io/NewKrok/pen/jEEErZy](https://codepen.io/NewKrok/pen/jEEErZy)
 *   **Video - Projectiles:** [https://youtu.be/Q352JuxON04](https://youtu.be/Q352JuxON04)
 *   **Video - First Preview:** [https://youtu.be/dtN_bndvoGU](https://youtu.be/dtN_bndvoGU)
 
@@ -38,7 +40,6 @@ npm install @newkrok/three-particles
 Include the script directly in your HTML:
 
 ```html
-<!-- Please verify this path points to the correct UMD/IIFE bundle -->
 <script src="https://cdn.jsdelivr.net/npm/@newkrok/three-particles@latest/dist/three-particles.min.js"></script>
 <!-- or -->
 <script src="https://unpkg.com/@newkrok/three-particles@latest/dist/three-particles.min.js"></script>
