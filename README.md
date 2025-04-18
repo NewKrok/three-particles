@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/images/logo.svg" alt="THREE Particles Logo" width="150" />
+  <img src="assets/images/logo-original.png" alt="THREE Particles Logo" width="150" />
 </p>
 
 # THREE Particles
