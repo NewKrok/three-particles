@@ -35,7 +35,9 @@ export default [
       // Temporary disabled
       'import/no-unresolved': 'off', // Ensure imports can be resolved
       'import/newline-after-import': 'error', // Enforce newline after import statements
-      'prettier/prettier': 'error', // Ensure code is formatted according to Prettier rules
+      'prettier/prettier': ['error', {
+        endOfLine: 'lf' // Use LF line endings consistently
+      }], // Ensure code is formatted according to Prettier rules
     },
   },
   {

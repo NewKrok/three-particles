@@ -332,11 +332,11 @@ export const createParticleSystem = (
     },
     isEnabled: true,
   };
-  const normalizedConfig = ObjectUtils.patchObject(
+  const normalizedConfig = ObjectUtils.deepMerge(
     DEFAULT_PARTICLE_SYSTEM_CONFIG as NormalizedParticleSystemConfig,
-    config
-  );
-
+    config,
+    { applyToFirstObject: false, skippedProperties: [] }
+  ) as NormalizedParticleSystemConfig;
   let particleMap: THREE.Texture | null =
     normalizedConfig.map || createDefaultParticleTexture();
 

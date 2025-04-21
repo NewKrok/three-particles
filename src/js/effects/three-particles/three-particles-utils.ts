@@ -257,20 +257,20 @@ export const isLifeTimeCurve = (
 
 export const getCurveFunctionFromConfig = (
   particleSystemId: number,
-  lifeTimeCurve: LifetimeCurve
+  lifetimeCurve: LifetimeCurve
 ) => {
-  if (lifeTimeCurve.type === LifeTimeCurve.BEZIER) {
+  if (lifetimeCurve.type === LifeTimeCurve.BEZIER) {
     return createBezierCurveFunction(
       particleSystemId,
-      lifeTimeCurve.bezierPoints
+      lifetimeCurve.bezierPoints
     ); // Bézier curve
   }
 
-  if (lifeTimeCurve.type === LifeTimeCurve.EASING) {
-    return lifeTimeCurve.curveFunction; // Easing curve
+  if (lifetimeCurve.type === LifeTimeCurve.EASING) {
+    return lifetimeCurve.curveFunction; // Easing curve
   }
 
-  throw new Error(`Unsupported value type: ${lifeTimeCurve}`);
+  throw new Error(`Unsupported value type: ${lifetimeCurve}`);
 };
 
 export const calculateValue = (
@@ -289,9 +289,9 @@ export const calculateValue = (
     return THREE.MathUtils.randFloat(value.min ?? 0, value.max ?? 1); // Random range
   }
 
-  const lifeTimeCurve = value as LifetimeCurve;
+  const lifetimeCurve = value as LifetimeCurve;
   return (
-    getCurveFunctionFromConfig(particleSystemId, lifeTimeCurve)(time) *
-    (lifeTimeCurve.scale ?? 1)
+    getCurveFunctionFromConfig(particleSystemId, lifetimeCurve)(time) *
+    (lifetimeCurve.scale ?? 1)
   );
 };

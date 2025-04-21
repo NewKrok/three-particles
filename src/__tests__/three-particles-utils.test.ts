@@ -1,10 +1,17 @@
 import * as THREE from 'three';
 import { LifeTimeCurve } from '../js/effects/three-particles/three-particles-enums.js';
-import { calculateValue } from '../js/effects/three-particles/three-particles-utils.js';
-import { calculateRandomPositionAndVelocityOnSphere } from '../js/effects/three-particles/three-particles-utils.js';
+import {
+  calculateValue,
+  calculateRandomPositionAndVelocityOnSphere,
+  getCurveFunctionFromConfig,
+  isLifeTimeCurve,
+} from '../js/effects/three-particles/three-particles-utils.js';
 import {
   BezierCurve,
   EasingCurve,
+  Constant,
+  RandomBetweenTwoConstants,
+  LifetimeCurve,
 } from '../js/effects/three-particles/types.js';
 
 describe('calculateRandomPositionAndVelocityOnSphere', () => {
@@ -130,5 +137,90 @@ describe('calculateValue function tests', () => {
 
   it('throws an error for unsupported value type', () => {
     expect(() => calculateValue(1, {})).toThrow('Unsupported value type');
+  });
+});
+
+describe('isLifeTimeCurve function tests', () => {
+  it('returns false for number values', () => {
+    const result = isLifeTimeCurve(5);
+    expect(result).toBe(false);
+  });
+
+  it('returns false for RandomBetweenTwoConstants objects', () => {
+    const randomValue: RandomBetweenTwoConstants = { min: 1, max: 5 };
+    const result = isLifeTimeCurve(randomValue);
+    expect(result).toBe(false);
+  });
+
+  it('returns true for BezierCurve objects', () => {
+    const bezierCurve: BezierCurve = {
+      type: LifeTimeCurve.BEZIER,
+      bezierPoints: [
+        { x: 0, y: 0, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
+      scale: 1,
+    };
+    const result = isLifeTimeCurve(bezierCurve);
+    expect(result).toBe(true);
+  });
+
+  it('returns true for EasingCurve objects', () => {
+    const easingCurve: EasingCurve = {
+      type: LifeTimeCurve.EASING,
+      curveFunction: (time: number) => time,
+      scale: 1,
+    };
+    const result = isLifeTimeCurve(easingCurve);
+    expect(result).toBe(true);
+  });
+});
+
+describe('getCurveFunctionFromConfig function tests', () => {
+  it('returns a Bezier curve function for BEZIER type', () => {
+    const bezierCurve: BezierCurve = {
+      type: LifeTimeCurve.BEZIER,
+      bezierPoints: [
+        { x: 0, y: 0, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
+      scale: 1,
+    };
+
+    const curveFunction = getCurveFunctionFromConfig(1, bezierCurve);
+
+    // Test the returned function
+    expect(typeof curveFunction).toBe('function');
+    expect(curveFunction(0)).toBeCloseTo(0);
+    expect(curveFunction(1)).toBeCloseTo(1);
+    expect(curveFunction(0.5)).toBeCloseTo(0.5);
+  });
+
+  it('returns the provided curve function for EASING type', () => {
+    const testFunction = (time: number) => time * 2;
+    const easingCurve: EasingCurve = {
+      type: LifeTimeCurve.EASING,
+      curveFunction: testFunction,
+      scale: 1,
+    };
+
+    const curveFunction = getCurveFunctionFromConfig(1, easingCurve);
+
+    // Verify it returns the same function
+    expect(curveFunction).toBe(testFunction);
+    expect(curveFunction(0.5)).toBe(1); // 0.5 * 2 = 1
+  });
+
+  it('throws an error for unsupported curve type', () => {
+    // Create a curve with an invalid type that will pass TypeScript but fail at runtime
+    const invalidCurve = {
+      type: 999 as unknown as LifeTimeCurve, // Invalid enum value
+      scale: 1,
+      bezierPoints: [], // Add this to satisfy TypeScript
+    } as LifetimeCurve;
+
+    expect(() => getCurveFunctionFromConfig(1, invalidCurve)).toThrow(
+      'Unsupported value type'
+    );
   });
 });
