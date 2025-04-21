@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { LifeTimeCurve } from '../js/effects/three-particles/three-particles-enums.js';
-import { 
-  calculateValue, 
+import {
+  calculateValue,
   calculateRandomPositionAndVelocityOnSphere,
   getCurveFunctionFromConfig,
-  isLifeTimeCurve
+  isLifeTimeCurve,
 } from '../js/effects/three-particles/three-particles-utils.js';
 import {
   BezierCurve,
   EasingCurve,
   Constant,
   RandomBetweenTwoConstants,
-  LifetimeCurve
+  LifetimeCurve,
 } from '../js/effects/three-particles/types.js';
 
 describe('calculateRandomPositionAndVelocityOnSphere', () => {
@@ -186,9 +186,9 @@ describe('getCurveFunctionFromConfig function tests', () => {
       ],
       scale: 1,
     };
-    
+
     const curveFunction = getCurveFunctionFromConfig(1, bezierCurve);
-    
+
     // Test the returned function
     expect(typeof curveFunction).toBe('function');
     expect(curveFunction(0)).toBeCloseTo(0);
@@ -203,9 +203,9 @@ describe('getCurveFunctionFromConfig function tests', () => {
       curveFunction: testFunction,
       scale: 1,
     };
-    
+
     const curveFunction = getCurveFunctionFromConfig(1, easingCurve);
-    
+
     // Verify it returns the same function
     expect(curveFunction).toBe(testFunction);
     expect(curveFunction(0.5)).toBe(1); // 0.5 * 2 = 1
@@ -216,9 +216,11 @@ describe('getCurveFunctionFromConfig function tests', () => {
     const invalidCurve = {
       type: 999 as unknown as LifeTimeCurve, // Invalid enum value
       scale: 1,
-      bezierPoints: [] // Add this to satisfy TypeScript
+      bezierPoints: [], // Add this to satisfy TypeScript
     } as LifetimeCurve;
-    
-    expect(() => getCurveFunctionFromConfig(1, invalidCurve)).toThrow('Unsupported value type');
+
+    expect(() => getCurveFunctionFromConfig(1, invalidCurve)).toThrow(
+      'Unsupported value type'
+    );
   });
 });
