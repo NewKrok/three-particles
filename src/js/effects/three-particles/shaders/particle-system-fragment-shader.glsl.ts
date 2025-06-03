@@ -14,6 +14,9 @@ const ParticleSystemFragmentShader = `
   varying float vRotation;
   varying float vStartFrame;
 
+  #include <common>
+  #include <logdepthbuf_pars_fragment>
+
   void main()
   {
     gl_FragColor = vColor;
@@ -60,7 +63,9 @@ const ParticleSystemFragmentShader = `
 
     gl_FragColor = gl_FragColor * rotatedTexture;
 
-    if (discardBackgroundColor && abs(length(rotatedTexture.rgb - backgroundColor.rgb)) < backgroundColorTolerance ) discard;
+    if (discardBackgroundColor && abs(length(rotatedTexture.rgb - backgroundColor.rgb)) < backgroundColorTolerance) discard;
+    
+    #include <logdepthbuf_fragment>
   }
 `;
 
