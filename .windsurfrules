@@ -1,0 +1,55 @@
+# Three Particles – Development Rules
+
+## General Guidelines
+- The project uses the latest version of the `three` npm package.
+- Use **TypeScript** for all code, utilizing `type` definitions (avoid `interface` and `class` unless necessary).
+- Prefer **TypeScript types** over JSDoc for internal documentation.
+- Use **English** for all code and documentation.
+- All variables and functions must have explicitly declared types.
+- Avoid using `any`. If unavoidable, document the reason.
+- Create and reuse proper composite types instead of repeating structures.
+- Use **JSDoc** for documenting public classes and methods.
+- Use **ESLint** and **Prettier** for code formatting.
+- Use **Jest** for unit testing.
+- Always create unit tests for **utility functions**.
+
+## Code Conventions
+- File extensions: `.ts` for TypeScript.
+- Use **PascalCase** for classes.
+- Use **camelCase** for variables, functions, and methods.
+- Use **kebab-case** for file and directory names.
+- Use **UPPERCASE** for environment variables.
+- Avoid magic numbers — define them as constants.
+- Ensure code is formatted using **ESLint** and **Prettier**.
+- Use **Husky** and **lint-staged** for pre-commit checks.
+
+## Functions & Logic
+- Keep functions short and focused — preferably under 20 lines.
+- Avoid deeply nested blocks:
+  - Use early returns.
+  - Extract logic into utility functions.
+- Use higher-order functions like `map`, `filter`, and `reduce` where applicable.
+- Prefer arrow functions for simple cases (under 3 instructions), and named functions otherwise.
+- Use default parameter values instead of null/undefined checks.
+- Use RO-RO pattern (Receive Object, Return Object) for multiple parameters or return values.
+- Don’t leave unnecessary blank lines within functions.
+
+## Data Handling
+- Avoid excessive use of primitive types — encapsulate related data in composite types.
+- Avoid inline validation in functions — use types or classes with internal validation logic.
+- Prefer immutable data structures:
+  - Use `readonly` for immutable properties.
+  - Use `as const` for literals that should never change.
+
+## Version Control
+- Use **Conventional Commits** for all commit messages (`feat`, `fix`, `refactor`, etc.).
+- Each significant change must be in a separate commit.
+- The `master` branch contains the latest stable version.
+- **NEVER** use `--no-verify` when committing.
+- Branch names should follow the pattern: `type/description` (e.g., `feat/particle-effect`, `fix/css-issue`).
+- Branch types should match conventional commit types: `feat/`, `fix/`, `docs/`, `refactor/`, etc.
+- Long-term development should use `release/next` branch.
+- Hotfixes should branch directly from `master` with `fix/` prefix.
+
+## Testing
+- Write unit tests for utility functions
