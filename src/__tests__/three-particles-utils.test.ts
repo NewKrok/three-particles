@@ -121,7 +121,7 @@ describe('calculateValue function tests', () => {
       scale: 1,
     };
 
-    expect(() => calculateValue(1, invalidBezierCurve, 0.5)).toThrowError();
+    expect(() => calculateValue(1, invalidBezierCurve, 0.5)).toThrow();
   });
 
   it('returns Easing curve value with scaling', () => {
