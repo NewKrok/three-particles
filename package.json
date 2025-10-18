@@ -43,6 +43,9 @@
     "url": "https://github.com/NewKrok/three-particles/issues"
   },
   "homepage": "https://github.com/NewKrok/three-particles#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "rimraf dist && tsc && webpack --config webpack.config.js",
     "prepublishOnly": "npm run build",
