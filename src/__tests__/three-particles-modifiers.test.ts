@@ -17,6 +17,9 @@ describe('applyModifiers', () => {
       rotation: { array: new Float32Array(1), needsUpdate: false },
       size: { array: new Float32Array(1), needsUpdate: false },
       colorA: { array: new Float32Array(1), needsUpdate: false },
+      colorR: { array: new Float32Array(1), needsUpdate: false },
+      colorG: { array: new Float32Array(1), needsUpdate: false },
+      colorB: { array: new Float32Array(1), needsUpdate: false },
     } as unknown as THREE.NormalBufferAttributes;
 
     normalizedConfig = {
@@ -33,6 +36,24 @@ describe('applyModifiers', () => {
         lifetimeCurve: {
           type: LifeTimeCurve.EASING,
           curveFunction: () => 2,
+          scale: 1,
+        },
+      },
+      colorOverLifetime: {
+        isActive: false,
+        r: {
+          type: LifeTimeCurve.EASING,
+          curveFunction: () => 0.5,
+          scale: 1,
+        },
+        g: {
+          type: LifeTimeCurve.EASING,
+          curveFunction: () => 0.75,
+          scale: 1,
+        },
+        b: {
+          type: LifeTimeCurve.EASING,
+          curveFunction: () => 0.25,
           scale: 1,
         },
       },
@@ -337,5 +358,81 @@ describe('applyModifiers', () => {
 
     expect(_attributes.rotation.array[0]).toBeCloseTo(5 * 1 * 0.02, 5);
     expect(_attributes.rotation.needsUpdate).toBe(true);
+  });
+
+  test('applies colorOverLifetime curve modifiers when active', () => {
+    normalizedConfig.colorOverLifetime.isActive = true;
+
+    const _attributes = {
+      ...attributes,
+      colorR: { array: new Float32Array([1]), needsUpdate: false },
+      colorG: { array: new Float32Array([1]), needsUpdate: false },
+      colorB: { array: new Float32Array([1]), needsUpdate: false },
+    };
+
+    applyModifiers({
+      delta: 1,
+      generalData: {
+        noise: { isActive: false } as Noise,
+        startValues: {
+          startColorR: [1.0],
+          startColorG: [0.8],
+          startColorB: [0.6],
+        },
+        lifetimeValues: {},
+        linearVelocityData: undefined,
+      } as unknown as GeneralData,
+      normalizedConfig,
+      attributes: _attributes as any,
+      particleLifetimePercentage: 0.5,
+      particleIndex: 0,
+    });
+
+    expect(_attributes.colorR.array[0]).toBeCloseTo(1.0 * 0.5, 5);
+    expect(_attributes.colorR.needsUpdate).toBe(true);
+
+    expect(_attributes.colorG.array[0]).toBeCloseTo(0.8 * 0.75, 5);
+    expect(_attributes.colorG.needsUpdate).toBe(true);
+
+    expect(_attributes.colorB.array[0]).toBeCloseTo(0.6 * 0.25, 5);
+    expect(_attributes.colorB.needsUpdate).toBe(true);
+  });
+
+  test('does not apply colorOverLifetime when inactive', () => {
+    normalizedConfig.colorOverLifetime.isActive = false;
+
+    const _attributes = {
+      ...attributes,
+      colorR: { array: new Float32Array([1]), needsUpdate: false },
+      colorG: { array: new Float32Array([0.5]), needsUpdate: false },
+      colorB: { array: new Float32Array([0.25]), needsUpdate: false },
+    };
+
+    applyModifiers({
+      delta: 1,
+      generalData: {
+        noise: { isActive: false } as Noise,
+        startValues: {
+          startColorR: [1.0],
+          startColorG: [0.8],
+          startColorB: [0.6],
+        },
+        lifetimeValues: {},
+        linearVelocityData: undefined,
+      } as unknown as GeneralData,
+      normalizedConfig,
+      attributes: _attributes as any,
+      particleLifetimePercentage: 0.5,
+      particleIndex: 0,
+    });
+
+    expect(_attributes.colorR.array[0]).toBe(1);
+    expect(_attributes.colorR.needsUpdate).toBe(false);
+
+    expect(_attributes.colorG.array[0]).toBe(0.5);
+    expect(_attributes.colorG.needsUpdate).toBe(false);
+
+    expect(_attributes.colorB.array[0]).toBe(0.25);
+    expect(_attributes.colorB.needsUpdate).toBe(false);
   });
 });

@@ -141,14 +141,33 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
       ],
     },
   },
-  /* colorOverLifetime: {
+  colorOverLifetime: {
     isActive: false,
-    lifetimeCurve: {
-      type: LifeTimeCurve.EASING,
+    r: {
+      type: LifeTimeCurve.BEZIER,
       scale: 1,
-      curveFunction: CurveFunctionId.LINEAR,
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
     },
-  }, */
+    g: {
+      type: LifeTimeCurve.BEZIER,
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
+    },
+    b: {
+      type: LifeTimeCurve.BEZIER,
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
+    },
+  },
   opacityOverLifetime: {
     isActive: false,
     lifetimeCurve: {
@@ -496,6 +515,19 @@ export const createParticleSystem = (
     );
   });
 
+  generalData.startValues.startColorR = Array.from(
+    { length: maxParticles },
+    () => 0
+  );
+  generalData.startValues.startColorG = Array.from(
+    { length: maxParticles },
+    () => 0
+  );
+  generalData.startValues.startColorB = Array.from(
+    { length: maxParticles },
+    () => 0
+  );
+
   const lifetimeValueKeys: Array<keyof NormalizedParticleSystemConfig> = [
     'rotationOverLifetime',
   ];
@@ -684,6 +716,13 @@ export const createParticleSystem = (
       startColor.min!.b! +
       colorRandomRatio * (startColor.max!.b! - startColor.min!.b!);
     geometry.attributes.colorB.needsUpdate = true;
+
+    generalData.startValues.startColorR[particleIndex] =
+      geometry.attributes.colorR.array[particleIndex];
+    generalData.startValues.startColorG[particleIndex] =
+      geometry.attributes.colorG.array[particleIndex];
+    generalData.startValues.startColorB[particleIndex] =
+      geometry.attributes.colorB.array[particleIndex];
 
     geometry.attributes.startFrame.array[particleIndex] =
       textureSheetAnimation.startFrame

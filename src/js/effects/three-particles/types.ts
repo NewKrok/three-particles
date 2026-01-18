@@ -913,6 +913,50 @@ export type ParticleSystemConfig = {
   };
 
   /**
+   * Controls the color of particles over their lifetime.
+   * Each RGB channel can be adjusted independently using a lifetime curve (Bézier or easing).
+   * The curves act as multipliers (0-1 range) that are applied to the particle's start color.
+   *
+   * This follows Unity's Color over Lifetime behavior where the final color is:
+   * finalColor = startColor * colorOverLifetime
+   *
+   * @default
+   * colorOverLifetime: {
+   *   isActive: false,
+   *   r: {
+   *     type: LifeTimeCurve.BEZIER,
+   *     scale: 1,
+   *     bezierPoints: [
+   *       { x: 0, y: 1, percentage: 0 },
+   *       { x: 1, y: 1, percentage: 1 },
+   *     ],
+   *   },
+   *   g: {
+   *     type: LifeTimeCurve.BEZIER,
+   *     scale: 1,
+   *     bezierPoints: [
+   *       { x: 0, y: 1, percentage: 0 },
+   *       { x: 1, y: 1, percentage: 1 },
+   *     ],
+   *   },
+   *   b: {
+   *     type: LifeTimeCurve.BEZIER,
+   *     scale: 1,
+   *     bezierPoints: [
+   *       { x: 0, y: 1, percentage: 0 },
+   *       { x: 1, y: 1, percentage: 1 },
+   *     ],
+   *   },
+   * }
+   */
+  colorOverLifetime?: {
+    isActive: boolean;
+    r: LifetimeCurve;
+    g: LifetimeCurve;
+    b: LifetimeCurve;
+  };
+
+  /**
    * Controls the rotation of particles over their lifetime.
    * The rotation can be randomized between two constants, and the feature can be toggled on or off.
    *

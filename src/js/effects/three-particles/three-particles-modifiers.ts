@@ -111,6 +111,35 @@ export const applyModifiers = ({
     attributes.colorA.needsUpdate = true;
   }
 
+  if (normalizedConfig.colorOverLifetime.isActive) {
+    const rMultiplier = calculateValue(
+      particleSystemId,
+      normalizedConfig.colorOverLifetime.r,
+      particleLifetimePercentage
+    );
+    const gMultiplier = calculateValue(
+      particleSystemId,
+      normalizedConfig.colorOverLifetime.g,
+      particleLifetimePercentage
+    );
+    const bMultiplier = calculateValue(
+      particleSystemId,
+      normalizedConfig.colorOverLifetime.b,
+      particleLifetimePercentage
+    );
+
+    attributes.colorR.array[particleIndex] =
+      startValues.startColorR[particleIndex] * rMultiplier;
+    attributes.colorG.array[particleIndex] =
+      startValues.startColorG[particleIndex] * gMultiplier;
+    attributes.colorB.array[particleIndex] =
+      startValues.startColorB[particleIndex] * bMultiplier;
+
+    attributes.colorR.needsUpdate = true;
+    attributes.colorG.needsUpdate = true;
+    attributes.colorB.needsUpdate = true;
+  }
+
   if (lifetimeValues.rotationOverLifetime) {
     attributes.rotation.array[particleIndex] +=
       lifetimeValues.rotationOverLifetime[particleIndex] * delta * 0.02;
