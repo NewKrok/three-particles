@@ -9,6 +9,28 @@ import {
   RandomBetweenTwoConstants,
 } from './types.js';
 
+/**
+ * Calculates random position and velocity for particles emitted from a sphere.
+ *
+ * Supports emission from the entire volume or just the shell of the sphere.
+ * Uses spherical coordinates for uniform distribution across the surface.
+ *
+ * @param position - Output vector for the particle's starting position
+ * @param quaternion - Rotation to apply to the emission shape
+ * @param velocity - Output vector for the particle's initial velocity
+ * @param speed - Speed multiplier for the velocity
+ * @param params - Sphere configuration
+ * @param params.radius - Radius of the sphere
+ * @param params.radiusThickness - Controls emission from volume (1.0) vs shell (0.0)
+ * @param params.arc - Arc angle in degrees (360 = full sphere, 180 = hemisphere)
+ *
+ * @remarks
+ * - `radiusThickness = 1.0`: Emit from entire volume
+ * - `radiusThickness = 0.0`: Emit only from surface shell
+ * - Particles are emitted radially outward from the center
+ *
+ * @see {@link Sphere} - Configuration type for sphere shape
+ */
 export const calculateRandomPositionAndVelocityOnSphere = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,
@@ -53,6 +75,32 @@ export const calculateRandomPositionAndVelocityOnSphere = (
   velocity.applyQuaternion(quaternion);
 };
 
+/**
+ * Calculates random position and velocity for particles emitted from a cone.
+ *
+ * Useful for directional particle effects like fire, smoke plumes, fountains,
+ * or spray effects. The cone emits particles in a spreading pattern.
+ *
+ * @param position - Output vector for the particle's starting position
+ * @param quaternion - Rotation to apply to the emission shape
+ * @param velocity - Output vector for the particle's initial velocity
+ * @param speed - Speed multiplier for the velocity
+ * @param params - Cone configuration
+ * @param params.radius - Base radius of the cone
+ * @param params.radiusThickness - Controls emission from volume (1.0) vs shell (0.0)
+ * @param params.arc - Arc angle in degrees (360 = full cone, 180 = half cone)
+ * @param params.angle - Cone opening angle in degrees (default: 90)
+ *                       Smaller values create tighter cones
+ *
+ * @remarks
+ * - The cone emits from its base (circular area) outward
+ * - Particles travel in a conical spread pattern
+ * - `angle = 0`: Straight line (no spread)
+ * - `angle = 90`: Wide cone
+ * - Common for fire (10-30°), smoke (30-60°), explosions (60-90°)
+ *
+ * @see {@link Cone} - Configuration type for cone shape
+ */
 export const calculateRandomPositionAndVelocityOnCone = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,
@@ -102,6 +150,33 @@ export const calculateRandomPositionAndVelocityOnCone = (
   velocity.applyQuaternion(quaternion);
 };
 
+/**
+ * Calculates random position and velocity for particles emitted from a box.
+ *
+ * Supports three emission modes: volume, shell (surface), and edges.
+ * Useful for area-based effects like dust clouds, rain, or geometric patterns.
+ *
+ * @param position - Output vector for the particle's starting position
+ * @param quaternion - Rotation to apply to the emission shape
+ * @param velocity - Output vector for the particle's initial velocity
+ * @param speed - Speed multiplier for the velocity
+ * @param params - Box configuration
+ * @param params.scale - Size of the box on each axis (width, height, depth)
+ * @param params.emitFrom - Emission mode:
+ *   - `VOLUME`: Random positions throughout the entire box volume
+ *   - `SHELL`: Random positions on the 6 faces (surface)
+ *   - `EDGE`: Random positions along the 12 edges
+ *
+ * @remarks
+ * - All particles emit with velocity along the +Z axis (forward)
+ * - Box is centered at the origin before rotation
+ * - VOLUME mode: Best for rain, snow, or volumetric clouds
+ * - SHELL mode: Best for hollow effects or surface particles
+ * - EDGE mode: Best for wireframe effects or particle outlines
+ *
+ * @see {@link Box} - Configuration type for box shape
+ * @see {@link EmitFrom} - Emission mode enum
+ */
 export const calculateRandomPositionAndVelocityOnBox = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,
@@ -151,6 +226,30 @@ export const calculateRandomPositionAndVelocityOnBox = (
   velocity.applyQuaternion(quaternion);
 };
 
+/**
+ * Calculates random position and velocity for particles emitted from a circle.
+ *
+ * Emits particles from a circular area or ring. Useful for ground impacts,
+ * radial effects, magic circles, or any circular planar emission.
+ *
+ * @param position - Output vector for the particle's starting position
+ * @param quaternion - Rotation to apply to the emission shape
+ * @param velocity - Output vector for the particle's initial velocity
+ * @param speed - Speed multiplier for the velocity
+ * @param params - Circle configuration
+ * @param params.radius - Radius of the circle
+ * @param params.radiusThickness - Controls emission from area (1.0) vs edge (0.0)
+ * @param params.arc - Arc angle in degrees (360 = full circle, 180 = semicircle)
+ *
+ * @remarks
+ * - Circle lies in the XY plane by default (Z = 0)
+ * - Particles emit along the +Z axis (perpendicular to circle)
+ * - `radiusThickness = 1.0`: Filled circle (disc)
+ * - `radiusThickness = 0.0`: Ring (circle edge only)
+ * - Good for ground impact effects, teleport circles, or radial bursts
+ *
+ * @see {@link Circle} - Configuration type for circle shape
+ */
 export const calculateRandomPositionAndVelocityOnCircle = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,
@@ -189,6 +288,30 @@ export const calculateRandomPositionAndVelocityOnCircle = (
   velocity.applyQuaternion(quaternion);
 };
 
+/**
+ * Calculates random position and velocity for particles emitted from a rectangle.
+ *
+ * Emits particles from a rectangular planar area. Useful for rain on a surface,
+ * screen-space effects, or any planar emission pattern.
+ *
+ * @param position - Output vector for the particle's starting position
+ * @param quaternion - Rotation to apply to the emission shape
+ * @param velocity - Output vector for the particle's initial velocity
+ * @param speed - Speed multiplier for the velocity
+ * @param params - Rectangle configuration
+ * @param params.rotation - Local rotation of the rectangle (degrees) before
+ *                          applying quaternion
+ * @param params.scale - Size of the rectangle (width and height)
+ *
+ * @remarks
+ * - Rectangle lies in the XY plane by default
+ * - Particles emit along the +Z axis (perpendicular to rectangle)
+ * - The rotation parameter allows tilting the rectangle before the main
+ *   quaternion rotation is applied
+ * - Good for rain effects, screen particles, or planar area emissions
+ *
+ * @see {@link Rectangle} - Configuration type for rectangle shape
+ */
 export const calculateRandomPositionAndVelocityOnRectangle = (
   position: THREE.Vector3,
   quaternion: THREE.Quaternion,

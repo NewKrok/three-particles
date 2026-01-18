@@ -44,6 +44,21 @@ export * from './types.js';
 let _particleSystemId = 0;
 let createdParticleSystems: Array<ParticleSystemInstance> = [];
 
+/**
+ * Mapping of blending mode string identifiers to Three.js blending constants.
+ *
+ * Used for converting serialized particle system configurations (e.g., from JSON)
+ * to actual Three.js blending mode constants.
+ *
+ * @example
+ * ```typescript
+ * import { blendingMap } from '@newkrok/three-particles';
+ *
+ * // Convert string to Three.js constant
+ * const blending = blendingMap['THREE.AdditiveBlending'];
+ * // blending === THREE.AdditiveBlending
+ * ```
+ */
 export const blendingMap = {
   'THREE.NoBlending': THREE.NoBlending,
   'THREE.NormalBlending': THREE.NormalBlending,
@@ -52,6 +67,27 @@ export const blendingMap = {
   'THREE.MultiplyBlending': THREE.MultiplyBlending,
 };
 
+/**
+ * Returns a deep copy of the default particle system configuration.
+ *
+ * This is useful when you want to start with default settings and modify specific properties
+ * without affecting the internal default configuration object.
+ *
+ * @returns A new object containing all default particle system settings
+ *
+ * @example
+ * ```typescript
+ * import { getDefaultParticleSystemConfig, createParticleSystem } from '@newkrok/three-particles';
+ *
+ * // Get default config and modify it
+ * const config = getDefaultParticleSystemConfig();
+ * config.emission.rateOverTime = 100;
+ * config.startColor.min = { r: 1, g: 0, b: 0 };
+ *
+ * const { instance } = createParticleSystem(config);
+ * scene.add(instance);
+ * ```
+ */
 export const getDefaultParticleSystemConfig = () =>
   JSON.parse(JSON.stringify(DEFAULT_PARTICLE_SYSTEM_CONFIG));
 
@@ -141,14 +177,33 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
       ],
     },
   },
-  /* colorOverLifetime: {
+  colorOverLifetime: {
     isActive: false,
-    lifetimeCurve: {
-      type: LifeTimeCurve.EASING,
+    r: {
+      type: LifeTimeCurve.BEZIER,
       scale: 1,
-      curveFunction: CurveFunctionId.LINEAR,
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
     },
-  }, */
+    g: {
+      type: LifeTimeCurve.BEZIER,
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
+    },
+    b: {
+      type: LifeTimeCurve.BEZIER,
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
+    },
+  },
   opacityOverLifetime: {
     isActive: false,
     lifetimeCurve: {
@@ -301,6 +356,64 @@ const destroyParticleSystem = (particleSystem: THREE.Points) => {
   );
 };
 
+/**
+ * Creates a new particle system with the specified configuration.
+ *
+ * This is the primary function for instantiating particle effects. It handles the complete
+ * setup of a particle system including geometry creation, material configuration, shader setup,
+ * and initialization of all particle properties.
+ *
+ * @param config - Configuration object for the particle system. If not provided, uses default settings.
+ *                 See {@link ParticleSystemConfig} for all available options.
+ * @param externalNow - Optional custom timestamp in milliseconds. If not provided, uses `Date.now()`.
+ *                      Useful for synchronized particle systems or testing.
+ *
+ * @returns A {@link ParticleSystem} object containing:
+ *   - `instance`: The THREE.Object3D that should be added to your scene
+ *   - `resumeEmitter()`: Function to resume particle emission
+ *   - `pauseEmitter()`: Function to pause particle emission
+ *   - `dispose()`: Function to clean up resources and remove the particle system
+ *
+ * @example
+ * ```typescript
+ * import { createParticleSystem, updateParticleSystems } from '@newkrok/three-particles';
+ *
+ * // Create a basic particle system with default settings
+ * const { instance, dispose } = createParticleSystem();
+ * scene.add(instance);
+ *
+ * // Create a custom fire effect
+ * const fireEffect = createParticleSystem({
+ *   duration: 2.0,
+ *   looping: true,
+ *   startLifetime: { min: 0.5, max: 1.5 },
+ *   startSpeed: { min: 2, max: 4 },
+ *   startSize: { min: 0.5, max: 1.5 },
+ *   startColor: {
+ *     min: { r: 1.0, g: 0.3, b: 0.0 },
+ *     max: { r: 1.0, g: 0.8, b: 0.0 }
+ *   },
+ *   emission: { rateOverTime: 50 },
+ *   shape: {
+ *     shape: Shape.CONE,
+ *     cone: { angle: 10, radius: 0.2 }
+ *   }
+ * });
+ * scene.add(fireEffect.instance);
+ *
+ * // In your animation loop
+ * function animate(time) {
+ *   updateParticleSystems({ now: time, delta: deltaTime, elapsed: elapsedTime });
+ *   renderer.render(scene, camera);
+ * }
+ *
+ * // Clean up when done
+ * fireEffect.dispose();
+ * ```
+ *
+ * @see {@link updateParticleSystems} - Required function to call in your animation loop
+ * @see {@link ParticleSystemConfig} - Complete configuration options
+ */
 export const createParticleSystem = (
   config: ParticleSystemConfig = DEFAULT_PARTICLE_SYSTEM_CONFIG,
   externalNow?: number
@@ -496,6 +609,19 @@ export const createParticleSystem = (
     );
   });
 
+  generalData.startValues.startColorR = Array.from(
+    { length: maxParticles },
+    () => 0
+  );
+  generalData.startValues.startColorG = Array.from(
+    { length: maxParticles },
+    () => 0
+  );
+  generalData.startValues.startColorB = Array.from(
+    { length: maxParticles },
+    () => 0
+  );
+
   const lifetimeValueKeys: Array<keyof NormalizedParticleSystemConfig> = [
     'rotationOverLifetime',
   ];
@@ -685,6 +811,13 @@ export const createParticleSystem = (
       colorRandomRatio * (startColor.max!.b! - startColor.min!.b!);
     geometry.attributes.colorB.needsUpdate = true;
 
+    generalData.startValues.startColorR[particleIndex] =
+      geometry.attributes.colorR.array[particleIndex];
+    generalData.startValues.startColorG[particleIndex] =
+      geometry.attributes.colorG.array[particleIndex];
+    generalData.startValues.startColorB[particleIndex] =
+      geometry.attributes.colorB.array[particleIndex];
+
     geometry.attributes.startFrame.array[particleIndex] =
       textureSheetAnimation.startFrame
         ? calculateValue(
@@ -870,6 +1003,78 @@ export const createParticleSystem = (
   };
 };
 
+/**
+ * Updates all active particle systems created with {@link createParticleSystem}.
+ *
+ * This function must be called once per frame in your animation loop to animate all particles.
+ * It handles particle emission, movement, lifetime tracking, modifier application, and cleanup
+ * of expired particle systems.
+ *
+ * @param cycleData - Object containing timing information for the current frame:
+ *   - `now`: Current timestamp in milliseconds (typically from `performance.now()` or `Date.now()`)
+ *   - `delta`: Time elapsed since the last frame in seconds
+ *   - `elapsed`: Total time elapsed since the animation started in seconds
+ *
+ * @example
+ * ```typescript
+ * import { createParticleSystem, updateParticleSystems } from '@newkrok/three-particles';
+ *
+ * const { instance } = createParticleSystem({
+ *   // your config
+ * });
+ * scene.add(instance);
+ *
+ * // Animation loop
+ * let lastTime = 0;
+ * let elapsedTime = 0;
+ *
+ * function animate(currentTime) {
+ *   requestAnimationFrame(animate);
+ *
+ *   const delta = (currentTime - lastTime) / 1000; // Convert to seconds
+ *   elapsedTime += delta;
+ *   lastTime = currentTime;
+ *
+ *   // Update all particle systems
+ *   updateParticleSystems({
+ *     now: currentTime,
+ *     delta: delta,
+ *     elapsed: elapsedTime
+ *   });
+ *
+ *   renderer.render(scene, camera);
+ * }
+ *
+ * animate(0);
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Using Three.js Clock for timing
+ * import * as THREE from 'three';
+ * import { updateParticleSystems } from '@newkrok/three-particles';
+ *
+ * const clock = new THREE.Clock();
+ *
+ * function animate() {
+ *   requestAnimationFrame(animate);
+ *
+ *   const delta = clock.getDelta();
+ *   const elapsed = clock.getElapsedTime();
+ *
+ *   updateParticleSystems({
+ *     now: performance.now(),
+ *     delta: delta,
+ *     elapsed: elapsed
+ *   });
+ *
+ *   renderer.render(scene, camera);
+ * }
+ * ```
+ *
+ * @see {@link createParticleSystem} - Creates particle systems to be updated
+ * @see {@link CycleData} - Timing data structure
+ */
 export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
   createdParticleSystems.forEach((props) => {
     const {
