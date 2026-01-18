@@ -154,14 +154,53 @@ export type Transform = {
   scale?: THREE.Vector3;
 };
 
+/**
+ * Represents an RGB color with normalized values (0.0 to 1.0).
+ *
+ * @example
+ * ```typescript
+ * // Pure red
+ * const red: Rgb = { r: 1.0, g: 0.0, b: 0.0 };
+ *
+ * // Pure white
+ * const white: Rgb = { r: 1.0, g: 1.0, b: 1.0 };
+ *
+ * // Orange
+ * const orange: Rgb = { r: 1.0, g: 0.5, b: 0.0 };
+ * ```
+ */
 export type Rgb = {
+  /** Red channel (0.0 to 1.0) */
   r?: number;
+  /** Green channel (0.0 to 1.0) */
   g?: number;
+  /** Blue channel (0.0 to 1.0) */
   b?: number;
 };
 
+/**
+ * Defines a color range for random particle colors.
+ * Each particle will receive a random color between min and max on emission.
+ *
+ * @example
+ * ```typescript
+ * // Random colors between red and yellow
+ * const fireColors: MinMaxColor = {
+ *   min: { r: 1.0, g: 0.0, b: 0.0 }, // Red
+ *   max: { r: 1.0, g: 1.0, b: 0.0 }  // Yellow
+ * };
+ *
+ * // Fixed white color (no randomness)
+ * const white: MinMaxColor = {
+ *   min: { r: 1.0, g: 1.0, b: 1.0 },
+ *   max: { r: 1.0, g: 1.0, b: 1.0 }
+ * };
+ * ```
+ */
 export type MinMaxColor = {
+  /** Minimum color values (lower bound for random selection) */
   min?: Rgb;
+  /** Maximum color values (upper bound for random selection) */
   max?: Rgb;
 };
 
