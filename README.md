@@ -66,3 +66,53 @@ updateParticleSystems({now, delta, elapsed});
 # Documentation
 
 Automatically generated TypeDoc: [https://newkrok.github.io/three-particles/](https://newkrok.github.io/three-particles/)
+
+## Important Notes
+
+### Color Over Lifetime
+
+The `colorOverLifetime` feature uses a **multiplier-based approach** (similar to Unity's particle system), where each RGB channel curve acts as a multiplier applied to the particle's `startColor`.
+
+**Formula:** `finalColor = startColor * colorOverLifetime`
+
+**⚠️ Important:** To achieve full color transitions, set `startColor` to white `{ r: 1, g: 1, b: 1 }`. If any channel in `startColor` is set to 0, that channel cannot be modified by `colorOverLifetime`.
+
+**Example - Rainbow effect:**
+```javascript
+{
+  startColor: {
+    min: { r: 1, g: 1, b: 1 },  // White - allows full color range
+    max: { r: 1, g: 1, b: 1 }
+  },
+  colorOverLifetime: {
+    isActive: true,
+    r: {  // Red: full → half → off
+      type: 'BEZIER',
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 0.5, y: 0.5, percentage: 0.5 },
+        { x: 1, y: 0, percentage: 1 }
+      ]
+    },
+    g: {  // Green: off → full → off
+      type: 'BEZIER',
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 0, percentage: 0 },
+        { x: 0.5, y: 1, percentage: 0.5 },
+        { x: 1, y: 0, percentage: 1 }
+      ]
+    },
+    b: {  // Blue: off → half → full
+      type: 'BEZIER',
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 0, percentage: 0 },
+        { x: 0.5, y: 0.5, percentage: 0.5 },
+        { x: 1, y: 1, percentage: 1 }
+      ]
+    }
+  }
+}
+```

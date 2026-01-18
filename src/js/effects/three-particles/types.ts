@@ -920,6 +920,43 @@ export type ParticleSystemConfig = {
    * This follows Unity's Color over Lifetime behavior where the final color is:
    * finalColor = startColor * colorOverLifetime
    *
+   * **IMPORTANT**: To achieve full color transitions, set startColor to white { r: 1, g: 1, b: 1 }.
+   * If startColor has any channel set to 0, that channel cannot be modified by colorOverLifetime.
+   *
+   * @example
+   * // Rainbow effect - requires white startColor
+   * startColor: { min: { r: 1, g: 1, b: 1 }, max: { r: 1, g: 1, b: 1 } }
+   * colorOverLifetime: {
+   *   isActive: true,
+   *   r: { // Red: full -> half -> off
+   *     type: LifeTimeCurve.BEZIER,
+   *     scale: 1,
+   *     bezierPoints: [
+   *       { x: 0, y: 1, percentage: 0 },
+   *       { x: 0.5, y: 0.5, percentage: 0.5 },
+   *       { x: 1, y: 0, percentage: 1 },
+   *     ],
+   *   },
+   *   g: { // Green: off -> full -> off
+   *     type: LifeTimeCurve.BEZIER,
+   *     scale: 1,
+   *     bezierPoints: [
+   *       { x: 0, y: 0, percentage: 0 },
+   *       { x: 0.5, y: 1, percentage: 0.5 },
+   *       { x: 1, y: 0, percentage: 1 },
+   *     ],
+   *   },
+   *   b: { // Blue: off -> half -> full
+   *     type: LifeTimeCurve.BEZIER,
+   *     scale: 1,
+   *     bezierPoints: [
+   *       { x: 0, y: 0, percentage: 0 },
+   *       { x: 0.5, y: 0.5, percentage: 0.5 },
+   *       { x: 1, y: 1, percentage: 1 },
+   *     ],
+   *   },
+   * }
+   *
    * @default
    * colorOverLifetime: {
    *   isActive: false,
