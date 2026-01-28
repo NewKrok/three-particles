@@ -249,18 +249,15 @@ const createFloat32Attributes = ({
   maxParticles: number;
   factory: ((value: never, index: number) => number) | number;
 }) => {
-  geometry.setAttribute(
-    propertyName,
-    new THREE.BufferAttribute(
-      new Float32Array(
-        Array.from(
-          { length: maxParticles },
-          typeof factory === 'function' ? factory : () => factory
-        )
-      ),
-      1
-    )
-  );
+  const array = new Float32Array(maxParticles);
+  if (typeof factory === 'function') {
+    for (let i = 0; i < maxParticles; i++) {
+      array[i] = factory(undefined as never, i);
+    }
+  } else {
+    array.fill(factory);
+  }
+  geometry.setAttribute(propertyName, new THREE.BufferAttribute(array, 1));
 };
 
 const calculatePositionAndVelocity = (
@@ -700,78 +697,78 @@ export const createParticleSystem = (
       velocities[i]
     );
 
-  geometry.setFromPoints(
-    Array.from({ length: maxParticles }, (_, index) =>
-      startPositions[index].clone()
-    )
-  );
+  const positionArray = new Float32Array(maxParticles * 3);
+  for (let i = 0; i < maxParticles; i++) {
+    positionArray[i * 3] = startPositions[i].x;
+    positionArray[i * 3 + 1] = startPositions[i].y;
+    positionArray[i * 3 + 2] = startPositions[i].z;
+  }
+  geometry.setAttribute('position', new THREE.BufferAttribute(positionArray, 3));
 
-  const createFloat32AttributesRequest = (
-    propertyName: string,
-    factory: ((value: never, index: number) => number) | number
-  ) => {
-    createFloat32Attributes({
-      geometry,
-      propertyName,
-      maxParticles,
-      factory,
-    });
-  };
+  createFloat32Attributes({ geometry, propertyName: 'isActive', maxParticles, factory: 0 });
 
-  createFloat32AttributesRequest('isActive', 0);
+  createFloat32Attributes({ geometry, propertyName: 'lifetime', maxParticles, factory: 0 });
 
-  createFloat32AttributesRequest('lifetime', 0);
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'startLifetime',
+    maxParticles,
+    factory: () => calculateValue(generalData.particleSystemId, startLifetime, 0) * 1000,
+  });
 
-  createFloat32AttributesRequest(
-    'startLifetime',
-    () => calculateValue(generalData.particleSystemId, startLifetime, 0) * 1000
-  );
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'startFrame',
+    maxParticles,
+    factory: () =>
+      textureSheetAnimation.startFrame
+        ? calculateValue(generalData.particleSystemId, textureSheetAnimation.startFrame, 0)
+        : 0,
+  });
 
-  createFloat32AttributesRequest('startFrame', () =>
-    textureSheetAnimation.startFrame
-      ? calculateValue(
-          generalData.particleSystemId,
-          textureSheetAnimation.startFrame,
-          0
-        )
-      : 0
-  );
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'opacity',
+    maxParticles,
+    factory: () => calculateValue(generalData.particleSystemId, startOpacity, 0),
+  });
 
-  createFloat32AttributesRequest('opacity', () =>
-    calculateValue(generalData.particleSystemId, startOpacity, 0)
-  );
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'rotation',
+    maxParticles,
+    factory: () => calculateValue(generalData.particleSystemId, startRotation, 0),
+  });
 
-  createFloat32AttributesRequest('rotation', () =>
-    calculateValue(generalData.particleSystemId, startRotation, 0)
-  );
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'size',
+    maxParticles,
+    factory: (_, index) => generalData.startValues.startSize[index],
+  });
 
-  createFloat32AttributesRequest(
-    'size',
-    (_, index) => generalData.startValues.startSize[index]
-  );
-
-  createFloat32AttributesRequest('rotation', 0);
+  createFloat32Attributes({ geometry, propertyName: 'rotation', maxParticles, factory: 0 });
 
   const colorRandomRatio = Math.random();
-  createFloat32AttributesRequest(
-    'colorR',
-    () =>
-      startColor.min!.r! +
-      colorRandomRatio * (startColor.max!.r! - startColor.min!.r!)
-  );
-  createFloat32AttributesRequest(
-    'colorG',
-    () =>
-      startColor.min!.g! +
-      colorRandomRatio * (startColor.max!.g! - startColor.min!.g!)
-  );
-  createFloat32AttributesRequest(
-    'colorB',
-    () =>
-      startColor.min!.b! +
-      colorRandomRatio * (startColor.max!.b! - startColor.min!.b!)
-  );
-  createFloat32AttributesRequest('colorA', 0);
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'colorR',
+    maxParticles,
+    factory: () => startColor.min!.r! + colorRandomRatio * (startColor.max!.r! - startColor.min!.r!),
+  });
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'colorG',
+    maxParticles,
+    factory: () => startColor.min!.g! + colorRandomRatio * (startColor.max!.g! - startColor.min!.g!),
+  });
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'colorB',
+    maxParticles,
+    factory: () => startColor.min!.b! + colorRandomRatio * (startColor.max!.b! - startColor.min!.b!),
+  });
+  createFloat32Attributes({ geometry, propertyName: 'colorA', maxParticles, factory: 0 });
 
   const deactivateParticle = (particleIndex: number) => {
     geometry.attributes.isActive.array[particleIndex] = 0;
