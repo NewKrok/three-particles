@@ -44,6 +44,19 @@ export * from './types.js';
 let _particleSystemId = 0;
 let createdParticleSystems: Array<ParticleSystemInstance> = [];
 
+// Pre-allocated objects for updateParticleSystemInstance to avoid GC pressure
+const _lastWorldPositionSnapshot = new THREE.Vector3();
+const _distanceStep = { x: 0, y: 0, z: 0 };
+const _tempPosition = { x: 0, y: 0, z: 0 };
+const _modifierParams = {
+  delta: 0,
+  generalData: null as unknown as GeneralData,
+  normalizedConfig: null as unknown as NormalizedParticleSystemConfig,
+  attributes: null as unknown as THREE.NormalBufferAttributes,
+  particleLifetimePercentage: 0,
+  particleIndex: 0,
+};
+
 /**
  * Mapping of blending mode string identifiers to Three.js blending constants.
  *
@@ -1123,7 +1136,7 @@ const updateParticleSystemInstance = (
   if (wrapper?.parent)
     generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
 
-  const lastWorldPositionSnapshot = { ...lastWorldPosition };
+  _lastWorldPositionSnapshot.copy(lastWorldPosition);
 
   if (Array.isArray(particleSystem.material))
     particleSystem.material.forEach((material) => {
@@ -1162,15 +1175,28 @@ const updateParticleSystemInstance = (
     particleSystem.worldToLocal(gravityVelocity);
   }
 
-  generalData.creationTimes.forEach((entry, index) => {
-    if (particleSystem.geometry.attributes.isActive.array[index]) {
-      const particleLifetime = now - entry;
-      if (
-        particleLifetime >
-        particleSystem.geometry.attributes.startLifetime.array[index]
-      )
+  const creationTimes = generalData.creationTimes;
+  const attributes = particleSystem.geometry.attributes;
+  const isActiveArr = attributes.isActive.array;
+  const startLifetimeArr = attributes.startLifetime.array;
+  const positionArr = attributes.position.array;
+  const lifetimeArr = attributes.lifetime.array;
+  const creationTimesLength = creationTimes.length;
+
+  let positionNeedsUpdate = false;
+  let lifetimeNeedsUpdate = false;
+
+  _modifierParams.delta = delta;
+  _modifierParams.generalData = generalData;
+  _modifierParams.normalizedConfig = normalizedConfig;
+  _modifierParams.attributes = attributes;
+
+  for (let index = 0; index < creationTimesLength; index++) {
+    if (isActiveArr[index]) {
+      const particleLifetime = now - creationTimes[index];
+      if (particleLifetime > startLifetimeArr[index]) {
         deactivateParticle(index);
-      else {
+      } else {
         const velocity = velocities[index];
         velocity.x -= gravityVelocity.x * delta;
         velocity.y -= gravityVelocity.y * delta;
@@ -1186,8 +1212,6 @@ const updateParticleSystemInstance = (
           worldPositionChange.z !== 0
         ) {
           const positionIndex = index * 3;
-          const positionArr =
-            particleSystem.geometry.attributes.position.array;
 
           if (simulationSpace === SimulationSpace.WORLD) {
             positionArr[positionIndex] -= worldPositionChange.x;
@@ -1198,27 +1222,22 @@ const updateParticleSystemInstance = (
           positionArr[positionIndex] += velocity.x * delta;
           positionArr[positionIndex + 1] += velocity.y * delta;
           positionArr[positionIndex + 2] += velocity.z * delta;
-          particleSystem.geometry.attributes.position.needsUpdate = true;
+          positionNeedsUpdate = true;
         }
 
-        particleSystem.geometry.attributes.lifetime.array[index] =
-          particleLifetime;
-        particleSystem.geometry.attributes.lifetime.needsUpdate = true;
+        lifetimeArr[index] = particleLifetime;
+        lifetimeNeedsUpdate = true;
 
-        const particleLifetimePercentage =
-          particleLifetime /
-          particleSystem.geometry.attributes.startLifetime.array[index];
-        applyModifiers({
-          delta,
-          generalData,
-          normalizedConfig,
-          attributes: particleSystem.geometry.attributes,
-          particleLifetimePercentage,
-          particleIndex: index,
-        });
+        _modifierParams.particleLifetimePercentage =
+          particleLifetime / startLifetimeArr[index];
+        _modifierParams.particleIndex = index;
+        applyModifiers(_modifierParams);
       }
     }
-  });
+  }
+
+  if (positionNeedsUpdate) attributes.position.needsUpdate = true;
+  if (lifetimeNeedsUpdate) attributes.lifetime.needsUpdate = true;
 
   if (isEnabled && (looping || lifetime < duration * 1000)) {
     const emissionDelta = now - lastEmissionTime;
@@ -1247,20 +1266,18 @@ const updateParticleSystemInstance = (
               (1 / rateOverDistance!)
           )
         : 0;
-    const distanceStep =
-      neededParticlesByDistance > 0
-        ? {
-            x:
-              (currentWorldPosition.x - lastWorldPositionSnapshot.x) /
-              neededParticlesByDistance,
-            y:
-              (currentWorldPosition.y - lastWorldPositionSnapshot.y) /
-              neededParticlesByDistance,
-            z:
-              (currentWorldPosition.z - lastWorldPositionSnapshot.z) /
-              neededParticlesByDistance,
-          }
-        : null;
+    const useDistanceStep = neededParticlesByDistance > 0;
+    if (useDistanceStep) {
+      _distanceStep.x =
+        (currentWorldPosition.x - _lastWorldPositionSnapshot.x) /
+        neededParticlesByDistance;
+      _distanceStep.y =
+        (currentWorldPosition.y - _lastWorldPositionSnapshot.y) /
+        neededParticlesByDistance;
+      _distanceStep.z =
+        (currentWorldPosition.z - _lastWorldPositionSnapshot.z) /
+        neededParticlesByDistance;
+    }
     const neededParticles = neededParticlesByTime + neededParticlesByDistance;
 
     if (rateOverDistance > 0 && neededParticlesByDistance >= 1) {
@@ -1269,39 +1286,37 @@ const updateParticleSystemInstance = (
 
     if (neededParticles > 0) {
       let generatedParticlesByDistanceNeeds = 0;
+      const isActiveArrLen = isActiveArr.length;
+
       for (let i = 0; i < neededParticles; i++) {
         let particleIndex = -1;
-        particleSystem.geometry.attributes.isActive.array.find(
-          (isActive, index) => {
-            if (!isActive) {
-              particleIndex = index;
-              return true;
-            }
-            return false;
+        for (let j = 0; j < isActiveArrLen; j++) {
+          if (!isActiveArr[j]) {
+            particleIndex = j;
+            break;
           }
-        );
+        }
 
-        if (
-          particleIndex !== -1 &&
-          particleIndex <
-            particleSystem.geometry.attributes.isActive.array.length
-        ) {
-          let position: Required<Point3D> = { x: 0, y: 0, z: 0 };
+        if (particleIndex !== -1 && particleIndex < isActiveArrLen) {
+          _tempPosition.x = 0;
+          _tempPosition.y = 0;
+          _tempPosition.z = 0;
           if (
-            distanceStep &&
+            useDistanceStep &&
             generatedParticlesByDistanceNeeds < neededParticlesByDistance
           ) {
-            position = {
-              x: distanceStep.x * generatedParticlesByDistanceNeeds,
-              y: distanceStep.y * generatedParticlesByDistanceNeeds,
-              z: distanceStep.z * generatedParticlesByDistanceNeeds,
-            };
+            _tempPosition.x =
+              _distanceStep.x * generatedParticlesByDistanceNeeds;
+            _tempPosition.y =
+              _distanceStep.y * generatedParticlesByDistanceNeeds;
+            _tempPosition.z =
+              _distanceStep.z * generatedParticlesByDistanceNeeds;
             generatedParticlesByDistanceNeeds++;
           }
           activateParticle({
             particleIndex,
             activationTime: now,
-            position,
+            position: _tempPosition,
           });
           props.lastEmissionTime = now;
         }
