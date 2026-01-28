@@ -1189,6 +1189,7 @@ export type ParticleSystem = {
   resumeEmitter: () => void;
   pauseEmitter: () => void;
   dispose: () => void;
+  update: (cycleData: CycleData) => void;
 };
 
 /**

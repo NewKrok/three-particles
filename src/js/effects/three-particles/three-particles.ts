@@ -971,7 +971,7 @@ export const createParticleSystem = (
     wrapper.add(particleSystem);
   }
 
-  createdParticleSystems.push({
+  const instanceData: ParticleSystemInstance = {
     particleSystem,
     wrapper,
     generalData,
@@ -989,17 +989,22 @@ export const createParticleSystem = (
     velocities,
     deactivateParticle,
     activateParticle,
-  });
+  };
+
+  createdParticleSystems.push(instanceData);
 
   const resumeEmitter = () => (generalData.isEnabled = true);
   const pauseEmitter = () => (generalData.isEnabled = false);
   const dispose = () => destroyParticleSystem(particleSystem);
+  const update = (cycleData: CycleData) =>
+    updateParticleSystemInstance(instanceData, cycleData);
 
   return {
     instance: wrapper || particleSystem,
     resumeEmitter,
     pauseEmitter,
     dispose,
+    update,
   };
 };
 
@@ -1075,247 +1080,254 @@ export const createParticleSystem = (
  * @see {@link createParticleSystem} - Creates particle systems to be updated
  * @see {@link CycleData} - Timing data structure
  */
-export const updateParticleSystems = ({ now, delta, elapsed }: CycleData) => {
-  createdParticleSystems.forEach((props) => {
-    const {
-      onUpdate,
-      generalData,
-      onComplete,
-      particleSystem,
-      wrapper,
-      creationTime,
-      lastEmissionTime,
-      duration,
-      looping,
-      emission,
-      normalizedConfig,
-      iterationCount,
-      velocities,
-      deactivateParticle,
-      activateParticle,
-      simulationSpace,
-      gravity,
-    } = props;
+const updateParticleSystemInstance = (
+  props: ParticleSystemInstance,
+  { now, delta, elapsed }: CycleData
+) => {
+  const {
+    onUpdate,
+    generalData,
+    onComplete,
+    particleSystem,
+    wrapper,
+    creationTime,
+    lastEmissionTime,
+    duration,
+    looping,
+    emission,
+    normalizedConfig,
+    iterationCount,
+    velocities,
+    deactivateParticle,
+    activateParticle,
+    simulationSpace,
+    gravity,
+  } = props;
 
-    const lifetime = now - creationTime;
-    const normalizedLifetime = lifetime % (duration * 1000);
+  const lifetime = now - creationTime;
+  const normalizedLifetime = lifetime % (duration * 1000);
 
-    generalData.normalizedLifetimePercentage = Math.max(
-      Math.min(normalizedLifetime / (duration * 1000), 1),
-      0
-    );
+  generalData.normalizedLifetimePercentage = Math.max(
+    Math.min(normalizedLifetime / (duration * 1000), 1),
+    0
+  );
 
-    const {
-      lastWorldPosition,
-      currentWorldPosition,
-      worldPositionChange,
-      lastWorldQuaternion,
-      worldQuaternion,
-      worldEuler,
-      gravityVelocity,
-      isEnabled,
-    } = generalData;
+  const {
+    lastWorldPosition,
+    currentWorldPosition,
+    worldPositionChange,
+    lastWorldQuaternion,
+    worldQuaternion,
+    worldEuler,
+    gravityVelocity,
+    isEnabled,
+  } = generalData;
 
-    if (wrapper?.parent)
-      generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
+  if (wrapper?.parent)
+    generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
 
-    const lastWorldPositionSnapshot = { ...lastWorldPosition };
+  const lastWorldPositionSnapshot = { ...lastWorldPosition };
 
-    if (Array.isArray(particleSystem.material))
-      particleSystem.material.forEach((material) => {
-        if (material instanceof THREE.ShaderMaterial)
-          material.uniforms.elapsed.value = elapsed;
-      });
-    else {
-      if (particleSystem.material instanceof THREE.ShaderMaterial)
-        particleSystem.material.uniforms.elapsed.value = elapsed;
-    }
-
-    particleSystem.getWorldPosition(currentWorldPosition);
-    if (lastWorldPosition.x !== -99999) {
-      worldPositionChange.set(
-        currentWorldPosition.x - lastWorldPosition.x,
-        currentWorldPosition.y - lastWorldPosition.y,
-        currentWorldPosition.z - lastWorldPosition.z
-      );
-    }
-    generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
-    particleSystem.getWorldPosition(lastWorldPosition);
-    particleSystem.getWorldQuaternion(worldQuaternion);
-    if (
-      lastWorldQuaternion.x === -99999 ||
-      lastWorldQuaternion.x !== worldQuaternion.x ||
-      lastWorldQuaternion.y !== worldQuaternion.y ||
-      lastWorldQuaternion.z !== worldQuaternion.z
-    ) {
-      worldEuler.setFromQuaternion(worldQuaternion);
-      lastWorldQuaternion.copy(worldQuaternion);
-      gravityVelocity.set(
-        lastWorldPosition.x,
-        lastWorldPosition.y + gravity,
-        lastWorldPosition.z
-      );
-      particleSystem.worldToLocal(gravityVelocity);
-    }
-
-    generalData.creationTimes.forEach((entry, index) => {
-      if (particleSystem.geometry.attributes.isActive.array[index]) {
-        const particleLifetime = now - entry;
-        if (
-          particleLifetime >
-          particleSystem.geometry.attributes.startLifetime.array[index]
-        )
-          deactivateParticle(index);
-        else {
-          const velocity = velocities[index];
-          velocity.x -= gravityVelocity.x * delta;
-          velocity.y -= gravityVelocity.y * delta;
-          velocity.z -= gravityVelocity.z * delta;
-
-          if (
-            gravity !== 0 ||
-            velocity.x !== 0 ||
-            velocity.y !== 0 ||
-            velocity.z !== 0 ||
-            worldPositionChange.x !== 0 ||
-            worldPositionChange.y !== 0 ||
-            worldPositionChange.z !== 0
-          ) {
-            const positionIndex = index * 3;
-            const positionArr =
-              particleSystem.geometry.attributes.position.array;
-
-            if (simulationSpace === SimulationSpace.WORLD) {
-              positionArr[positionIndex] -= worldPositionChange.x;
-              positionArr[positionIndex + 1] -= worldPositionChange.y;
-              positionArr[positionIndex + 2] -= worldPositionChange.z;
-            }
-
-            positionArr[positionIndex] += velocity.x * delta;
-            positionArr[positionIndex + 1] += velocity.y * delta;
-            positionArr[positionIndex + 2] += velocity.z * delta;
-            particleSystem.geometry.attributes.position.needsUpdate = true;
-          }
-
-          particleSystem.geometry.attributes.lifetime.array[index] =
-            particleLifetime;
-          particleSystem.geometry.attributes.lifetime.needsUpdate = true;
-
-          const particleLifetimePercentage =
-            particleLifetime /
-            particleSystem.geometry.attributes.startLifetime.array[index];
-          applyModifiers({
-            delta,
-            generalData,
-            normalizedConfig,
-            attributes: particleSystem.geometry.attributes,
-            particleLifetimePercentage,
-            particleIndex: index,
-          });
-        }
-      }
+  if (Array.isArray(particleSystem.material))
+    particleSystem.material.forEach((material) => {
+      if (material instanceof THREE.ShaderMaterial)
+        material.uniforms.elapsed.value = elapsed;
     });
+  else {
+    if (particleSystem.material instanceof THREE.ShaderMaterial)
+      particleSystem.material.uniforms.elapsed.value = elapsed;
+  }
 
-    if (isEnabled && (looping || lifetime < duration * 1000)) {
-      const emissionDelta = now - lastEmissionTime;
-      const neededParticlesByTime = emission.rateOverTime
-        ? Math.floor(
-            calculateValue(
-              generalData.particleSystemId,
-              emission.rateOverTime,
-              generalData.normalizedLifetimePercentage
-            ) *
-              (emissionDelta / 1000)
-          )
-        : 0;
+  particleSystem.getWorldPosition(currentWorldPosition);
+  if (lastWorldPosition.x !== -99999) {
+    worldPositionChange.set(
+      currentWorldPosition.x - lastWorldPosition.x,
+      currentWorldPosition.y - lastWorldPosition.y,
+      currentWorldPosition.z - lastWorldPosition.z
+    );
+  }
+  generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
+  particleSystem.getWorldPosition(lastWorldPosition);
+  particleSystem.getWorldQuaternion(worldQuaternion);
+  if (
+    lastWorldQuaternion.x === -99999 ||
+    lastWorldQuaternion.x !== worldQuaternion.x ||
+    lastWorldQuaternion.y !== worldQuaternion.y ||
+    lastWorldQuaternion.z !== worldQuaternion.z
+  ) {
+    worldEuler.setFromQuaternion(worldQuaternion);
+    lastWorldQuaternion.copy(worldQuaternion);
+    gravityVelocity.set(
+      lastWorldPosition.x,
+      lastWorldPosition.y + gravity,
+      lastWorldPosition.z
+    );
+    particleSystem.worldToLocal(gravityVelocity);
+  }
 
-      const rateOverDistance = emission.rateOverDistance
-        ? calculateValue(
-            generalData.particleSystemId,
-            emission.rateOverDistance,
-            generalData.normalizedLifetimePercentage
-          )
-        : 0;
-      const neededParticlesByDistance =
-        rateOverDistance > 0 && generalData.distanceFromLastEmitByDistance > 0
-          ? Math.floor(
-              generalData.distanceFromLastEmitByDistance /
-                (1 / rateOverDistance!)
-            )
-          : 0;
-      const distanceStep =
-        neededParticlesByDistance > 0
-          ? {
-              x:
-                (currentWorldPosition.x - lastWorldPositionSnapshot.x) /
-                neededParticlesByDistance,
-              y:
-                (currentWorldPosition.y - lastWorldPositionSnapshot.y) /
-                neededParticlesByDistance,
-              z:
-                (currentWorldPosition.z - lastWorldPositionSnapshot.z) /
-                neededParticlesByDistance,
-            }
-          : null;
-      const neededParticles = neededParticlesByTime + neededParticlesByDistance;
+  generalData.creationTimes.forEach((entry, index) => {
+    if (particleSystem.geometry.attributes.isActive.array[index]) {
+      const particleLifetime = now - entry;
+      if (
+        particleLifetime >
+        particleSystem.geometry.attributes.startLifetime.array[index]
+      )
+        deactivateParticle(index);
+      else {
+        const velocity = velocities[index];
+        velocity.x -= gravityVelocity.x * delta;
+        velocity.y -= gravityVelocity.y * delta;
+        velocity.z -= gravityVelocity.z * delta;
 
-      if (rateOverDistance > 0 && neededParticlesByDistance >= 1) {
-        generalData.distanceFromLastEmitByDistance = 0;
-      }
+        if (
+          gravity !== 0 ||
+          velocity.x !== 0 ||
+          velocity.y !== 0 ||
+          velocity.z !== 0 ||
+          worldPositionChange.x !== 0 ||
+          worldPositionChange.y !== 0 ||
+          worldPositionChange.z !== 0
+        ) {
+          const positionIndex = index * 3;
+          const positionArr =
+            particleSystem.geometry.attributes.position.array;
 
-      if (neededParticles > 0) {
-        let generatedParticlesByDistanceNeeds = 0;
-        for (let i = 0; i < neededParticles; i++) {
-          let particleIndex = -1;
-          particleSystem.geometry.attributes.isActive.array.find(
-            (isActive, index) => {
-              if (!isActive) {
-                particleIndex = index;
-                return true;
-              }
-              return false;
-            }
-          );
-
-          if (
-            particleIndex !== -1 &&
-            particleIndex <
-              particleSystem.geometry.attributes.isActive.array.length
-          ) {
-            let position: Required<Point3D> = { x: 0, y: 0, z: 0 };
-            if (
-              distanceStep &&
-              generatedParticlesByDistanceNeeds < neededParticlesByDistance
-            ) {
-              position = {
-                x: distanceStep.x * generatedParticlesByDistanceNeeds,
-                y: distanceStep.y * generatedParticlesByDistanceNeeds,
-                z: distanceStep.z * generatedParticlesByDistanceNeeds,
-              };
-              generatedParticlesByDistanceNeeds++;
-            }
-            activateParticle({
-              particleIndex,
-              activationTime: now,
-              position,
-            });
-            props.lastEmissionTime = now;
+          if (simulationSpace === SimulationSpace.WORLD) {
+            positionArr[positionIndex] -= worldPositionChange.x;
+            positionArr[positionIndex + 1] -= worldPositionChange.y;
+            positionArr[positionIndex + 2] -= worldPositionChange.z;
           }
+
+          positionArr[positionIndex] += velocity.x * delta;
+          positionArr[positionIndex + 1] += velocity.y * delta;
+          positionArr[positionIndex + 2] += velocity.z * delta;
+          particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
+        particleSystem.geometry.attributes.lifetime.array[index] =
+          particleLifetime;
+        particleSystem.geometry.attributes.lifetime.needsUpdate = true;
+
+        const particleLifetimePercentage =
+          particleLifetime /
+          particleSystem.geometry.attributes.startLifetime.array[index];
+        applyModifiers({
+          delta,
+          generalData,
+          normalizedConfig,
+          attributes: particleSystem.geometry.attributes,
+          particleLifetimePercentage,
+          particleIndex: index,
+        });
+      }
+    }
+  });
+
+  if (isEnabled && (looping || lifetime < duration * 1000)) {
+    const emissionDelta = now - lastEmissionTime;
+    const neededParticlesByTime = emission.rateOverTime
+      ? Math.floor(
+          calculateValue(
+            generalData.particleSystemId,
+            emission.rateOverTime,
+            generalData.normalizedLifetimePercentage
+          ) *
+            (emissionDelta / 1000)
+        )
+      : 0;
+
+    const rateOverDistance = emission.rateOverDistance
+      ? calculateValue(
+          generalData.particleSystemId,
+          emission.rateOverDistance,
+          generalData.normalizedLifetimePercentage
+        )
+      : 0;
+    const neededParticlesByDistance =
+      rateOverDistance > 0 && generalData.distanceFromLastEmitByDistance > 0
+        ? Math.floor(
+            generalData.distanceFromLastEmitByDistance /
+              (1 / rateOverDistance!)
+          )
+        : 0;
+    const distanceStep =
+      neededParticlesByDistance > 0
+        ? {
+            x:
+              (currentWorldPosition.x - lastWorldPositionSnapshot.x) /
+              neededParticlesByDistance,
+            y:
+              (currentWorldPosition.y - lastWorldPositionSnapshot.y) /
+              neededParticlesByDistance,
+            z:
+              (currentWorldPosition.z - lastWorldPositionSnapshot.z) /
+              neededParticlesByDistance,
+          }
+        : null;
+    const neededParticles = neededParticlesByTime + neededParticlesByDistance;
+
+    if (rateOverDistance > 0 && neededParticlesByDistance >= 1) {
+      generalData.distanceFromLastEmitByDistance = 0;
+    }
+
+    if (neededParticles > 0) {
+      let generatedParticlesByDistanceNeeds = 0;
+      for (let i = 0; i < neededParticles; i++) {
+        let particleIndex = -1;
+        particleSystem.geometry.attributes.isActive.array.find(
+          (isActive, index) => {
+            if (!isActive) {
+              particleIndex = index;
+              return true;
+            }
+            return false;
+          }
+        );
+
+        if (
+          particleIndex !== -1 &&
+          particleIndex <
+            particleSystem.geometry.attributes.isActive.array.length
+        ) {
+          let position: Required<Point3D> = { x: 0, y: 0, z: 0 };
+          if (
+            distanceStep &&
+            generatedParticlesByDistanceNeeds < neededParticlesByDistance
+          ) {
+            position = {
+              x: distanceStep.x * generatedParticlesByDistanceNeeds,
+              y: distanceStep.y * generatedParticlesByDistanceNeeds,
+              z: distanceStep.z * generatedParticlesByDistanceNeeds,
+            };
+            generatedParticlesByDistanceNeeds++;
+          }
+          activateParticle({
+            particleIndex,
+            activationTime: now,
+            position,
+          });
+          props.lastEmissionTime = now;
         }
       }
+    }
 
-      if (onUpdate)
-        onUpdate({
-          particleSystem,
-          delta,
-          elapsed,
-          lifetime,
-          normalizedLifetime,
-          iterationCount: iterationCount + 1,
-        });
-    } else if (onComplete)
-      onComplete({
+    if (onUpdate)
+      onUpdate({
         particleSystem,
+        delta,
+        elapsed,
+        lifetime,
+        normalizedLifetime,
+        iterationCount: iterationCount + 1,
       });
-  });
+  } else if (onComplete)
+    onComplete({
+      particleSystem,
+    });
+};
+
+export const updateParticleSystems = (cycleData: CycleData) => {
+  createdParticleSystems.forEach((props) =>
+    updateParticleSystemInstance(props, cycleData)
+  );
 };
