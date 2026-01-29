@@ -128,6 +128,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   emission: {
     rateOverTime: 10.0,
     rateOverDistance: 0.0,
+    bursts: [],
   },
   shape: {
     shape: Shape.SPHERE,
@@ -663,6 +664,15 @@ export const createParticleSystem = (
       ? Array.from({ length: maxParticles }, () => Math.random() * 100)
       : undefined,
   };
+
+  // Initialize burst states if bursts are configured
+  if (emission.bursts && emission.bursts.length > 0) {
+    generalData.burstStates = emission.bursts.map(() => ({
+      cyclesExecuted: 0,
+      lastCycleTime: 0,
+      probabilityPassed: false,
+    }));
+  }
 
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -1278,10 +1288,62 @@ const updateParticleSystemInstance = (
         (currentWorldPosition.z - _lastWorldPositionSnapshot.z) /
         neededParticlesByDistance;
     }
-    const neededParticles = neededParticlesByTime + neededParticlesByDistance;
+    let neededParticles = neededParticlesByTime + neededParticlesByDistance;
 
     if (rateOverDistance > 0 && neededParticlesByDistance >= 1) {
       generalData.distanceFromLastEmitByDistance = 0;
+    }
+
+    // Process burst emissions
+    if (emission.bursts && generalData.burstStates) {
+      const bursts = emission.bursts;
+      const burstStates = generalData.burstStates;
+      const currentIterationTime = normalizedLifetime;
+
+      for (let i = 0; i < bursts.length; i++) {
+        const burst = bursts[i];
+        const state = burstStates[i];
+        const burstTimeMs = burst.time * 1000;
+        const cycles = burst.cycles ?? 1;
+        const intervalMs = (burst.interval ?? 0) * 1000;
+        const probability = burst.probability ?? 1;
+
+        // Check if we've looped and need to reset burst states
+        if (looping && currentIterationTime < burstTimeMs && state.cyclesExecuted > 0) {
+          state.cyclesExecuted = 0;
+          state.lastCycleTime = 0;
+          state.probabilityPassed = false;
+        }
+
+        // Check if all cycles for this burst have been executed
+        if (state.cyclesExecuted >= cycles) continue;
+
+        // Calculate the time for the next cycle
+        const nextCycleTime = burstTimeMs + state.cyclesExecuted * intervalMs;
+
+        // Check if it's time for the next cycle
+        if (currentIterationTime >= nextCycleTime) {
+          // On first cycle, determine if probability check passes
+          if (state.cyclesExecuted === 0) {
+            state.probabilityPassed = Math.random() < probability;
+          }
+
+          // Only emit if probability check passed
+          if (state.probabilityPassed) {
+            const burstCount = Math.floor(
+              calculateValue(
+                generalData.particleSystemId,
+                burst.count,
+                generalData.normalizedLifetimePercentage
+              )
+            );
+            neededParticles += burstCount;
+          }
+
+          state.cyclesExecuted++;
+          state.lastCycleTime = currentIterationTime;
+        }
+      }
     }
 
     if (neededParticles > 0) {
