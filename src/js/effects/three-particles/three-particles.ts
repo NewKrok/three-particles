@@ -726,17 +726,31 @@ export const createParticleSystem = (
     positionArray[i * 3 + 1] = startPositions[i].y;
     positionArray[i * 3 + 2] = startPositions[i].z;
   }
-  geometry.setAttribute('position', new THREE.BufferAttribute(positionArray, 3));
+  geometry.setAttribute(
+    'position',
+    new THREE.BufferAttribute(positionArray, 3)
+  );
 
-  createFloat32Attributes({ geometry, propertyName: 'isActive', maxParticles, factory: 0 });
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'isActive',
+    maxParticles,
+    factory: 0,
+  });
 
-  createFloat32Attributes({ geometry, propertyName: 'lifetime', maxParticles, factory: 0 });
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'lifetime',
+    maxParticles,
+    factory: 0,
+  });
 
   createFloat32Attributes({
     geometry,
     propertyName: 'startLifetime',
     maxParticles,
-    factory: () => calculateValue(generalData.particleSystemId, startLifetime, 0) * 1000,
+    factory: () =>
+      calculateValue(generalData.particleSystemId, startLifetime, 0) * 1000,
   });
 
   createFloat32Attributes({
@@ -745,7 +759,11 @@ export const createParticleSystem = (
     maxParticles,
     factory: () =>
       textureSheetAnimation.startFrame
-        ? calculateValue(generalData.particleSystemId, textureSheetAnimation.startFrame, 0)
+        ? calculateValue(
+            generalData.particleSystemId,
+            textureSheetAnimation.startFrame,
+            0
+          )
         : 0,
   });
 
@@ -753,14 +771,16 @@ export const createParticleSystem = (
     geometry,
     propertyName: 'opacity',
     maxParticles,
-    factory: () => calculateValue(generalData.particleSystemId, startOpacity, 0),
+    factory: () =>
+      calculateValue(generalData.particleSystemId, startOpacity, 0),
   });
 
   createFloat32Attributes({
     geometry,
     propertyName: 'rotation',
     maxParticles,
-    factory: () => calculateValue(generalData.particleSystemId, startRotation, 0),
+    factory: () =>
+      calculateValue(generalData.particleSystemId, startRotation, 0),
   });
 
   createFloat32Attributes({
@@ -770,28 +790,44 @@ export const createParticleSystem = (
     factory: (_, index) => generalData.startValues.startSize[index],
   });
 
-  createFloat32Attributes({ geometry, propertyName: 'rotation', maxParticles, factory: 0 });
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'rotation',
+    maxParticles,
+    factory: 0,
+  });
 
   const colorRandomRatio = Math.random();
   createFloat32Attributes({
     geometry,
     propertyName: 'colorR',
     maxParticles,
-    factory: () => startColor.min!.r! + colorRandomRatio * (startColor.max!.r! - startColor.min!.r!),
+    factory: () =>
+      startColor.min!.r! +
+      colorRandomRatio * (startColor.max!.r! - startColor.min!.r!),
   });
   createFloat32Attributes({
     geometry,
     propertyName: 'colorG',
     maxParticles,
-    factory: () => startColor.min!.g! + colorRandomRatio * (startColor.max!.g! - startColor.min!.g!),
+    factory: () =>
+      startColor.min!.g! +
+      colorRandomRatio * (startColor.max!.g! - startColor.min!.g!),
   });
   createFloat32Attributes({
     geometry,
     propertyName: 'colorB',
     maxParticles,
-    factory: () => startColor.min!.b! + colorRandomRatio * (startColor.max!.b! - startColor.min!.b!),
+    factory: () =>
+      startColor.min!.b! +
+      colorRandomRatio * (startColor.max!.b! - startColor.min!.b!),
   });
-  createFloat32Attributes({ geometry, propertyName: 'colorA', maxParticles, factory: 0 });
+  createFloat32Attributes({
+    geometry,
+    propertyName: 'colorA',
+    maxParticles,
+    factory: 0,
+  });
 
   const deactivateParticle = (particleIndex: number) => {
     geometry.attributes.isActive.array[particleIndex] = 0;
@@ -1272,8 +1308,7 @@ const updateParticleSystemInstance = (
     const neededParticlesByDistance =
       rateOverDistance > 0 && generalData.distanceFromLastEmitByDistance > 0
         ? Math.floor(
-            generalData.distanceFromLastEmitByDistance /
-              (1 / rateOverDistance!)
+            generalData.distanceFromLastEmitByDistance / (1 / rateOverDistance!)
           )
         : 0;
     const useDistanceStep = neededParticlesByDistance > 0;
@@ -1309,7 +1344,11 @@ const updateParticleSystemInstance = (
         const probability = burst.probability ?? 1;
 
         // Check if we've looped and need to reset burst states
-        if (looping && currentIterationTime < burstTimeMs && state.cyclesExecuted > 0) {
+        if (
+          looping &&
+          currentIterationTime < burstTimeMs &&
+          state.cyclesExecuted > 0
+        ) {
           state.cyclesExecuted = 0;
           state.lastCycleTime = 0;
           state.probabilityPassed = false;
