@@ -205,12 +205,51 @@ export type MinMaxColor = {
 };
 
 /**
+ * Defines a burst emission event that emits a specific number of particles at a given time.
+ * Bursts are useful for explosions, impacts, fireworks, and other instantaneous particle effects.
+ *
+ * @property time - The time (in seconds) after the particle system starts when this burst should occur.
+ * @property count - The number of particles to emit. Can be a constant or a random range.
+ * @property cycles - The number of times this burst should repeat. Defaults to 1 (single burst).
+ * @property interval - The time interval (in seconds) between burst cycles. Only used when cycles > 1.
+ * @property probability - The probability (0.0 to 1.0) that this burst will occur. Defaults to 1.0.
+ *
+ * @example
+ * // Simple burst at start
+ * { time: 0, count: 50 }
+ *
+ * // Random count burst at 1 second
+ * { time: 1, count: { min: 20, max: 30 } }
+ *
+ * // Repeating burst with interval
+ * { time: 0.5, count: 10, cycles: 3, interval: 0.2 }
+ * // Emits at 0.5s, 0.7s, 0.9s
+ *
+ * // Probabilistic burst (50% chance)
+ * { time: 2, count: 100, probability: 0.5 }
+ */
+export type Burst = {
+  /** Time in seconds when the burst should occur */
+  time: number;
+  /** Number of particles to emit (constant or random range) */
+  count: Constant | RandomBetweenTwoConstants;
+  /** Number of times to repeat this burst. Defaults to 1. */
+  cycles?: number;
+  /** Time interval in seconds between burst cycles. Defaults to 0. */
+  interval?: number;
+  /** Probability (0-1) that this burst will occur. Defaults to 1. */
+  probability?: number;
+};
+
+/**
  * Defines the emission behavior of the particles.
  * Supports rates defined over time or distance using constant values, random ranges, or curves (Bézier or easing).
+ * Also supports burst emissions for instantaneous particle effects.
  *
  * @default
  * rateOverTime: 10.0
  * rateOverDistance: 0.0
+ * bursts: []
  *
  * @example
  * // Rate over time as a constant value
@@ -242,10 +281,19 @@ export type MinMaxColor = {
  *   curveFunction: (distance) => Math.sin(distance),
  *   scale: 0.5
  * };
+ *
+ * // Burst emissions for explosions
+ * bursts: [
+ *   { time: 0, count: 50 },
+ *   { time: 1, count: { min: 20, max: 30 }, probability: 0.8 },
+ *   { time: 0.5, count: 10, cycles: 3, interval: 0.2 }
+ * ];
  */
 export type Emission = {
   rateOverTime?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
   rateOverDistance?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+  /** Array of burst configurations for instantaneous particle emissions */
+  bursts?: Array<Burst>;
 };
 
 /**
@@ -1097,6 +1145,19 @@ export type ParticleSystemConfig = {
 
 export type NormalizedParticleSystemConfig = Required<ParticleSystemConfig>;
 
+/**
+ * Tracks the state of a burst emission event.
+ * Used internally to determine when bursts should fire and how many cycles remain.
+ */
+export type BurstState = {
+  /** Number of cycles that have been executed so far */
+  cyclesExecuted: number;
+  /** Time (in ms) when the last cycle was executed */
+  lastCycleTime: number;
+  /** Whether the probability check passed for this iteration */
+  probabilityPassed: boolean;
+};
+
 export type GeneralData = {
   particleSystemId: number;
   normalizedLifetimePercentage: number;
@@ -1131,6 +1192,8 @@ export type GeneralData = {
   lifetimeValues: Record<string, Array<number>>;
   noise: Noise;
   isEnabled: boolean;
+  /** Tracks the state of each burst emission event */
+  burstStates?: Array<BurstState>;
 };
 
 export type ParticleSystemInstance = {
@@ -1189,6 +1252,7 @@ export type ParticleSystem = {
   resumeEmitter: () => void;
   pauseEmitter: () => void;
   dispose: () => void;
+  update: (cycleData: CycleData) => void;
 };
 
 /**
