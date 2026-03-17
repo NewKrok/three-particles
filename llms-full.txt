@@ -1,0 +1,523 @@
+# @newkrok/three-particles — Full API Reference
+
+> Three.js-based high-performance particle system library (v2.4.0)
+> License: MIT | Author: Istvan Krisztian Somoracz
+> Repository: https://github.com/NewKrok/three-particles
+
+---
+
+## Installation
+
+```bash
+npm install @newkrok/three-particles three
+```
+
+Peer dependency: `three` ^0.182.0
+
+---
+
+## Main API
+
+### createParticleSystem(config: ParticleSystemConfig): ParticleSystem
+
+Creates a new particle system and registers it for global updates.
+
+```typescript
+import { createParticleSystem } from "@newkrok/three-particles";
+
+const system = createParticleSystem({
+  duration: 5,
+  looping: true,
+  maxParticles: 200,
+  startLifetime: 3,
+  startSpeed: 2,
+  startSize: 0.5,
+  emission: { rateOverTime: 30 },
+  shape: { shape: Shape.CONE, cone: { angle: 0.5, radius: 1 } },
+});
+
+scene.add(system.instance);
+```
+
+### updateParticleSystems(cycleData: CycleData): void
+
+Updates all registered particle systems. Call this in your animation loop.
+
+```typescript
+import { updateParticleSystems } from "@newkrok/three-particles";
+
+function animate() {
+  updateParticleSystems({
+    now: performance.now(),
+    delta: clock.getDelta(),
+    elapsed: clock.getElapsedTime(),
+  });
+  requestAnimationFrame(animate);
+}
+```
+
+---
+
+## ParticleSystem (returned object)
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `instance` | `THREE.Points \| Gyroscope` | The renderable object — add to scene |
+| `pauseEmitter()` | `() => void` | Stop emitting new particles |
+| `resumeEmitter()` | `() => void` | Resume emitting particles |
+| `dispose()` | `() => void` | Destroy system, free resources |
+| `update(cycleData)` | `(CycleData) => void` | Update this system individually |
+
+---
+
+## CycleData
+
+```typescript
+type CycleData = {
+  now: number;     // Current timestamp in milliseconds (performance.now())
+  delta: number;   // Time since last frame in seconds
+  elapsed: number; // Total elapsed time in seconds
+};
+```
+
+---
+
+## ParticleSystemConfig — Complete Reference
+
+### General Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `transform` | `Transform` | origin | Position, rotation, scale of emitter |
+| `duration` | `number` | 5.0 | System duration in seconds |
+| `looping` | `boolean` | true | Loop after duration ends |
+| `startDelay` | `number \| {min,max}` | 0.0 | Delay before first emission |
+| `maxParticles` | `number` | 100 | Maximum concurrent particles |
+| `gravity` | `number` | 0.0 | Downward acceleration |
+| `simulationSpace` | `SimulationSpace` | LOCAL | LOCAL or WORLD coordinate space |
+
+### Start Properties
+
+All start properties support three value types:
+- **Constant**: `number` — fixed value
+- **Random range**: `{ min: number, max: number }` — random between min and max
+- **Curve**: `BezierCurve | EasingCurve` — value based on system lifetime
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `startLifetime` | 5.0 | Particle lifetime in seconds |
+| `startSpeed` | 1.0 | Initial particle speed |
+| `startSize` | 1.0 | Initial particle size |
+| `startOpacity` | 1.0 | Initial particle opacity (0-1) |
+| `startRotation` | 0.0 | Initial rotation in degrees |
+| `startColor` | white | `MinMaxColor` — color range for randomization |
+
+### startColor — MinMaxColor
+
+```typescript
+type MinMaxColor = {
+  min?: Rgb;  // { r?: number, g?: number, b?: number } — values 0.0 to 1.0
+  max?: Rgb;
+};
+
+// Example: random orange-to-yellow
+startColor: {
+  min: { r: 1.0, g: 0.3, b: 0.0 },
+  max: { r: 1.0, g: 1.0, b: 0.0 },
+}
+```
+
+---
+
+## Transform
+
+```typescript
+type Transform = {
+  position?: THREE.Vector3;
+  rotation?: THREE.Vector3;  // Radians per axis
+  scale?: THREE.Vector3;
+};
+```
+
+---
+
+## Emission
+
+```typescript
+type Emission = {
+  rateOverTime?: number | { min, max } | LifetimeCurve;    // Particles per second (default: 10)
+  rateOverDistance?: number | { min, max } | LifetimeCurve; // Particles per unit moved (default: 0)
+  bursts?: Burst[];                                         // Instantaneous emissions
+};
+```
+
+### Burst
+
+```typescript
+type Burst = {
+  time: number;                               // Trigger time in seconds
+  count: number | { min: number, max: number }; // Particle count
+  cycles?: number;                            // Repeat count (default: 1)
+  interval?: number;                          // Seconds between cycles
+  probability?: number;                       // 0-1 chance of firing (default: 1)
+};
+```
+
+**Example — explosion with aftershocks:**
+```typescript
+emission: {
+  rateOverTime: 0,
+  bursts: [
+    { time: 0, count: 100 },                            // Main explosion
+    { time: 0.3, count: { min: 20, max: 40 } },         // First aftershock
+    { time: 0.5, count: 15, cycles: 4, interval: 0.1 }, // Debris pulses
+  ],
+}
+```
+
+---
+
+## Shape Configuration
+
+```typescript
+type ShapeConfig = {
+  shape?: Shape;         // SPHERE | CONE | CIRCLE | RECTANGLE | BOX
+  sphere?: Sphere;
+  cone?: Cone;
+  circle?: Circle;
+  rectangle?: Rectangle;
+  box?: Box;
+};
+```
+
+### Shape.SPHERE
+
+```typescript
+type Sphere = {
+  radius?: number;          // Default: 1
+  radiusThickness?: number; // 0-1, where 1 = solid sphere (default: 1)
+  arc?: number;             // Radians, partial sphere (default: 2π)
+};
+```
+
+### Shape.CONE
+
+```typescript
+type Cone = {
+  angle?: number;           // Cone angle in radians (default: ~0.44)
+  radius?: number;          // Base radius (default: 1)
+  radiusThickness?: number; // 0-1 (default: 1)
+  arc?: number;             // Radians (default: 2π)
+};
+```
+
+### Shape.CIRCLE
+
+```typescript
+type Circle = {
+  radius?: number;          // Default: 1
+  radiusThickness?: number; // 0-1 (default: 1)
+  arc?: number;             // Radians (default: 2π)
+};
+```
+
+### Shape.RECTANGLE
+
+```typescript
+type Rectangle = {
+  rotation?: Point3D;  // { x?, y?, z? } in radians
+  scale?: Point3D;     // { x?, y?, z? } dimensions
+};
+```
+
+### Shape.BOX
+
+```typescript
+type Box = {
+  scale?: Point3D;     // { x?, y?, z? } dimensions
+  emitFrom?: EmitFrom; // VOLUME | SHELL | EDGE
+};
+```
+
+---
+
+## Lifetime Modifiers
+
+### velocityOverLifetime
+
+Modifies particle velocity over its lifetime. Supports linear (directional) and orbital (rotational) velocity.
+
+```typescript
+type VelocityOverLifetime = {
+  isActive: boolean;
+  linear: {
+    x?: number | { min, max } | LifetimeCurve;
+    y?: number | { min, max } | LifetimeCurve;
+    z?: number | { min, max } | LifetimeCurve;
+  };
+  orbital: {  // Values in degrees
+    x?: number | { min, max } | LifetimeCurve;
+    y?: number | { min, max } | LifetimeCurve;
+    z?: number | { min, max } | LifetimeCurve;
+  };
+};
+```
+
+### sizeOverLifetime
+
+```typescript
+sizeOverLifetime: {
+  isActive: boolean;
+  lifetimeCurve: LifetimeCurve;  // Multiplier on startSize
+}
+```
+
+### opacityOverLifetime
+
+```typescript
+opacityOverLifetime: {
+  isActive: boolean;
+  lifetimeCurve: LifetimeCurve;  // Multiplier on startOpacity
+}
+```
+
+### colorOverLifetime
+
+Each RGB channel is a separate curve acting as a multiplier (0-1) on startColor.
+**Important**: Set startColor to white `{ r:1, g:1, b:1 }` for full color transitions.
+
+```typescript
+colorOverLifetime: {
+  isActive: boolean;
+  r: LifetimeCurve;
+  g: LifetimeCurve;
+  b: LifetimeCurve;
+}
+```
+
+### rotationOverLifetime
+
+```typescript
+rotationOverLifetime: {
+  isActive: boolean;
+  min?: number;  // Minimum rotation speed
+  max?: number;  // Maximum rotation speed
+}
+```
+
+---
+
+## Noise
+
+FBM (Fractal Brownian Motion) noise affecting particles dynamically.
+
+```typescript
+type NoiseConfig = {
+  isActive: boolean;
+  useRandomOffset: boolean; // Randomize noise per particle
+  strength: number;         // Overall noise strength (default: 1)
+  frequency: number;        // Noise frequency (default: 0.5)
+  octaves: number;          // FBM octaves (default: 1)
+  positionAmount: number;   // Position displacement (default: 1)
+  rotationAmount: number;   // Rotation displacement (default: 0)
+  sizeAmount: number;       // Size displacement (default: 0)
+};
+```
+
+---
+
+## Renderer
+
+```typescript
+type Renderer = {
+  blending: THREE.Blending;             // Default: NormalBlending
+  discardBackgroundColor: boolean;      // Default: false
+  backgroundColorTolerance: number;     // Default: 1.0
+  backgroundColor: Rgb;                 // Default: { r:0, g:0, b:0 }
+  transparent: boolean;                 // Default: true
+  depthTest: boolean;                   // Default: true
+  depthWrite: boolean;                  // Default: false
+};
+```
+
+Common blending modes: `THREE.NormalBlending`, `THREE.AdditiveBlending`, `THREE.SubtractiveBlending`
+
+---
+
+## Texture Sheet Animation
+
+Animate sprite sheets over particle lifetime.
+
+```typescript
+type TextureSheetAnimation = {
+  tiles?: THREE.Vector2;                        // Grid dimensions (default: 1x1)
+  timeMode?: TimeMode;                          // LIFETIME or FPS (default: LIFETIME)
+  fps?: number;                                 // Frames per second (default: 30)
+  startFrame?: number | { min, max };           // Starting frame (default: 0)
+};
+```
+
+---
+
+## Texture (map)
+
+```typescript
+const texture = new THREE.TextureLoader().load("particle.png");
+const system = createParticleSystem({
+  map: texture,
+  // ...
+});
+```
+
+---
+
+## Curve Types
+
+### BezierCurve
+
+```typescript
+{
+  type: LifeTimeCurve.BEZIER,
+  scale: 1,  // Optional multiplier
+  bezierPoints: [
+    { x: 0, y: 0, percentage: 0 },       // Start point
+    { x: 0.3, y: 0.8 },                   // Control point
+    { x: 0.7, y: 0.2 },                   // Control point
+    { x: 1, y: 1, percentage: 1 },        // End point
+  ],
+}
+```
+
+### EasingCurve
+
+```typescript
+{
+  type: LifeTimeCurve.EASING,
+  scale: 1,  // Optional multiplier
+  curveFunction: (time: number) => number, // 0→1 input, any output
+}
+```
+
+---
+
+## Enums
+
+### Shape
+`SPHERE` | `CONE` | `CIRCLE` | `RECTANGLE` | `BOX`
+
+### EmitFrom
+`VOLUME` | `SHELL` | `EDGE`
+
+### SimulationSpace
+`LOCAL` | `WORLD`
+
+### TimeMode
+`LIFETIME` | `FPS`
+
+### LifeTimeCurve
+`BEZIER` | `EASING`
+
+---
+
+## Callbacks
+
+```typescript
+createParticleSystem({
+  // Called every frame
+  onUpdate: ({ particleSystem, delta, elapsed, lifetime, iterationCount }) => {
+    // particleSystem: THREE.Points instance
+    // delta: seconds since last frame
+    // elapsed: total seconds
+    // lifetime: system duration
+    // iterationCount: number of completed loops
+  },
+
+  // Called when a non-looping system completes, or each loop iteration ends
+  onComplete: () => {
+    console.log("Particle system iteration complete");
+  },
+});
+```
+
+---
+
+## Complete Example — Fire Effect
+
+```typescript
+import * as THREE from "three";
+import {
+  createParticleSystem,
+  updateParticleSystems,
+  Shape,
+  LifeTimeCurve,
+  SimulationSpace,
+} from "@newkrok/three-particles";
+
+const fireTexture = new THREE.TextureLoader().load("fire-particle.png");
+
+const fire = createParticleSystem({
+  duration: 5,
+  looping: true,
+  maxParticles: 200,
+  startLifetime: { min: 0.5, max: 1.5 },
+  startSpeed: { min: 1, max: 3 },
+  startSize: { min: 0.3, max: 0.8 },
+  startColor: {
+    min: { r: 1.0, g: 0.2, b: 0.0 },
+    max: { r: 1.0, g: 0.8, b: 0.0 },
+  },
+  gravity: -1,
+  simulationSpace: SimulationSpace.WORLD,
+  emission: { rateOverTime: 50 },
+  shape: {
+    shape: Shape.CONE,
+    cone: { angle: 0.2, radius: 0.3, radiusThickness: 1 },
+  },
+  map: fireTexture,
+  renderer: {
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    discardBackgroundColor: false,
+    backgroundColorTolerance: 1,
+    backgroundColor: { r: 0, g: 0, b: 0 },
+  },
+  sizeOverLifetime: {
+    isActive: true,
+    lifetimeCurve: {
+      type: LifeTimeCurve.BEZIER,
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 0.5, y: 0.5 },
+        { x: 1, y: 0, percentage: 1 },
+      ],
+    },
+  },
+  opacityOverLifetime: {
+    isActive: true,
+    lifetimeCurve: {
+      type: LifeTimeCurve.BEZIER,
+      scale: 1,
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 0.7, y: 0.8 },
+        { x: 1, y: 0, percentage: 1 },
+      ],
+    },
+  },
+});
+
+scene.add(fire.instance);
+```
+
+---
+
+## Links
+
+- Repository: https://github.com/NewKrok/three-particles
+- API Docs: https://newkrok.github.io/three-particles/
+- Visual Editor: https://github.com/NewKrok/three-particles-editor
+- Editor Demo: https://newkrok.com/three-particles-editor/index.html
+- npm: https://www.npmjs.com/package/@newkrok/three-particles

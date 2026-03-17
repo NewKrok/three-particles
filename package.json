@@ -9,8 +9,12 @@
   "files": [
     "dist/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "llms.txt",
+    "llms-full.txt"
   ],
+  "llms": "https://newkrok.github.io/three-particles/llms.txt",
+  "llmsFull": "https://newkrok.github.io/three-particles/llms-full.txt",
   "exports": {
     ".": {
       "import": "./dist/index.js",

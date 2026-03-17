@@ -6,31 +6,53 @@ on:
       - master
 
 jobs:
-  analyze-bundle:
+  check-size:
+    name: Check Bundle Size
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
+      - name: Checkout PR
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project
+      - name: Build
         run: npm run build
 
-      - name: Generate bundle report
+      - name: Check bundle size
         run: |
-          npm run build
-          cat dist/bundle-report.json
+          MINIFIED_SIZE=$(wc -c < dist/three-particles.min.js)
+          MINIFIED_KB=$((MINIFIED_SIZE / 1024))
+          echo "## Bundle Size Report" > bundle-report.md
+          echo "" >> bundle-report.md
+          echo "| File | Size |" >> bundle-report.md
+          echo "|------|------|" >> bundle-report.md
+          echo "| \`three-particles.min.js\` | ${MINIFIED_KB} KB (${MINIFIED_SIZE} bytes) |" >> bundle-report.md
+
+          # Fail if bundle exceeds 150KB (current ~122KB with headroom)
+          MAX_SIZE=153600
+          if [ "$MINIFIED_SIZE" -gt "$MAX_SIZE" ]; then
+            echo "" >> bundle-report.md
+            echo "**⚠️ Bundle size exceeds limit of $((MAX_SIZE / 1024)) KB!**" >> bundle-report.md
+            echo "::error::Bundle size ${MINIFIED_KB}KB exceeds limit of $((MAX_SIZE / 1024))KB"
+            cat bundle-report.md
+            exit 1
+          else
+            echo "" >> bundle-report.md
+            echo "✅ Bundle size is within the $((MAX_SIZE / 1024)) KB limit." >> bundle-report.md
+          fi
+
+          cat bundle-report.md
 
       - name: Post bundle size comment
+        if: always()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          path: dist/bundle-report.json
+          header: bundle-size
+          path: bundle-report.md
