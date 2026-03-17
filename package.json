@@ -56,6 +56,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src",
+    "benchmark": "npm run build && node --experimental-vm-modules benchmarks/run.js",
+    "benchmark:json": "npm run build && node --experimental-vm-modules benchmarks/run.js --json",
+    "benchmark:compare": "node --experimental-vm-modules benchmarks/run.js --compare",
+    "benchmark:save-baseline": "npm run benchmark:json > benchmarks/baseline.json",
     "prepare": "husky"
   },
   "dependencies": {
