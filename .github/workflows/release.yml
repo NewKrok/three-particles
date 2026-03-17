@@ -15,7 +15,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     # Skip runs triggered by the version bump commit (loop prevention)
-    if: "!startsWith(github.event.head_commit.message, 'release: v')"
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,7 +42,7 @@ jobs:
           else
             COMMITS=$(git log "${LAST_TAG}..HEAD" --oneline --format="%s")
           fi
-          COMMITS=$(echo "$COMMITS" | grep -v "^release: v" || true)
+          COMMITS=$(echo "$COMMITS" | grep -v "^chore(release):" || true)
           echo "Commits since last tag:"
           echo "$COMMITS"
           if [ -z "$COMMITS" ]; then
@@ -79,7 +79,7 @@ jobs:
             git tag -d "$NEXT_VERSION" || true
             break
           done
-          NEW_VERSION=$(npm version "$BUMP" -m "release: v%s")
+          HUSKY=0 NEW_VERSION=$(npm version "$BUMP" -m "chore(release): v%s")
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION"
 
