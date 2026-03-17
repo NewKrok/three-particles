@@ -1,0 +1,121 @@
+# @newkrok/three-particles
+
+> Three.js-based high-performance particle system library for creating visually stunning particle effects. Perfect for game developers and 3D applications.
+
+## Quick Start
+
+```bash
+npm install @newkrok/three-particles three
+```
+
+```typescript
+import * as THREE from "three";
+import { createParticleSystem, updateParticleSystems } from "@newkrok/three-particles";
+
+const scene = new THREE.Scene();
+
+const { instance } = createParticleSystem({
+  duration: 5,
+  looping: true,
+  maxParticles: 100,
+  startLifetime: 2,
+  startSpeed: 3,
+  startSize: 0.5,
+  startColor: { min: { r: 1, g: 0.5, b: 0 }, max: { r: 1, g: 1, b: 0 } },
+  emission: { rateOverTime: 20 },
+  shape: { shape: Shape.CONE, cone: { angle: 0.4, radius: 0.5 } },
+});
+
+scene.add(instance);
+
+// In your animation loop:
+function animate() {
+  updateParticleSystems({
+    now: performance.now(),
+    delta: clock.getDelta(),
+    elapsed: clock.getElapsedTime(),
+  });
+}
+```
+
+## Main API
+
+- `createParticleSystem(config: ParticleSystemConfig): ParticleSystem` — Create a particle system
+- `updateParticleSystems(cycleData: CycleData)` — Update all active particle systems
+
+### ParticleSystem Methods
+
+- `instance` — The Three.js Points or Gyroscope object (add to scene)
+- `pauseEmitter()` — Pause particle emission
+- `resumeEmitter()` — Resume particle emission
+- `dispose()` — Clean up and free resources
+- `update(cycleData)` — Update this specific system only
+
+## Key Configuration Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| duration | number | 5.0 | Duration in seconds |
+| looping | boolean | true | Whether to loop |
+| maxParticles | number | 100 | Maximum active particles |
+| startLifetime | number / {min,max} / Curve | 5.0 | Particle lifetime |
+| startSpeed | number / {min,max} / Curve | 1.0 | Initial speed |
+| startSize | number / {min,max} / Curve | 1.0 | Initial size |
+| startOpacity | number / {min,max} / Curve | 1.0 | Initial opacity |
+| startRotation | number / {min,max} / Curve | 0.0 | Initial rotation (degrees) |
+| startColor | MinMaxColor | white | Color range |
+| gravity | number | 0.0 | Gravity strength |
+| simulationSpace | LOCAL / WORLD | LOCAL | Coordinate space |
+| emission | Emission | rateOverTime: 10 | Emission config |
+| shape | ShapeConfig | — | Emitter shape |
+| map | THREE.Texture | undefined | Particle texture |
+
+## Emitter Shapes
+
+- `Shape.SPHERE` — Spherical emission (radius, arc, radiusThickness)
+- `Shape.CONE` — Conical emission (angle, radius, arc)
+- `Shape.CIRCLE` — Circular flat emission (radius, arc)
+- `Shape.RECTANGLE` — Rectangular flat emission (scale, rotation)
+- `Shape.BOX` — Box volume emission (scale, emitFrom: VOLUME/SHELL/EDGE)
+
+## Lifetime Modifiers
+
+- `velocityOverLifetime` — Linear & orbital velocity changes
+- `sizeOverLifetime` — Size curve over lifetime
+- `opacityOverLifetime` — Opacity curve over lifetime
+- `colorOverLifetime` — RGB curves (multipliers on startColor)
+- `rotationOverLifetime` — Rotation speed range
+- `noise` — FBM noise affecting position, rotation, size
+
+## Burst Emission
+
+```typescript
+emission: {
+  rateOverTime: 0,
+  bursts: [
+    { time: 0, count: 50 },
+    { time: 1, count: { min: 10, max: 30 }, probability: 0.8 },
+    { time: 0.5, count: 10, cycles: 3, interval: 0.2 },
+  ],
+}
+```
+
+## Curves
+
+Values support: constant `number`, random `{ min, max }`, or curves:
+
+```typescript
+// Bezier curve
+{ type: LifeTimeCurve.BEZIER, bezierPoints: [...], scale: 1 }
+
+// Easing function
+{ type: LifeTimeCurve.EASING, curveFunction: (t) => t * t, scale: 1 }
+```
+
+## Links
+
+- Repository: https://github.com/NewKrok/three-particles
+- API Docs: https://newkrok.github.io/three-particles/
+- Visual Editor: https://github.com/NewKrok/three-particles-editor
+- Editor Demo: https://newkrok.com/three-particles-editor/index.html
+- Full LLM Reference: https://github.com/NewKrok/three-particles/blob/master/llms-full.txt

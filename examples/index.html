@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three Particles — Examples</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+    header {
+      text-align: center;
+      padding: 40px 20px 20px;
+      border-bottom: 1px solid #222;
+    }
+    header h1 { font-size: 2rem; color: #fff; margin-bottom: 8px; }
+    header p { color: #888; font-size: 1.1rem; }
+    header a { color: #4fc3f7; text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    .links { margin-top: 12px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .links a {
+      color: #4fc3f7; text-decoration: none; font-size: 0.9rem;
+      padding: 4px 12px; border: 1px solid #333; border-radius: 4px;
+    }
+    .links a:hover { background: #1a1a2e; border-color: #4fc3f7; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
+      padding: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .card:hover { border-color: #4fc3f7; transform: translateY(-2px); }
+    .card canvas { width: 100%; height: 220px; display: block; background: #000; }
+    .card-info { padding: 16px; }
+    .card-info h3 { font-size: 1.1rem; color: #fff; margin-bottom: 4px; }
+    .card-info p { font-size: 0.85rem; color: #888; line-height: 1.4; }
+    .card-info .tag {
+      display: inline-block; margin-top: 8px; padding: 2px 8px;
+      background: #1a1a2e; color: #4fc3f7; border-radius: 3px; font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>@newkrok/three-particles</h1>
+    <p>Interactive examples for the Three.js particle system library</p>
+    <div class="links">
+      <a href="https://github.com/NewKrok/three-particles">GitHub</a>
+      <a href="https://www.npmjs.com/package/@newkrok/three-particles">npm</a>
+      <a href="https://newkrok.github.io/three-particles/">API Docs</a>
+      <a href="https://newkrok.com/three-particles-editor/index.html">Visual Editor</a>
+    </div>
+  </header>
+
+  <div class="grid" id="examples-grid"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+      "three/examples/jsm/misc/Gyroscope.js": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/misc/Gyroscope.js"
+    }
+  }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
