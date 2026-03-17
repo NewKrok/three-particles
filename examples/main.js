@@ -117,7 +117,6 @@ class LiveDemo {
     if (this.particleSystem) this.particleSystem.dispose();
     if (this.renderer) {
       this.renderer.dispose();
-      this.renderer.forceContextLoss();
     }
 
     const canvas = this.container.querySelector("canvas");
