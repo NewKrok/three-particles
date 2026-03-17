@@ -119,6 +119,16 @@ npm run build         # Clean dist/ + TypeScript compile + Webpack bundle
 - `dist/index.d.ts` - TypeScript declarations
 - `dist/three-particles.min.js` - Minified browser bundle
 
+### Pre-Push Checklist
+
+Before pushing any changes, **all** of these must pass:
+
+```bash
+npm run lint          # ESLint — must pass
+npm test              # Jest — all tests must pass
+npm run build         # tsc + webpack — must succeed
+```
+
 ### Git Workflow
 - Main branch: `master`
 - Conventional commits enforced via commitlint
@@ -126,7 +136,7 @@ npm run build         # Clean dist/ + TypeScript compile + Webpack bundle
 - Commit messages should follow conventional format
 - Add Co-authored-by for Claude commits:
   ```
-  Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+  Co-Authored-By: Claude <noreply@anthropic.com>
   ```
 
 ---
@@ -219,6 +229,29 @@ npx typedoc               # Generate documentation
 - Tests may need mocking for Three.js objects
 - Node.js version compatibility (>=18.0.0)
 - Jest configured with Babel for TypeScript support
+
+---
+
+## Project Status
+
+| Feature | Status |
+|---------|--------|
+| Core particle system | ✅ Complete |
+| Shape emitters (Sphere, Cone, Circle, Rectangle, Box) | ✅ Complete |
+| Lifetime modifiers (size, opacity, color, rotation, velocity) | ✅ Complete |
+| Noise module | ✅ Complete |
+| Texture sheet animation | ✅ Complete |
+| World/Local simulation space | ✅ Complete |
+| TypeDoc API documentation | ✅ Complete |
+| Visual editor (three-particles-editor) | ✅ Complete |
+| Test coverage (87% statement, 65% branch) | 🔶 Target ≥90% stmt, ≥80% branch |
+| llms.txt / llms-full.txt | ⬜ Planned |
+| Interactive examples page (GitHub Pages) | ⬜ Planned |
+| CI/CD auto release | ⬜ Planned |
+| Benchmark / performance budget | ⬜ Planned |
+| Web Worker support | ⬜ Planned |
+| Preset system | ⬜ Planned |
+| Sub-emitters | ⬜ Planned |
 
 ---
 

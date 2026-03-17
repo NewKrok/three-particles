@@ -541,6 +541,7 @@ export type Renderer = {
 export type Noise = {
   isActive: boolean;
   strength: number;
+  noisePower: number;
   positionAmount: number;
   rotationAmount: number;
   sizeAmount: number;
@@ -1199,6 +1200,7 @@ export type GeneralData = {
 export type ParticleSystemInstance = {
   particleSystem: THREE.Points;
   wrapper?: Gyroscope;
+  elapsedUniform: { value: number };
   generalData: GeneralData;
   onUpdate: (data: {
     particleSystem: THREE.Points;
@@ -1219,6 +1221,7 @@ export type ParticleSystemInstance = {
   normalizedConfig: NormalizedParticleSystemConfig;
   iterationCount: number;
   velocities: Array<THREE.Vector3>;
+  freeList: Array<number>;
   deactivateParticle: (particleIndex: number) => void;
   activateParticle: (data: {
     particleIndex: number;

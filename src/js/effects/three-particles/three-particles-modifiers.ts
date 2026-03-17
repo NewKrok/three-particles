@@ -212,6 +212,7 @@ export const applyModifiers = ({
     const {
       sampler,
       strength,
+      noisePower,
       offsets,
       positionAmount,
       rotationAmount,
@@ -223,7 +224,6 @@ export const applyModifiers = ({
       (particleLifetimePercentage + (offsets ? offsets[particleIndex] : 0)) *
       10 *
       strength;
-    const noisePower = 0.15 * strength;
 
     noiseInput.set(noisePosition, 0, 0);
     noiseOnPosition = sampler!.get3(noiseInput);

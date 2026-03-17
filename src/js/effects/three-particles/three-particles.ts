@@ -450,6 +450,7 @@ export const createParticleSystem = (
     noise: {
       isActive: false,
       strength: 0,
+      noisePower: 0,
       positionAmount: 0,
       rotationAmount: 0,
       sizeAmount: 0,
@@ -501,6 +502,12 @@ export const createParticleSystem = (
   );
 
   generalData.creationTimes = Array.from({ length: maxParticles }, () => 0);
+
+  // Free list for O(1) inactive particle lookup (stack, top = end of array)
+  const freeList: Array<number> = Array.from(
+    { length: maxParticles },
+    (_, i) => maxParticles - 1 - i
+  );
 
   if (velocityOverLifetime.isActive) {
     generalData.linearVelocityData = Array.from(
@@ -650,6 +657,7 @@ export const createParticleSystem = (
   generalData.noise = {
     isActive: noise.isActive,
     strength: noise.strength,
+    noisePower: 0.15 * noise.strength,
     positionAmount: noise.positionAmount,
     rotationAmount: noise.rotationAmount,
     sizeAmount: noise.sizeAmount,
@@ -833,6 +841,7 @@ export const createParticleSystem = (
     geometry.attributes.isActive.array[particleIndex] = 0;
     geometry.attributes.colorA.array[particleIndex] = 0;
     geometry.attributes.colorA.needsUpdate = true;
+    freeList.push(particleIndex);
   };
 
   const activateParticle = ({
@@ -1030,6 +1039,7 @@ export const createParticleSystem = (
   const instanceData: ParticleSystemInstance = {
     particleSystem,
     wrapper,
+    elapsedUniform: material.uniforms.elapsed,
     generalData,
     onUpdate,
     onComplete,
@@ -1043,6 +1053,7 @@ export const createParticleSystem = (
     normalizedConfig,
     iterationCount: 0,
     velocities,
+    freeList,
     deactivateParticle,
     activateParticle,
   };
@@ -1146,6 +1157,7 @@ const updateParticleSystemInstance = (
     onComplete,
     particleSystem,
     wrapper,
+    elapsedUniform,
     creationTime,
     lastEmissionTime,
     duration,
@@ -1154,6 +1166,7 @@ const updateParticleSystemInstance = (
     normalizedConfig,
     iterationCount,
     velocities,
+    freeList,
     deactivateParticle,
     activateParticle,
     simulationSpace,
@@ -1184,15 +1197,7 @@ const updateParticleSystemInstance = (
 
   _lastWorldPositionSnapshot.copy(lastWorldPosition);
 
-  if (Array.isArray(particleSystem.material))
-    particleSystem.material.forEach((material) => {
-      if (material instanceof THREE.ShaderMaterial)
-        material.uniforms.elapsed.value = elapsed;
-    });
-  else {
-    if (particleSystem.material instanceof THREE.ShaderMaterial)
-      particleSystem.material.uniforms.elapsed.value = elapsed;
-  }
+  elapsedUniform.value = elapsed;
 
   particleSystem.getWorldPosition(currentWorldPosition);
   if (lastWorldPosition.x !== -99999) {
@@ -1387,40 +1392,29 @@ const updateParticleSystemInstance = (
 
     if (neededParticles > 0) {
       let generatedParticlesByDistanceNeeds = 0;
-      const isActiveArrLen = isActiveArr.length;
 
       for (let i = 0; i < neededParticles; i++) {
-        let particleIndex = -1;
-        for (let j = 0; j < isActiveArrLen; j++) {
-          if (!isActiveArr[j]) {
-            particleIndex = j;
-            break;
-          }
-        }
+        if (freeList.length === 0) break;
+        const particleIndex = freeList.pop()!;
 
-        if (particleIndex !== -1 && particleIndex < isActiveArrLen) {
-          _tempPosition.x = 0;
-          _tempPosition.y = 0;
-          _tempPosition.z = 0;
-          if (
-            useDistanceStep &&
-            generatedParticlesByDistanceNeeds < neededParticlesByDistance
-          ) {
-            _tempPosition.x =
-              _distanceStep.x * generatedParticlesByDistanceNeeds;
-            _tempPosition.y =
-              _distanceStep.y * generatedParticlesByDistanceNeeds;
-            _tempPosition.z =
-              _distanceStep.z * generatedParticlesByDistanceNeeds;
-            generatedParticlesByDistanceNeeds++;
-          }
-          activateParticle({
-            particleIndex,
-            activationTime: now,
-            position: _tempPosition,
-          });
-          props.lastEmissionTime = now;
+        _tempPosition.x = 0;
+        _tempPosition.y = 0;
+        _tempPosition.z = 0;
+        if (
+          useDistanceStep &&
+          generatedParticlesByDistanceNeeds < neededParticlesByDistance
+        ) {
+          _tempPosition.x = _distanceStep.x * generatedParticlesByDistanceNeeds;
+          _tempPosition.y = _distanceStep.y * generatedParticlesByDistanceNeeds;
+          _tempPosition.z = _distanceStep.z * generatedParticlesByDistanceNeeds;
+          generatedParticlesByDistanceNeeds++;
         }
+        activateParticle({
+          particleIndex,
+          activationTime: now,
+          position: _tempPosition,
+        });
+        props.lastEmissionTime = now;
       }
     }
 

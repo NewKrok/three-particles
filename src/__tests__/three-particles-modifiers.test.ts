@@ -270,6 +270,7 @@ describe('applyModifiers', () => {
     const noise = {
       isActive: true,
       strength: 1,
+      noisePower: 0.15,
       positionAmount: 1,
       rotationAmount: 0.5,
       sizeAmount: 2,
@@ -305,6 +306,7 @@ describe('applyModifiers', () => {
     const noise = {
       isActive: true,
       strength: 1,
+      noisePower: 0.15,
       positionAmount: 1,
       rotationAmount: 0,
       sizeAmount: 0,
