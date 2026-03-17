@@ -31,15 +31,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build library & examples
+        run: npm run build:examples
+
+      - name: Stamp examples with cache-busting version
+        run: node scripts/stamp-docs.mjs
+
       - name: Generate TypeDoc
         run: npx typedoc
 
       - name: Disable Jekyll
         run: touch docs/.nojekyll
 
-      - name: Copy examples to docs
+      - name: Copy examples & assets to docs
         run: |
-          cp -r examples/ docs/examples/ 2>/dev/null || true
+          cp -r examples/ docs/examples/
           cp llms.txt docs/llms.txt 2>/dev/null || true
           cp llms-full.txt docs/llms-full.txt 2>/dev/null || true
 

@@ -60,6 +60,8 @@
     "benchmark:json": "npm run build && node --experimental-vm-modules benchmarks/run.js --json",
     "benchmark:compare": "node --experimental-vm-modules benchmarks/run.js --compare",
     "benchmark:save-baseline": "npm run benchmark:json > benchmarks/baseline.json",
+    "build:examples": "npm run build && webpack --config webpack.docs.config.js",
+    "examples:dev": "npm run build:examples && npx http-server examples -p 8081 -o",
     "prepare": "husky"
   },
   "dependencies": {

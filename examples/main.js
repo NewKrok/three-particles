@@ -1,293 +1,266 @@
 import * as THREE from "three";
+import { createParticleSystem } from "./three-particles.esm.js";
 
-// Example configurations
+// Texture ID to file mapping
+const TEXTURE_MAP = {
+  FLAME: "textures/flame.webp",
+  CLOUD: "textures/cloud.webp",
+  SNOWFLAKE: "textures/snowflake.webp",
+  GRADIENT_POINT: "textures/gradient-point.webp",
+  VORTEX: "textures/vortex.webp",
+  STAR: "textures/star.webp",
+  POINT: "textures/point.webp",
+  PLUS_TOON: "textures/plus-toon.webp",
+  SNOWFLAKE_DETAILED: "textures/snowflake-detailed.webp",
+  SQUARE: "textures/square.webp",
+  CIRCLE: "textures/circle.webp",
+  LEAF_TOON: "textures/leaf-toon.webp",
+  SKULL: "textures/skull.webp",
+  ROCKS: "textures/rocks.webp",
+  STARBURST: "textures/starbust.webp",
+  SOFT_SMOKE: "textures/soft-smoke.webp",
+  BUBBLES: "textures/bubbles.webp",
+  FEATHER: "textures/feather.webp",
+};
+
+const textureLoader = new THREE.TextureLoader();
+const textureCache = {};
+
+function loadTexture(textureId) {
+  if (!textureId || !TEXTURE_MAP[textureId]) return null;
+  if (textureCache[textureId]) return textureCache[textureId];
+  const tex = textureLoader.load(TEXTURE_MAP[textureId]);
+  tex.flipY = false;
+  textureCache[textureId] = tex;
+  return tex;
+}
+
+// Resolve blending strings from editor configs
+function resolveBlending(blending) {
+  if (typeof blending === "number") return blending;
+  if (blending === "THREE.AdditiveBlending") return THREE.AdditiveBlending;
+  return THREE.NormalBlending;
+}
+
+function prepareConfig(config, textureId) {
+  const prepared = JSON.parse(JSON.stringify(config));
+  // Remove editor-only data
+  delete prepared._editorData;
+  // Resolve blending
+  if (prepared.renderer?.blending) {
+    prepared.renderer.blending = resolveBlending(prepared.renderer.blending);
+  }
+  // Apply texture
+  const tex = loadTexture(textureId);
+  if (tex) prepared.map = tex;
+  return prepared;
+}
+
+// All examples from the editor
 const examples = [
-  {
-    id: "basic",
-    title: "Basic Particles",
-    description: "Simple upward particle stream with default settings.",
-    tags: ["beginner"],
-    config: {
-      duration: 5,
-      looping: true,
-      maxParticles: 100,
-      startLifetime: 2,
-      startSpeed: 2,
-      startSize: 0.15,
-      startColor: {
-        min: { r: 0.4, g: 0.7, b: 1.0 },
-        max: { r: 0.6, g: 0.9, b: 1.0 },
-      },
-      emission: { rateOverTime: 20 },
-      shape: {
-        shape: "CONE",
-        cone: { angle: 0.3, radius: 0.3 },
-      },
-    },
-  },
   {
     id: "fire",
     title: "Fire",
-    description:
-      "Realistic fire effect with color over lifetime and additive blending.",
+    description: "Realistic fire with color curves, noise, and rotation.",
     tags: ["intermediate", "color"],
-    config: {
-      duration: 5,
-      looping: true,
-      maxParticles: 200,
-      startLifetime: { min: 0.5, max: 1.5 },
-      startSpeed: { min: 1, max: 3 },
-      startSize: { min: 0.2, max: 0.5 },
-      startColor: {
-        min: { r: 1.0, g: 0.2, b: 0.0 },
-        max: { r: 1.0, g: 0.8, b: 0.0 },
-      },
-      gravity: -0.5,
-      emission: { rateOverTime: 60 },
-      shape: {
-        shape: "CONE",
-        cone: { angle: 0.15, radius: 0.2 },
-      },
-      renderer: {
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        depthTest: true,
-        depthWrite: false,
-        discardBackgroundColor: false,
-        backgroundColorTolerance: 1,
-        backgroundColor: { r: 0, g: 0, b: 0 },
-      },
-      sizeOverLifetime: {
-        isActive: true,
-        lifetimeCurve: {
-          type: "BEZIER",
-          scale: 1,
-          bezierPoints: [
-            { x: 0, y: 1, percentage: 0 },
-            { x: 0.5, y: 0.6 },
-            { x: 1, y: 0, percentage: 1 },
-          ],
-        },
-      },
-      opacityOverLifetime: {
-        isActive: true,
-        lifetimeCurve: {
-          type: "BEZIER",
-          scale: 1,
-          bezierPoints: [
-            { x: 0, y: 1, percentage: 0 },
-            { x: 0.6, y: 0.8 },
-            { x: 1, y: 0, percentage: 1 },
-          ],
-        },
-      },
-    },
-  },
-  {
-    id: "explosion",
-    title: "Explosion",
-    description: "Burst emission creating an explosion effect.",
-    tags: ["burst", "intermediate"],
-    config: {
-      duration: 2,
-      looping: true,
-      maxParticles: 150,
-      startLifetime: { min: 0.3, max: 1.0 },
-      startSpeed: { min: 3, max: 8 },
-      startSize: { min: 0.1, max: 0.4 },
-      startColor: {
-        min: { r: 1.0, g: 0.3, b: 0.0 },
-        max: { r: 1.0, g: 1.0, b: 0.3 },
-      },
-      gravity: 2,
-      emission: {
-        rateOverTime: 0,
-        bursts: [{ time: 0, count: 100 }],
-      },
-      shape: {
-        shape: "SPHERE",
-        sphere: { radius: 0.1 },
-      },
-      renderer: {
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        depthTest: true,
-        depthWrite: false,
-        discardBackgroundColor: false,
-        backgroundColorTolerance: 1,
-        backgroundColor: { r: 0, g: 0, b: 0 },
-      },
-      sizeOverLifetime: {
-        isActive: true,
-        lifetimeCurve: {
-          type: "BEZIER",
-          scale: 1,
-          bezierPoints: [
-            { x: 0, y: 1, percentage: 0 },
-            { x: 0.3, y: 0.8 },
-            { x: 1, y: 0, percentage: 1 },
-          ],
-        },
-      },
-      opacityOverLifetime: {
-        isActive: true,
-        lifetimeCurve: {
-          type: "BEZIER",
-          scale: 1,
-          bezierPoints: [
-            { x: 0, y: 1, percentage: 0 },
-            { x: 0.5, y: 0.5 },
-            { x: 1, y: 0, percentage: 1 },
-          ],
-        },
-      },
-    },
-  },
-  {
-    id: "snow",
-    title: "Snow",
-    description: "Gentle snowfall with slow drift and rotation.",
-    tags: ["weather", "beginner"],
-    config: {
-      duration: 10,
-      looping: true,
-      maxParticles: 300,
-      startLifetime: { min: 3, max: 6 },
-      startSpeed: { min: 0.2, max: 0.5 },
-      startSize: { min: 0.03, max: 0.1 },
-      startRotation: { min: 0, max: 360 },
-      startColor: {
-        min: { r: 0.9, g: 0.9, b: 1.0 },
-        max: { r: 1.0, g: 1.0, b: 1.0 },
-      },
-      gravity: 0.3,
-      emission: { rateOverTime: 40 },
-      shape: {
-        shape: "BOX",
-        box: { scale: { x: 4, y: 0, z: 4 }, emitFrom: "VOLUME" },
-      },
-      rotationOverLifetime: {
-        isActive: true,
-        min: -30,
-        max: 30,
-      },
-    },
-  },
-  {
-    id: "sparkle",
-    title: "Sparkle Ring",
-    description: "Orbital velocity creating a spinning sparkle ring.",
-    tags: ["orbital", "advanced"],
-    config: {
-      duration: 5,
-      looping: true,
-      maxParticles: 150,
-      startLifetime: 2,
-      startSpeed: 0,
-      startSize: { min: 0.05, max: 0.15 },
-      startColor: {
-        min: { r: 1.0, g: 0.8, b: 0.2 },
-        max: { r: 1.0, g: 1.0, b: 0.6 },
-      },
-      emission: { rateOverTime: 30 },
-      shape: {
-        shape: "CIRCLE",
-        circle: { radius: 1.5, radiusThickness: 0 },
-      },
-      renderer: {
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        depthTest: true,
-        depthWrite: false,
-        discardBackgroundColor: false,
-        backgroundColorTolerance: 1,
-        backgroundColor: { r: 0, g: 0, b: 0 },
-      },
-      velocityOverLifetime: {
-        isActive: true,
-        linear: { x: 0, y: 0, z: 0 },
-        orbital: { x: 0, y: 90, z: 0 },
-      },
-      sizeOverLifetime: {
-        isActive: true,
-        lifetimeCurve: {
-          type: "BEZIER",
-          scale: 1,
-          bezierPoints: [
-            { x: 0, y: 0, percentage: 0 },
-            { x: 0.2, y: 1 },
-            { x: 0.8, y: 1 },
-            { x: 1, y: 0, percentage: 1 },
-          ],
-        },
-      },
-      opacityOverLifetime: {
-        isActive: true,
-        lifetimeCurve: {
-          type: "BEZIER",
-          scale: 1,
-          bezierPoints: [
-            { x: 0, y: 0, percentage: 0 },
-            { x: 0.1, y: 1 },
-            { x: 0.8, y: 1 },
-            { x: 1, y: 0, percentage: 1 },
-          ],
-        },
-      },
-    },
+    textureId: "FLAME",
+    config: {"transform":{"rotation":{"x":-90}},"duration":0.5,"startLifetime":{"min":0.2,"max":1},"startSpeed":{"min":0.05,"max":2.2},"startSize":{"min":9.51,"max":19.57},"startOpacity":{"min":0.799,"max":1},"startRotation":{"min":-360,"max":360},"startColor":{"min":{"r":0.972,"g":0.051,"b":0.051},"max":{"r":0.992,"g":0.78,"b":0.031}},"gravity":-4,"emission":{"rateOverTime":200},"shape":{"shape":"CONE","cone":{"angle":0,"radius":0.3813}},"renderer":{"blending":"THREE.NormalBlending"},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0,"y":1},{"x":0,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":1,"y":1},{"x":1,"y":1},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1666,"y":0.8333},{"x":0.3333,"y":0.6666},{"x":0.5,"y":0.5,"percentage":0.5},{"x":0.6666,"y":0.3332},{"x":0.8333,"y":0.1665},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-22.4,"max":24.3},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.09,"positionAmount":0.191,"rotationAmount":1.677}},
   },
   {
     id: "smoke",
     title: "Smoke",
     description: "Rising smoke with growing size and fading opacity.",
-    tags: ["intermediate"],
-    config: {
-      duration: 5,
-      looping: true,
-      maxParticles: 100,
-      startLifetime: { min: 2, max: 4 },
-      startSpeed: { min: 0.5, max: 1.0 },
-      startSize: { min: 0.2, max: 0.4 },
-      startOpacity: 0.6,
-      startColor: {
-        min: { r: 0.3, g: 0.3, b: 0.3 },
-        max: { r: 0.5, g: 0.5, b: 0.5 },
-      },
-      gravity: -0.2,
-      emission: { rateOverTime: 15 },
-      shape: {
-        shape: "CONE",
-        cone: { angle: 0.1, radius: 0.15 },
-      },
-      sizeOverLifetime: {
-        isActive: true,
-        lifetimeCurve: {
-          type: "BEZIER",
-          scale: 3,
-          bezierPoints: [
-            { x: 0, y: 0.3, percentage: 0 },
-            { x: 0.5, y: 0.7 },
-            { x: 1, y: 1, percentage: 1 },
-          ],
-        },
-      },
-      opacityOverLifetime: {
-        isActive: true,
-        lifetimeCurve: {
-          type: "BEZIER",
-          scale: 1,
-          bezierPoints: [
-            { x: 0, y: 0.6, percentage: 0 },
-            { x: 0.3, y: 0.5 },
-            { x: 1, y: 0, percentage: 1 },
-          ],
-        },
-      },
-    },
+    tags: ["intermediate", "noise"],
+    textureId: "CLOUD",
+    config: {"transform":{"rotation":{"x":-90}},"startLifetime":{"min":4.23,"max":7.25},"startSpeed":{"min":0.31,"max":0.58},"startSize":{"min":28.71,"max":36.02},"startOpacity":{"min":0.141,"max":0.296},"startRotation":{"min":-360,"max":360},"shape":{"shape":"CONE","cone":{"angle":0,"radius":0.3813}},"renderer":{"blending":"THREE.NormalBlending"},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.625,"percentage":0},{"x":0.2666,"y":0.845},{"x":0.3596,"y":0.4551},{"x":0.5066,"y":0.49,"percentage":0.5066},{"x":0.6966,"y":0.5349},{"x":0.6366,"y":0.99},{"x":1,"y":1,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.0799,"percentage":0},{"x":0.0666,"y":0.85},{"x":0.1674,"y":1.0337},{"x":0.5,"y":1,"percentage":0.5},{"x":0.9933,"y":0.95},{"x":0.9966,"y":0.96},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-22.4,"max":24.3},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.09,"positionAmount":0.191,"rotationAmount":1.677}},
+  },
+  {
+    id: "explosion-smoke",
+    title: "Explosion Smoke",
+    description: "Explosive smoke burst with noise and rotation.",
+    tags: ["burst", "noise"],
+    textureId: "CLOUD",
+    config: {"duration":1,"looping":true,"startLifetime":{"min":0.67,"max":2.86},"startSpeed":{"min":0.05,"max":2.2},"startSize":{"min":35,"max":60},"startOpacity":{"min":1,"max":1},"startRotation":{"min":-360,"max":360},"startColor":{"min":{"r":0.1,"g":0.1,"b":0.1},"max":{"r":0.2,"g":0.2,"b":0.2}},"gravity":-0.5,"emission":{"rateOverTime":500},"shape":{"sphere":{"radius":0.4,"arc":180}},"renderer":{"blending":"THREE.NormalBlending"},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0,"y":1},{"x":0,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":1,"y":1},{"x":1,"y":1},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1666,"y":0.8333},{"x":0.3333,"y":0.6666},{"x":0.5,"y":0.5,"percentage":0.5},{"x":0.6666,"y":0.3332},{"x":0.8333,"y":0.1665},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-22.4,"max":24.3},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.09,"positionAmount":0.191,"rotationAmount":1.677}},
+  },
+  {
+    id: "pixel-fire",
+    title: "Pixel Fire",
+    description: "Retro-style pixelated fire effect.",
+    tags: ["beginner", "color"],
+    textureId: "SQUARE",
+    config: {"transform":{"rotation":{"x":-90}},"duration":0.5,"startLifetime":{"min":0.5,"max":0.8},"startSpeed":{"min":0.4,"max":1.5},"startSize":{"min":4,"max":5},"startOpacity":{"min":0.799,"max":1},"startColor":{"min":{"r":0.972,"g":0.051,"b":0.051},"max":{"r":0.992,"g":0.78,"b":0.031}},"maxParticles":15,"emission":{"rateOverTime":200},"shape":{"shape":"CONE","cone":{"angle":0,"radius":0.1}},"renderer":{"blending":"THREE.NormalBlending"},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1666,"y":0.8333},{"x":0.3666,"y":0.8566},{"x":0.5333,"y":0.6899,"percentage":0.5333},{"x":0.6999,"y":0.5232},{"x":0.8333,"y":0.5914},{"x":1,"y":0.425,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1666,"y":0.8333},{"x":0.3333,"y":0.6666},{"x":0.5,"y":0.5,"percentage":0.5},{"x":0.6666,"y":0.3332},{"x":0.8333,"y":0.1665},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"min":-22.4,"max":24.3},"noise":{"strength":0.09,"positionAmount":0.191}},
+  },
+  {
+    id: "snowfall",
+    title: "Snowfall",
+    description: "Gentle snowfall with rotation and noise-driven drift.",
+    tags: ["weather", "noise"],
+    textureId: "SNOWFLAKE",
+    config: {"transform":{"position":{"y":4},"rotation":{"x":90}},"startLifetime":{"min":1.49,"max":2.86},"startSpeed":{"min":0.1,"max":0.3},"startSize":{"min":1.03,"max":1.92},"startOpacity":{"min":1,"max":1},"startRotation":{"min":-360,"max":360},"startColor":{"min":{"r":0.804,"g":0.816,"b":0.976}},"gravity":0.5,"maxParticles":200,"emission":{"rateOverTime":50},"shape":{"shape":"RECTANGLE","rectangle":{"scale":{"x":7.682,"y":7.504}}},"renderer":{"blending":"THREE.NormalBlending"},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.41,"percentage":0},{"x":0.0566,"y":1.01},{"x":0.05,"y":0.985},{"x":0.62,"y":0.99,"percentage":0.62},{"x":1.0499,"y":0.9937},{"x":0.9866,"y":0.95},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-170.2,"max":231.9},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.27,"frequency":0.206}},
+  },
+  {
+    id: "snow-cannon",
+    title: "Snow Cannon",
+    description: "Burst-based snow cannon with gravity and color curves.",
+    tags: ["burst", "color"],
+    textureId: "SNOWFLAKE_DETAILED",
+    config: {"transform":{"rotation":{"x":-90,"y":10}},"duration":6,"startLifetime":{"min":2,"max":3.5},"startSpeed":{"min":2.58,"max":3.68},"startSize":{"min":0.37,"max":3.11},"startOpacity":{"min":0.8,"max":1},"startRotation":{"min":-360,"max":360},"gravity":2,"emission":{"rateOverTime":0,"bursts":[{"time":0.1,"count":{"min":20,"max":40},"cycles":3,"interval":2,"probability":1}]},"shape":{"shape":"CONE","cone":{"angle":12.0877,"radius":0.119}},"renderer":{"blending":"THREE.NormalBlending","discardBackgroundColor":true,"backgroundColorTolerance":0.39,"backgroundColor":{"r":0,"g":0,"b":0}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1,"y":1},{"x":0.2,"y":0.784},{"x":0.3,"y":0.784,"percentage":0.3},{"x":0.433,"y":0.784},{"x":0.567,"y":0.392},{"x":0.7,"y":0.392,"percentage":0.7},{"x":0.8,"y":0.392},{"x":0.9,"y":0.196},{"x":1,"y":0.196,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1,"y":1},{"x":0.2,"y":0.941},{"x":0.3,"y":0.941,"percentage":0.3},{"x":0.433,"y":0.941},{"x":0.567,"y":0.784},{"x":0.7,"y":0.784,"percentage":0.7},{"x":0.8,"y":0.784},{"x":0.9,"y":0.588},{"x":1,"y":0.588,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1,"y":1},{"x":0.2,"y":1},{"x":0.3,"y":1,"percentage":0.3},{"x":0.433,"y":1},{"x":0.567,"y":1},{"x":0.7,"y":1,"percentage":0.7},{"x":0.8,"y":1},{"x":0.9,"y":0.784},{"x":1,"y":0.784,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1,"y":1},{"x":0.2,"y":1},{"x":0.3,"y":1,"percentage":0.3},{"x":0.433,"y":1},{"x":0.567,"y":0.784},{"x":0.7,"y":0.784,"percentage":0.7},{"x":0.8,"y":0.784},{"x":0.9,"y":0},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-120,"max":120},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.55,"frequency":0.639,"octaves":2,"positionAmount":0.191,"rotationAmount":0.365}},
+  },
+  {
+    id: "fireflies",
+    title: "Fireflies",
+    description: "Floating glowing fireflies with pulsing opacity.",
+    tags: ["ambient", "noise"],
+    textureId: "GRADIENT_POINT",
+    config: {"transform":{"position":{"y":2}},"startLifetime":{"min":1,"max":4},"startSpeed":{"min":0,"max":0},"startSize":{"min":0.5,"max":0.9},"startOpacity":{"min":1,"max":1},"startRotation":{"min":-360,"max":360},"startColor":{"min":{"r":0.627,"g":0.757,"b":0.278},"max":{"r":0.439,"g":0.518,"b":0.18}},"maxParticles":200,"emission":{"rateOverTime":50},"shape":{"shape":"BOX","box":{"scale":{"x":10,"y":4,"z":10}}},"renderer":{"blending":"THREE.NormalBlending"},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0,"y":1},{"x":0,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":1,"y":1},{"x":1,"y":1},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.3333,"y":0},{"x":0.1666,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":0.8333,"y":1},{"x":0.6666,"y":0},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-170.2,"max":231.9},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.13,"frequency":0.206,"positionAmount":-0.072}},
+  },
+  {
+    id: "underwater-bubbles",
+    title: "Underwater Bubbles",
+    description: "Rising bubbles with orbital drift.",
+    tags: ["beginner", "orbital"],
+    textureId: "CIRCLE",
+    config: {"transform":{"rotation":{"x":-90}},"startLifetime":{"min":1.77,"max":3.96},"startSpeed":{"min":0.39,"max":0.93},"startSize":{"min":0.5,"max":1.5},"startOpacity":{"min":1,"max":1},"maxParticles":20,"emission":{"rateOverTime":5},"shape":{"shape":"CONE","cone":{"angle":14.4487,"radius":0.1}},"velocityOverLifetime":{"isActive":true,"orbital":{"x":{"min":-1,"max":1},"y":{"min":-3,"max":3},"z":{"min":-3,"max":3}}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.0166,"y":0.675},{"x":-0.0134,"y":0.7633},{"x":0.1533,"y":0.93,"percentage":0.1533},{"x":0.3199,"y":1.0966},{"x":0.8333,"y":0.8333},{"x":1,"y":1,"percentage":1}]}}},
+  },
+  {
+    id: "mystic-portal",
+    title: "Mystic Portal",
+    description: "Swirling portal with orbital velocity and color curves.",
+    tags: ["advanced", "orbital", "color"],
+    textureId: "VORTEX",
+    config: {"duration":3,"startLifetime":{"min":1.5,"max":4.78},"startSpeed":{"min":0,"max":0.1},"startSize":{"min":14.08,"max":43.33},"startOpacity":{"min":0.7,"max":0.95},"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":0.2,"g":0.4},"max":{"r":0.6,"g":0.3,"b":0.9}},"maxParticles":22,"emission":{"rateOverTime":15},"shape":{"shape":"CIRCLE","circle":{"radius":0.119,"radiusThickness":0.2}},"renderer":{"blending":"THREE.AdditiveBlending"},"velocityOverLifetime":{"isActive":true,"orbital":{"x":{"min":0,"max":0},"y":{"min":1.5,"max":2.5},"z":{"min":0,"max":0}}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.3333,"y":0},{"x":0.1666,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":0.8333,"y":1},{"x":0.6666,"y":0},{"x":1,"y":0,"percentage":1}]}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.25,"y":0.5},{"x":0.5,"y":0.7,"percentage":0.5},{"x":0.75,"y":0.5},{"x":1,"y":0.3,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.4,"percentage":0},{"x":0.25,"y":0.5},{"x":0.5,"y":0.6,"percentage":0.5},{"x":0.75,"y":0.4},{"x":1,"y":0.3,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.25,"y":0.9},{"x":0.5,"y":0.85,"percentage":0.5},{"x":0.75,"y":0.9},{"x":1,"y":1,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.1,"y":0.9},{"x":0.08,"y":1},{"x":0.5,"y":0.9,"percentage":0.5},{"x":0.8,"y":0.7},{"x":0.92,"y":0.3},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":180,"max":270},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.1,"frequency":0.3,"positionAmount":0.15,"rotationAmount":0.5,"sizeAmount":0.2}},
+  },
+  {
+    id: "magic-circle",
+    title: "Magic Circle",
+    description: "Sparkling magic circle in world space.",
+    tags: ["advanced", "world-space"],
+    textureId: "STAR",
+    config: {"startLifetime":{"min":0.2,"max":0.4},"startSpeed":{"min":0.05,"max":0.08},"startSize":{"min":0.37,"max":3.11},"startOpacity":{"min":1,"max":1},"startColor":{"min":{"r":0.482,"g":0.506,"b":0.859},"max":{"r":0.384,"g":0.11,"b":0.51}},"simulationSpace":"WORLD","emission":{"rateOverTime":500},"shape":{"shape":"CIRCLE","circle":{"radius":0.7311,"radiusThickness":0}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1666,"y":0.8333},{"x":0.3333,"y":0.6666},{"x":0.5,"y":0.5,"percentage":0.5},{"x":0.6666,"y":0.3332},{"x":0.8333,"y":0.1665},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0,"y":1},{"x":0,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":1,"y":1},{"x":1,"y":1},{"x":1,"y":0,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.11,"positionAmount":0.453}},
+  },
+  {
+    id: "tornado",
+    title: "Tornado",
+    description: "Spinning upward vortex with size growth and noise.",
+    tags: ["advanced", "noise"],
+    textureId: "CLOUD",
+    config: {"transform":{"rotation":{"x":-90}},"startLifetime":{"min":1.22,"max":2.31},"startSpeed":{"min":1.6,"max":2},"startSize":{"min":36.93,"max":44.24},"startOpacity":{"min":0.799,"max":1},"startRotation":{"min":-360,"max":360},"maxParticles":200,"emission":{"rateOverTime":200},"shape":{"shape":"CONE","cone":{"angle":14.4487,"radius":0.2939,"radiusThickness":0}},"renderer":{"blending":"THREE.NormalBlending"},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.17,"percentage":0},{"x":0.1666,"y":0.3366},{"x":0.4966,"y":0.0932},{"x":0.6633,"y":0.26,"percentage":0.6633},{"x":0.8299,"y":0.4266},{"x":0.8333,"y":0.8333},{"x":1,"y":1,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1666,"y":0.8333},{"x":0.5166,"y":0.9216},{"x":0.6833,"y":0.755,"percentage":0.6833},{"x":0.8499,"y":0.5883},{"x":0.8333,"y":0.1665},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":2.2,"max":88.3},"noise":{"isActive":true,"useRandomOffset":true,"positionAmount":0.1,"sizeAmount":5}},
+  },
+  {
+    id: "healing",
+    title: "Healing",
+    description: "Upward floating healing symbols with pulsing opacity.",
+    tags: ["game", "noise"],
+    textureId: "PLUS_TOON",
+    config: {"startLifetime":{"min":1,"max":1.2},"startSpeed":{"min":0.1,"max":0.3},"startSize":{"min":1.29,"max":5.86},"startOpacity":{"min":1,"max":1},"startRotation":{"min":-15,"max":15},"gravity":-0.8,"maxParticles":10,"emission":{"rateOverTime":6},"shape":{"sphere":{"radius":0.2939},"cone":{"angle":21.6024,"radius":0.4687}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"type":"BEZIER","bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":1,"y":1,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"type":"BEZIER","bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.3333,"y":0},{"x":0.1666,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":0.8333,"y":1},{"x":0.6666,"y":0},{"x":1,"y":0,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.11,"positionAmount":0.453,"sizeAmount":5}},
+  },
+  {
+    id: "collect-item",
+    title: "Collect Item",
+    description: "Quick burst effect for item collection.",
+    tags: ["game", "orbital"],
+    textureId: "POINT",
+    config: {"transform":{"rotation":{"x":-90}},"duration":0.2,"looping":true,"startLifetime":{"min":0.3,"max":0.8},"startSpeed":{"min":0.5,"max":0},"startSize":{"min":0.1,"max":1.5},"startOpacity":{"min":1,"max":1},"startColor":{"min":{"r":0.596,"g":0.082,"b":0.937},"max":{"g":0,"b":0.867}},"maxParticles":30,"emission":{"rateOverTime":200},"shape":{"sphere":{"radius":0.4},"cone":{"angle":17.5967,"radius":0.1}},"renderer":{"blending":"THREE.NormalBlending"},"velocityOverLifetime":{"isActive":true,"orbital":{"y":{"min":0,"max":5}}},"sizeOverLifetime":{"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.3333,"y":0},{"x":0.1666,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":0.8333,"y":1},{"x":0.6666,"y":0},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0,"y":1},{"x":0,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":1,"y":1},{"x":1,"y":1},{"x":1,"y":0,"percentage":1}]}}},
+  },
+  {
+    id: "teleport",
+    title: "Teleport",
+    description: "Rising ring of particles for teleportation effects.",
+    tags: ["game", "orbital"],
+    textureId: "GRADIENT_POINT",
+    config: {"transform":{"rotation":{"x":-90}},"duration":1,"looping":true,"startLifetime":{"min":0.8,"max":0.8},"startSpeed":{"min":0,"max":0},"startSize":{"min":0.1,"max":2},"startOpacity":{"min":1,"max":1},"startColor":{"min":{"r":0.478,"g":0.565},"max":{"r":0.431,"g":0.714,"b":0.886}},"gravity":-10,"maxParticles":50,"emission":{"rateOverTime":80},"shape":{"shape":"CIRCLE","circle":{"radiusThickness":0}},"velocityOverLifetime":{"isActive":true,"orbital":{"x":{"min":-1,"max":1},"y":{"min":-5,"max":2}}},"sizeOverLifetime":{"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":1,"y":1,"percentage":1}]}},"opacityOverLifetime":{"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":1,"y":1,"percentage":1}]}}},
+  },
+  {
+    id: "flying-leaves",
+    title: "Flying Leaves",
+    description: "Floating leaves with orbital velocity and noise.",
+    tags: ["nature", "orbital"],
+    textureId: "LEAF_TOON",
+    config: {"transform":{"rotation":{"x":-90}},"startLifetime":{"min":4,"max":4},"startSpeed":{"min":0,"max":0},"startSize":{"min":1.29,"max":4.94},"startOpacity":{"min":1,"max":1},"startRotation":{"min":-360,"max":360},"gravity":-0.99,"maxParticles":22,"emission":{"rateOverTime":5},"shape":{"cone":{"radius":0.2939,"radiusThickness":0}},"velocityOverLifetime":{"isActive":true,"orbital":{"z":{"min":2,"max":4}}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":1,"y":1,"percentage":1}]}},"noise":{"isActive":true,"positionAmount":0,"rotationAmount":2}},
+  },
+  {
+    id: "falling-leaves",
+    title: "Falling Leaves",
+    description: "Gently falling leaves with wind-like noise.",
+    tags: ["nature", "noise"],
+    textureId: "LEAF_TOON",
+    config: {"transform":{"position":{"y":1.5},"rotation":{"x":90}},"startLifetime":{"min":5,"max":7},"startSpeed":{"min":0,"max":0.1},"startSize":{"min":3.11,"max":5.86},"startOpacity":{"min":1,"max":1},"startRotation":{"min":-360,"max":360},"gravity":0.1,"maxParticles":10,"emission":{"rateOverTime":2},"shape":{"shape":"CONE","cone":{"angle":0,"radius":0.4687}},"renderer":{"blending":"THREE.NormalBlending"},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.0033,"y":1.01},{"x":0.0492,"y":0.9818},{"x":0.2133,"y":0.985,"percentage":0.2133},{"x":0.99,"y":1},{"x":0.9933,"y":0.985},{"x":1,"y":0,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.11,"frequency":0.246,"positionAmount":0.628,"rotationAmount":2.989}},
+  },
+  {
+    id: "poison-sphere",
+    title: "Poison Sphere",
+    description: "Floating skulls orbiting in a toxic sphere.",
+    tags: ["game", "orbital"],
+    textureId: "SKULL",
+    config: {"startLifetime":{"min":4.51,"max":6.97},"startSpeed":{"min":0,"max":0},"startSize":{"min":1.5,"max":3},"startOpacity":{"min":1,"max":1},"startColor":{"min":{"r":0.576,"g":0.49,"b":0.063},"max":{"r":0.349,"g":0.506,"b":0.157}},"maxParticles":6,"shape":{"sphere":{"radius":0.5,"radiusThickness":0}},"renderer":{"blending":"THREE.NormalBlending"},"velocityOverLifetime":{"isActive":true,"orbital":{"x":{"min":-2,"max":2},"y":{"min":-2,"max":2},"z":{"min":-2,"max":2}}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1666,"y":0.8333},{"x":0.6533,"y":0.9566},{"x":0.82,"y":0.79,"percentage":0.82},{"x":0.9866,"y":0.6233},{"x":0.8333,"y":0.1665},{"x":1,"y":0,"percentage":1}]}},"noise":{"strength":0.97,"positionAmount":0.191}},
+  },
+  {
+    id: "rock-explosion",
+    title: "Rock Explosion",
+    description: "Debris-style explosion with rocks and gravity.",
+    tags: ["burst", "game"],
+    textureId: "ROCKS",
+    config: {"transform":{"rotation":{"x":-90}},"duration":0.3,"looping":true,"startLifetime":{"min":0.67,"max":1.77},"startSpeed":{"min":1.21,"max":2.85},"startSize":{"min":1.29,"max":2.2},"startOpacity":{"min":1,"max":1},"startRotation":{"min":-360,"max":360},"startColor":{"min":{"r":0.8,"g":0.8,"b":0.8},"max":{"r":0.533,"g":0.533,"b":0.533}},"gravity":5.5,"maxParticles":10,"emission":{"rateOverTime":30},"shape":{"shape":"CONE","cone":{"angle":47.5024,"radius":0.5562}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1666,"y":0.8333},{"x":0.6366,"y":1.0466},{"x":0.8033,"y":0.88,"percentage":0.8033},{"x":0.9699,"y":0.7133},{"x":0.8333,"y":0.1665},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-342.5,"max":299},"textureSheetAnimation":{"tiles":{"x":5,"y":2},"timeMode":"FPS","fps":0,"startFrame":{"min":0,"max":10}}},
+  },
+  {
+    id: "rising-bubbles",
+    title: "Rising Bubbles",
+    description: "Colorful rising bubbles with color over lifetime.",
+    tags: ["color", "nature"],
+    textureId: "BUBBLES",
+    config: {"transform":{"rotation":{"x":-90}},"startLifetime":{"min":0.67,"max":2.31},"startSpeed":{"min":2.31,"max":3.4},"startSize":{"min":1.29,"max":8.6},"startOpacity":{"min":0.4,"max":0.8},"gravity":1.46,"maxParticles":74,"emission":{"rateOverTime":41},"shape":{"shape":"CONE","cone":{"angle":15.2357,"radius":0.2064}},"renderer":{"discardBackgroundColor":true,"backgroundColorTolerance":0.526,"backgroundColor":{"r":0,"g":0,"b":0}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0,"y":2},{"x":0,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":1,"y":1},{"x":1,"y":1},{"x":1,"y":0,"percentage":1}]}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.1,"y":0},{"x":0.2,"y":0.314},{"x":0.3,"y":0.314,"percentage":0.3},{"x":0.4,"y":0.314},{"x":0.5,"y":0},{"x":0.6,"y":0,"percentage":0.6},{"x":0.667,"y":0},{"x":0.733,"y":0},{"x":0.8,"y":0,"percentage":0.8},{"x":0.866,"y":0},{"x":0.933,"y":0},{"x":1,"y":0,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.733,"percentage":0},{"x":0.1,"y":0.733},{"x":0.2,"y":0.573},{"x":0.3,"y":0.573,"percentage":0.3},{"x":0.4,"y":0.573},{"x":0.5,"y":0.588},{"x":0.6,"y":0.588,"percentage":0.6},{"x":0.667,"y":0.588},{"x":0.733,"y":0.392},{"x":0.8,"y":0.392,"percentage":0.8},{"x":0.866,"y":0.392},{"x":0.933,"y":0.196},{"x":1,"y":0.196,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1,"y":1},{"x":0.2,"y":0.984},{"x":0.3,"y":0.984,"percentage":0.3},{"x":0.4,"y":0.984},{"x":0.5,"y":0.784},{"x":0.6,"y":0.784,"percentage":0.6},{"x":0.667,"y":0.784},{"x":0.733,"y":0.588},{"x":0.8,"y":0.588,"percentage":0.8},{"x":0.866,"y":0.588},{"x":0.933,"y":0.392},{"x":1,"y":0.392,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.1,"y":1},{"x":0.2,"y":1},{"x":0.3,"y":1,"percentage":0.3},{"x":0.4,"y":1},{"x":0.5,"y":1},{"x":0.6,"y":1,"percentage":0.6},{"x":0.667,"y":1},{"x":0.733,"y":0.784},{"x":0.8,"y":0.784,"percentage":0.8},{"x":0.866,"y":0.784},{"x":0.933,"y":0},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-64.8,"max":40.5},"noise":{"useRandomOffset":true,"positionAmount":0,"rotationAmount":1.939}},
+  },
+  {
+    id: "explosion",
+    title: "Explosion",
+    description: "Fiery explosion with color over lifetime and noise.",
+    tags: ["burst", "color"],
+    textureId: "SOFT_SMOKE",
+    config: {"transform":{"rotation":{"x":-90}},"duration":0.1,"looping":true,"startLifetime":{"min":2,"max":3.5},"startSpeed":{"min":1.5,"max":3},"startSize":{"min":25,"max":40},"startOpacity":{"min":0.9,"max":1},"startRotation":{"min":-180,"max":180},"startColor":{"min":{"r":1,"g":0.8,"b":0.4},"max":{"r":1,"g":0.9,"b":0.7}},"gravity":-0.5,"maxParticles":80,"emission":{"rateOverTime":800},"shape":{"shape":"SPHERE","sphere":{"radius":0.1}},"renderer":{"blending":"THREE.AdditiveBlending","discardBackgroundColor":true,"backgroundColor":{"r":0,"g":0,"b":0},"backgroundColorTolerance":0.2},"velocityOverLifetime":{"isActive":true,"orbital":{"x":{"min":-0.5,"max":0.5},"y":{"min":-0.5,"max":0.5},"z":{"min":-0.5,"max":0.5}}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.4,"percentage":0},{"x":0.08,"y":0.65},{"x":0.05,"y":0.85},{"x":0.25,"y":1,"percentage":0.25},{"x":0.6,"y":0.95},{"x":0.8,"y":0.9},{"x":1,"y":0.8,"percentage":1}]}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.15,"y":1},{"x":0.3,"y":0.9,"percentage":0.3},{"x":0.5,"y":0.6,"percentage":0.5},{"x":0.75,"y":0.4},{"x":1,"y":0.3,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.9,"percentage":0},{"x":0.15,"y":0.7},{"x":0.3,"y":0.5,"percentage":0.3},{"x":0.5,"y":0.35,"percentage":0.5},{"x":0.75,"y":0.25},{"x":1,"y":0.2,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.5,"percentage":0},{"x":0.15,"y":0.3},{"x":0.3,"y":0.2,"percentage":0.3},{"x":0.5,"y":0.15,"percentage":0.5},{"x":0.75,"y":0.15},{"x":1,"y":0.15,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.9,"percentage":0},{"x":0.1,"y":1},{"x":0.08,"y":1},{"x":0.4,"y":0.9,"percentage":0.4},{"x":0.7,"y":0.6},{"x":0.9,"y":0.3},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-40,"max":50},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.4,"frequency":0.25,"positionAmount":0.5,"rotationAmount":3.5,"sizeAmount":0.3}},
+  },
+  {
+    id: "solar-flare",
+    title: "Solar Flare",
+    description: "Quick starburst with warm color over lifetime.",
+    tags: ["burst", "color"],
+    textureId: "STARBURST",
+    config: {"transform":{"rotation":{"x":-90}},"duration":0.2,"looping":true,"startLifetime":{"min":0.4,"max":0.67},"startSpeed":{"min":0.11,"max":0.93},"startSize":{"min":5,"max":12.25},"startOpacity":{"min":0.7,"max":0.9},"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":1,"g":0.85,"b":0.4},"max":{"r":1,"g":0.95,"b":0.6}},"gravity":-1.4,"maxParticles":83,"emission":{"rateOverTime":255},"shape":{"shape":"SPHERE","sphere":{"radius":0.2064}},"renderer":{"blending":"THREE.AdditiveBlending"},"velocityOverLifetime":{"isActive":true,"orbital":{"x":{"min":-0.6,"max":0.6},"y":{"min":-0.6,"max":0.6},"z":{"min":-0.6,"max":0.6}}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.08,"y":0.75},{"x":0.06,"y":0.9},{"x":0.25,"y":1,"percentage":0.25},{"x":0.55,"y":0.9},{"x":0.8,"y":0.6},{"x":1,"y":0,"percentage":1}]}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.15,"y":1},{"x":0.35,"y":0.95,"percentage":0.35},{"x":0.6,"y":0.8,"percentage":0.6},{"x":0.85,"y":0.6},{"x":1,"y":0.4,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.95,"percentage":0},{"x":0.2,"y":0.9},{"x":0.4,"y":0.8,"percentage":0.4},{"x":0.65,"y":0.6,"percentage":0.65},{"x":0.85,"y":0.35},{"x":1,"y":0.2,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.55,"percentage":0},{"x":0.2,"y":0.4},{"x":0.4,"y":0.3,"percentage":0.4},{"x":0.6,"y":0.2,"percentage":0.6},{"x":0.8,"y":0.15},{"x":1,"y":0.1,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.12,"y":1},{"x":0.1,"y":0.98},{"x":0.45,"y":0.95,"percentage":0.45},{"x":0.7,"y":0.7},{"x":0.88,"y":0.3},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-150,"max":150},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.3,"frequency":0.35,"positionAmount":0.4,"rotationAmount":2.2,"sizeAmount":0.25}},
+  },
+  {
+    id: "arcane-burst",
+    title: "Arcane Burst",
+    description: "Magical blue burst with starburst particles.",
+    tags: ["burst", "color"],
+    textureId: "STARBURST",
+    config: {"duration":1.5,"looping":true,"startLifetime":{"min":0.4,"max":0.7},"startSpeed":{"min":1.48,"max":2.58},"startSize":{"min":5.86,"max":11.34},"startOpacity":{"min":0.9,"max":1},"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":0.3,"g":0.5,"b":1},"max":{"r":0.5,"g":0.7,"b":1}},"maxParticles":400,"emission":{"rateOverTime":350},"shape":{"shape":"SPHERE","sphere":{"radius":0.05}},"renderer":{"blending":"THREE.AdditiveBlending"},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.2,"percentage":0},{"x":0.1,"y":0.5},{"x":0.08,"y":0.7},{"x":0.35,"y":1,"percentage":0.35},{"x":0.65,"y":1.05},{"x":0.85,"y":0.9},{"x":1,"y":0.4,"percentage":1}]}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.35,"percentage":0},{"x":0.2,"y":0.5},{"x":0.4,"y":0.75,"percentage":0.4},{"x":0.7,"y":0.9},{"x":1,"y":1,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.6,"percentage":0},{"x":0.25,"y":0.75},{"x":0.5,"y":0.85,"percentage":0.5},{"x":0.75,"y":0.95},{"x":1,"y":1,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.25,"y":1},{"x":0.5,"y":0.98,"percentage":0.5},{"x":0.75,"y":0.95},{"x":1,"y":0.9,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.15,"y":1},{"x":0.12,"y":0.95},{"x":0.5,"y":0.9,"percentage":0.5},{"x":0.75,"y":0.6},{"x":0.9,"y":0.25},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-120,"max":120},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.15,"frequency":0.6,"positionAmount":0.15,"rotationAmount":2,"sizeAmount":0.2}},
+  },
+  {
+    id: "feathers",
+    title: "Feathers",
+    description: "Floating feathers with color gradient and noise.",
+    tags: ["nature", "color"],
+    textureId: "FEATHER",
+    config: {"startLifetime":{"min":4.23,"max":7.52},"startSpeed":{"min":0.11,"max":1.21},"startSize":{"min":2.2,"max":4.03},"startOpacity":{"min":1,"max":1},"startRotation":{"min":-360,"max":360},"maxParticles":48,"shape":{"shape":"CONE","cone":{"angle":0}},"renderer":{"blending":"THREE.NormalBlending"},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.784,"percentage":0},{"x":0.067,"y":0.784},{"x":0.133,"y":0.588},{"x":0.2,"y":0.588,"percentage":0.2},{"x":0.3,"y":0.588},{"x":0.4,"y":0.392},{"x":0.5,"y":0.392,"percentage":0.5},{"x":0.6,"y":0.392},{"x":0.7,"y":0.196},{"x":0.8,"y":0.196,"percentage":0.8},{"x":0.867,"y":0.196},{"x":0.933,"y":0},{"x":1,"y":0,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.067,"y":1},{"x":0.133,"y":1},{"x":0.2,"y":1,"percentage":0.2},{"x":0.3,"y":1},{"x":0.4,"y":0.784},{"x":0.5,"y":0.784,"percentage":0.5},{"x":0.6,"y":0.784},{"x":0.7,"y":0.588},{"x":0.8,"y":0.588,"percentage":0.8},{"x":0.867,"y":0.588},{"x":0.933,"y":0.392},{"x":1,"y":0.392,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.392,"percentage":0},{"x":0.067,"y":0.392},{"x":0.133,"y":0.196},{"x":0.2,"y":0.196,"percentage":0.2},{"x":0.3,"y":0.196},{"x":0.4,"y":0},{"x":0.5,"y":0,"percentage":0.5},{"x":0.6,"y":0},{"x":0.7,"y":0},{"x":0.8,"y":0,"percentage":0.8},{"x":0.867,"y":0},{"x":0.933,"y":0},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.067,"y":0},{"x":0.133,"y":0.784},{"x":0.2,"y":0.784,"percentage":0.2},{"x":0.3,"y":0.784},{"x":0.4,"y":1},{"x":0.5,"y":1,"percentage":0.5},{"x":0.6,"y":1},{"x":0.7,"y":0.588},{"x":0.8,"y":0.588,"percentage":0.8},{"x":0.867,"y":0.588},{"x":0.933,"y":0},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-74.4,"max":69.2},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.39,"positionAmount":0.453}},
+  },
+  {
+    id: "mystical-smoke",
+    title: "Mystical Smoke",
+    description: "Purple mystical smoke with orbital velocity.",
+    tags: ["advanced", "orbital", "color"],
+    textureId: "SOFT_SMOKE",
+    config: {"transform":{"rotation":{"x":-90}},"duration":3,"looping":true,"startLifetime":{"min":2.5,"max":3.5},"startSpeed":{"min":0.4,"max":0.8},"startSize":{"min":15,"max":25},"startOpacity":{"min":0.6,"max":0.85},"startRotation":{"min":-180,"max":180},"startColor":{"min":{"r":0.4,"g":0.2,"b":0.9},"max":{"r":0.7,"g":0.3,"b":1}},"gravity":-0.3,"maxParticles":80,"emission":{"rateOverTime":35},"shape":{"shape":"CONE","cone":{"angle":8,"radius":0.2}},"renderer":{"blending":"THREE.AdditiveBlending"},"velocityOverLifetime":{"isActive":true,"orbital":{"x":{"min":-0.5,"max":0.5},"y":{"min":-0.3,"max":0.3},"z":{"min":-0.5,"max":0.5}}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.15,"y":0.5},{"x":0.1,"y":0.7},{"x":0.4,"y":0.85,"percentage":0.4},{"x":0.7,"y":0.95},{"x":0.85,"y":0.85},{"x":1,"y":0.6,"percentage":1}]}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.4,"percentage":0},{"x":0.3,"y":0.6},{"x":0.5,"y":0.9,"percentage":0.5},{"x":0.7,"y":0.7},{"x":1,"y":0.5,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.2,"percentage":0},{"x":0.25,"y":0.4},{"x":0.5,"y":0.6,"percentage":0.5},{"x":0.75,"y":0.5},{"x":1,"y":0.3,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.9},{"x":0.5,"y":0.7,"percentage":0.5},{"x":0.7,"y":0.85},{"x":1,"y":0.95,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.08,"y":0.75},{"x":0.06,"y":0.9},{"x":0.5,"y":0.95,"percentage":0.5},{"x":0.85,"y":0.85},{"x":0.92,"y":0.4},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-35,"max":45},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.25,"frequency":0.4,"positionAmount":0.35,"rotationAmount":2.5,"sizeAmount":0.15}},
+  },
+  {
+    id: "toxic-smoke",
+    title: "Toxic Smoke",
+    description: "Green toxic smoke with orbital drift.",
+    tags: ["advanced", "orbital", "color"],
+    textureId: "SOFT_SMOKE",
+    config: {"transform":{"rotation":{"x":-90}},"duration":2.5,"looping":true,"startLifetime":{"min":2,"max":3},"startSpeed":{"min":0.3,"max":0.6},"startSize":{"min":18,"max":28},"startOpacity":{"min":0.7,"max":0.9},"startRotation":{"min":-180,"max":180},"startColor":{"min":{"r":0.3,"g":0.8,"b":0.2},"max":{"r":0.5,"g":1,"b":0.3}},"gravity":-0.2,"maxParticles":70,"emission":{"rateOverTime":40},"shape":{"shape":"CONE","cone":{"angle":12,"radius":0.25}},"renderer":{"blending":"THREE.AdditiveBlending"},"velocityOverLifetime":{"isActive":true,"orbital":{"x":{"min":-0.8,"max":0.8},"y":{"min":-0.4,"max":0.4},"z":{"min":-0.8,"max":0.8}}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.35,"percentage":0},{"x":0.12,"y":0.55},{"x":0.08,"y":0.75},{"x":0.35,"y":0.9,"percentage":0.35},{"x":0.65,"y":1},{"x":0.85,"y":0.9},{"x":1,"y":0.65,"percentage":1}]}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.2,"y":0.5},{"x":0.4,"y":0.7,"percentage":0.4},{"x":0.7,"y":0.55},{"x":1,"y":0.4,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.8,"percentage":0},{"x":0.25,"y":1},{"x":0.5,"y":0.85,"percentage":0.5},{"x":0.75,"y":0.7},{"x":1,"y":0.5,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.2,"percentage":0},{"x":0.3,"y":0.3},{"x":0.5,"y":0.15,"percentage":0.5},{"x":0.7,"y":0.1},{"x":1,"y":0.05,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.1,"y":0.8},{"x":0.07,"y":0.95},{"x":0.45,"y":1,"percentage":0.45},{"x":0.8,"y":0.9},{"x":0.9,"y":0.5},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-40,"max":50},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.3,"frequency":0.35,"positionAmount":0.4,"rotationAmount":3,"sizeAmount":0.2}},
   },
 ];
 
-// Minimal Three.js setup for each example card
+// Three.js setup for each example card
 class ExampleCard {
   constructor(container, exampleData) {
     this.container = container;
@@ -310,42 +283,15 @@ class ExampleCard {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
-    this.camera.position.set(0, 1, 5);
-    this.camera.lookAt(0, 0.5, 0);
+    this.camera = new THREE.PerspectiveCamera(45, width / height, 1, 100);
+    this.camera.position.set(0, 0, 6);
+    this.camera.lookAt(0, 0, 0);
 
-    // We dynamically import the library to support CDN or local builds
-    this.loadParticleSystem();
-  }
-
-  async loadParticleSystem() {
-    try {
-      // Try loading from the built dist (relative path for GitHub Pages)
-      const lib = await import(
-        "https://cdn.jsdelivr.net/npm/@newkrok/three-particles@2.4.0/dist/index.js"
-      );
-      const system = lib.createParticleSystem(this.data.config);
-      this.scene.add(system.instance);
-      this.particleSystem = system;
-      this.animate();
-    } catch (e) {
-      // Fallback: show a placeholder
-      console.warn(`Could not load particle system for "${this.data.id}":`, e);
-      const canvas = this.container.querySelector("canvas");
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.fillStyle = "#1a1a1a";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#666";
-        ctx.font = "14px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(
-          "Load library to see preview",
-          canvas.width / 2,
-          canvas.height / 2
-        );
-      }
-    }
+    const config = prepareConfig(this.data.config, this.data.textureId);
+    const system = createParticleSystem(config);
+    this.scene.add(system.instance);
+    this.particleSystem = system;
+    this.animate();
   }
 
   animate() {
@@ -354,7 +300,7 @@ class ExampleCard {
     const elapsed = this.clock.getElapsedTime();
 
     this.particleSystem.update({
-      now: performance.now(),
+      now: Date.now(),
       delta,
       elapsed,
     });
@@ -386,7 +332,6 @@ examples.forEach((example) => {
   `;
   grid.appendChild(card);
 
-  // Initialize with IntersectionObserver for performance
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
