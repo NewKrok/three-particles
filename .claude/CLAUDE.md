@@ -244,11 +244,11 @@ npx typedoc               # Generate documentation
 | World/Local simulation space | ✅ Complete |
 | TypeDoc API documentation | ✅ Complete |
 | Visual editor (three-particles-editor) | ✅ Complete |
-| Test coverage (87% statement, 65% branch) | 🔶 Target ≥90% stmt, ≥80% branch |
+| Test coverage (90% statement, 70% branch) | 🔶 Target ≥90% stmt, ≥80% branch |
 | llms.txt / llms-full.txt | ⬜ Planned |
-| Interactive examples page (GitHub Pages) | ⬜ Planned |
-| CI/CD auto release | ⬜ Planned |
-| Benchmark / performance budget | ⬜ Planned |
+| Interactive examples page (GitHub Pages) | ✅ Complete |
+| CI/CD auto release | ✅ Complete |
+| Benchmark / performance budget | ✅ Complete |
 | Web Worker support | ⬜ Planned |
 | Preset system | ⬜ Planned |
 | Sub-emitters | ⬜ Planned |
