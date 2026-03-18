@@ -42,6 +42,8 @@
       overflow: hidden;
       cursor: pointer;
       transition: border-color 0.2s, transform 0.2s;
+      display: flex;
+      flex-direction: column;
     }
     .card:hover { border-color: #4fc3f7; transform: translateY(-2px); }
     .card.active { border-color: #4fc3f7; }
@@ -76,13 +78,27 @@
       opacity: 0; transition: opacity 0.2s; pointer-events: none;
     }
     .card.active:hover .stop-hint { opacity: 1; }
-    .card-info { padding: 16px; }
+    .card-info { padding: 16px; flex: 1; display: flex; flex-direction: column; }
     .card-info h3 { font-size: 1.1rem; color: #fff; margin-bottom: 4px; }
-    .card-info p { font-size: 0.85rem; color: #888; line-height: 1.4; }
+    .card-info p { font-size: 0.85rem; color: #888; line-height: 1.4; flex: 1; }
     .card-info .tag {
       display: inline-block; margin-top: 8px; padding: 2px 8px;
       background: #1a1a2e; color: #4fc3f7; border-radius: 3px; font-size: 0.75rem;
     }
+    .card-info .card-actions {
+      display: flex; align-items: center; justify-content: space-between; margin-top: 10px;
+    }
+    .card-info .card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .card-btns { display: flex; gap: 6px; flex-shrink: 0; }
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border: 1px solid #333; border-radius: 4px;
+      background: transparent; color: #4fc3f7;
+      cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .icon-btn:hover { background: #1a1a2e; border-color: #4fc3f7; }
+    .icon-btn svg { width: 16px; height: 16px; }
+    .icon-btn.copied { color: #66bb6a; border-color: #66bb6a; }
   </style>
 </head>
 <body>

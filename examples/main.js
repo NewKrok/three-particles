@@ -173,10 +173,51 @@ examples.forEach((example) => {
     <div class="card-info">
       <h3>${example.title}</h3>
       <p>${example.description}</p>
-      ${example.tags.map((t) => `<span class="tag">${t}</span>`).join(" ")}
+      <div class="card-actions">
+        <div class="card-tags">
+          ${example.tags.map((t) => `<span class="tag">${t}</span>`).join(" ")}
+        </div>
+        <div class="card-btns">
+          <button class="icon-btn copy-btn" title="Copy config to clipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <button class="icon-btn download-btn" title="Download config JSON">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   `;
   grid.appendChild(card);
+
+  card.querySelector(".copy-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    const json = JSON.stringify(example.config, null, 2);
+    navigator.clipboard.writeText(json).then(() => {
+      btn.classList.add("copied");
+      setTimeout(() => btn.classList.remove("copied"), 1500);
+    });
+  });
+
+  card.querySelector(".download-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const json = JSON.stringify(example.config, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${example.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
 
   card.addEventListener("click", () => startDemo(card, example));
 });
