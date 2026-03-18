@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>body { margin: 0; background: #000; }</style>
+</head>
+<body>
+<canvas id="c" width="320" height="220"></canvas>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+    "three/": "https://cdn.jsdelivr.net/npm/three@0.182.0/",
+    "THREE": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+
+const WARMUP_FRAMES = 60;
+const MEASURE_FRAMES = 300;
+const TEXTURE_PATH = "textures/circle.webp";
+
+// Stress-test config: many particles, multiple modifiers active
+const BENCHMARK_CONFIG = {
+  duration: 10,
+  looping: true,
+  startLifetime: { min: 1.5, max: 3 },
+  startSpeed: { min: 1, max: 3 },
+  startSize: { min: 2, max: 8 },
+  startOpacity: { min: 0.7, max: 1 },
+  startRotation: { min: -180, max: 180 },
+  startColor: { min: { r: 0.3, g: 0.5, b: 1 }, max: { r: 1, g: 0.8, b: 0.4 } },
+  gravity: 0.5,
+  maxParticles: 5000,
+  emission: { rateOverTime: 2000 },
+  shape: { shape: "SPHERE", sphere: { radius: 0.5 } },
+  renderer: { blending: "THREE.AdditiveBlending" },
+  velocityOverLifetime: {
+    isActive: true,
+    orbital: {
+      x: { min: -0.5, max: 0.5 },
+      y: { min: -0.3, max: 0.3 },
+      z: { min: -0.5, max: 0.5 },
+    },
+  },
+  sizeOverLifetime: {
+    isActive: true,
+    lifetimeCurve: {
+      bezierPoints: [
+        { x: 0, y: 0.3, percentage: 0 },
+        { x: 0.15, y: 0.7 },
+        { x: 0.1, y: 0.9 },
+        { x: 0.5, y: 1, percentage: 0.5 },
+        { x: 0.8, y: 0.8 },
+        { x: 0.9, y: 0.4 },
+        { x: 1, y: 0, percentage: 1 },
+      ],
+    },
+  },
+  colorOverLifetime: {
+    isActive: true,
+    r: {
+      bezierPoints: [
+        { x: 0, y: 1, percentage: 0 },
+        { x: 0.3, y: 0.8 },
+        { x: 0.5, y: 0.6, percentage: 0.5 },
+        { x: 0.7, y: 0.4 },
+        { x: 1, y: 0.3, percentage: 1 },
+      ],
+    },
+    g: {
+      bezierPoints: [
+        { x: 0, y: 0.8, percentage: 0 },
+        { x: 0.3, y: 0.6 },
+        { x: 0.5, y: 0.5, percentage: 0.5 },
+        { x: 0.7, y: 0.4 },
+        { x: 1, y: 0.3, percentage: 1 },
+      ],
+    },
+    b: {
+      bezierPoints: [
+        { x: 0, y: 0.5, percentage: 0 },
+        { x: 0.3, y: 0.7 },
+        { x: 0.5, y: 0.9, percentage: 0.5 },
+        { x: 0.7, y: 1 },
+        { x: 1, y: 1, percentage: 1 },
+      ],
+    },
+  },
+  opacityOverLifetime: {
+    isActive: true,
+    lifetimeCurve: {
+      bezierPoints: [
+        { x: 0, y: 0, percentage: 0 },
+        { x: 0.08, y: 0.8 },
+        { x: 0.06, y: 1 },
+        { x: 0.5, y: 0.95, percentage: 0.5 },
+        { x: 0.85, y: 0.7 },
+        { x: 0.92, y: 0.3 },
+        { x: 1, y: 0, percentage: 1 },
+      ],
+    },
+  },
+  rotationOverLifetime: { isActive: true, min: -120, max: 120 },
+  noise: {
+    isActive: true,
+    useRandomOffset: true,
+    strength: 0.3,
+    frequency: 0.4,
+    positionAmount: 0.3,
+    rotationAmount: 2,
+    sizeAmount: 0.2,
+  },
+};
+
+function resolveBlending(blending) {
+  if (typeof blending === "number") return blending;
+  if (blending === "THREE.AdditiveBlending") return THREE.AdditiveBlending;
+  return THREE.NormalBlending;
+}
+
+async function run() {
+  const params = new URLSearchParams(window.location.search);
+  const version = params.get("v");
+  if (!version) {
+    parent.postMessage({ type: "error", error: "No version specified" }, "*");
+    return;
+  }
+
+  // Load texture
+  const textureLoader = new THREE.TextureLoader();
+  let texture;
+  try {
+    texture = await new Promise((resolve, reject) => {
+      textureLoader.load(TEXTURE_PATH, resolve, undefined, reject);
+    });
+    texture.flipY = false;
+  } catch {
+    // Continue without texture
+  }
+
+  // Load particle library
+  let particleModule;
+  try {
+    const cdnUrl = `https://cdn.jsdelivr.net/npm/@newkrok/three-particles@${version}/dist/three-particles.min.js`;
+    particleModule = await import(cdnUrl);
+  } catch (e) {
+    parent.postMessage({ type: "error", error: `Failed to load v${version}: ${e.message}` }, "*");
+    return;
+  }
+
+  const { createParticleSystem, updateParticleSystems } = particleModule;
+
+  // Setup renderer & scene
+  const canvas = document.getElementById("c");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
+  renderer.setSize(320, 220);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 320 / 220, 1, 100);
+  camera.position.set(0, 0, 15);
+  camera.lookAt(0, 0, 0);
+
+  // Prepare config
+  const config = JSON.parse(JSON.stringify(BENCHMARK_CONFIG));
+  if (config.renderer?.blending) {
+    config.renderer.blending = resolveBlending(config.renderer.blending);
+  }
+  if (texture) config.map = texture;
+
+  const system = createParticleSystem(config);
+  scene.add(system.instance);
+
+  const clock = new THREE.Clock();
+  let frameCount = 0;
+  const updateTimes = [];
+  const renderTimes = [];
+  const frameTimes = [];
+
+  function step() {
+    const delta = clock.getDelta();
+    const elapsed = clock.getElapsedTime();
+    const cycleData = { now: Date.now(), delta, elapsed };
+
+    const t0 = performance.now();
+    if (system.update) {
+      system.update(cycleData);
+    } else {
+      updateParticleSystems(cycleData);
+    }
+    const t1 = performance.now();
+    renderer.render(scene, camera);
+    const t2 = performance.now();
+
+    frameCount++;
+
+    if (frameCount <= WARMUP_FRAMES) {
+      requestAnimationFrame(step);
+      return;
+    }
+
+    // Measure phase
+    updateTimes.push(t1 - t0);
+    renderTimes.push(t2 - t1);
+    frameTimes.push(delta * 1000);
+
+    // Send progress every 30 frames
+    if (updateTimes.length % 30 === 0) {
+      parent.postMessage({
+        type: "progress",
+        version,
+        framesCompleted: updateTimes.length,
+        totalFrames: MEASURE_FRAMES,
+        metrics: calcMetrics(updateTimes, renderTimes, frameTimes),
+      }, "*");
+    }
+
+    if (updateTimes.length >= MEASURE_FRAMES) {
+      parent.postMessage({
+        type: "result",
+        version,
+        metrics: calcMetrics(updateTimes, renderTimes, frameTimes),
+      }, "*");
+
+      system.dispose();
+      renderer.dispose();
+      return;
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  parent.postMessage({ type: "started", version }, "*");
+  requestAnimationFrame(step);
+}
+
+function avg(arr) {
+  return arr.reduce((s, v) => s + v, 0) / arr.length;
+}
+
+function p95(arr) {
+  const sorted = [...arr].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length * 0.95)];
+}
+
+function calcMetrics(updateTimes, renderTimes, frameTimes) {
+  const avgFrameTime = avg(frameTimes);
+  return {
+    fps: 1000 / avgFrameTime,
+    avgFrameTime,
+    avgUpdateTime: avg(updateTimes),
+    avgRenderTime: avg(renderTimes),
+    p95UpdateTime: p95(updateTimes),
+    p95FrameTime: p95(frameTimes),
+  };
+}
+
+run();
+</script>
+</body>
+</html>

@@ -10,6 +10,14 @@ const VERSION_KEY = "three-particles-version";
  * Fetch the last N published 2.x versions from the npm registry.
  * Returns an array sorted newest-first, e.g. ["2.4.0", "2.3.0", ...].
  */
+let cachedVersions = null;
+
+export async function getAvailableVersions() {
+  if (cachedVersions) return cachedVersions;
+  cachedVersions = await fetchVersions();
+  return cachedVersions;
+}
+
 async function fetchVersions() {
   const res = await fetch(NPM_API);
   const data = await res.json();
@@ -54,7 +62,7 @@ export async function initVersionSwitcher() {
 
   let versions;
   try {
-    versions = await fetchVersions();
+    versions = await getAvailableVersions();
   } catch {
     select.innerHTML = "<option>unavailable</option>";
     return null;

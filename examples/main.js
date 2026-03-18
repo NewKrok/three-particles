@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { examples } from "./examples-data.js";
-import { initVersionSwitcher, cdnUrl } from "./version-switcher.js";
+import { initVersionSwitcher, cdnUrl, getAvailableVersions } from "./version-switcher.js";
+import { BenchmarkRunner } from "./benchmark.js";
+import { METRICS } from "./benchmark-chart.js";
 
 // ─── Bootstrap: load the particle library from CDN ──────────────────
 const version = await initVersionSwitcher() || "2.4.0";
@@ -232,3 +234,129 @@ examples.forEach((example) => {
 
   card.addEventListener("click", () => startDemo(card, example));
 });
+
+// ─── Benchmark UI ───────────────────────────────────────────────────
+(async () => {
+  const overlay = document.getElementById("bench-overlay");
+  const openBtn = document.getElementById("bench-open-btn");
+  const closeBtn = document.getElementById("bench-close");
+  const versionsContainer = document.getElementById("bench-versions");
+  const runBtn = document.getElementById("bench-run");
+  const abortBtn = document.getElementById("bench-abort");
+  const statusEl = document.getElementById("bench-status");
+  const chartCanvas = document.getElementById("bench-chart");
+  const iframeHost = document.getElementById("bench-iframe-host");
+  const selectAllBtn = document.getElementById("bench-select-all");
+  const selectNoneBtn = document.getElementById("bench-select-none");
+
+  if (!overlay) return;
+
+  let runner = null;
+
+  // Populate version checkboxes
+  let versions;
+  try {
+    versions = await getAvailableVersions();
+  } catch {
+    versionsContainer.innerHTML = '<span style="color:#666">Could not load versions</span>';
+    return;
+  }
+
+  versionsContainer.innerHTML = versions
+    .map(
+      (v, i) =>
+        `<label><input type="checkbox" value="${v}"${i < 3 ? " checked" : ""} /><span>${v}${i === 0 ? " (latest)" : ""}</span></label>`
+    )
+    .join("");
+
+  selectAllBtn.addEventListener("click", () => {
+    versionsContainer.querySelectorAll("input").forEach((cb) => (cb.checked = true));
+  });
+  selectNoneBtn.addEventListener("click", () => {
+    versionsContainer.querySelectorAll("input").forEach((cb) => (cb.checked = false));
+  });
+
+  // Metric tabs
+  const metricTabs = document.getElementById("bench-metric-tabs");
+  metricTabs.innerHTML = Object.entries(METRICS)
+    .map(
+      ([key, m]) =>
+        `<button class="bench-metric-tab${key === "fps" ? " active" : ""}" data-metric="${key}">${m.label}</button>`
+    )
+    .join("");
+
+  metricTabs.addEventListener("click", (e) => {
+    const btn = e.target.closest(".bench-metric-tab");
+    if (!btn) return;
+    metricTabs.querySelectorAll(".bench-metric-tab").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    if (runner) {
+      runner.chart.setMetric(btn.dataset.metric);
+    }
+  });
+
+  // Open / close modal
+  openBtn.addEventListener("click", () => {
+    stopActiveDemo();
+    overlay.classList.add("open");
+    if (runner) runner.resizeChart();
+  });
+  closeBtn.addEventListener("click", () => {
+    if (runner && runner.running) runner.abort();
+    overlay.classList.remove("open");
+  });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) {
+      if (runner && runner.running) runner.abort();
+      overlay.classList.remove("open");
+    }
+  });
+
+  // Run benchmark
+  runBtn.addEventListener("click", async () => {
+    const selected = [
+      ...versionsContainer.querySelectorAll("input:checked"),
+    ].map((cb) => cb.value);
+
+    if (selected.length === 0) {
+      statusEl.textContent = "Select at least one version.";
+      return;
+    }
+
+    runner = new BenchmarkRunner({
+      chartCanvas,
+      statusEl,
+      iframeContainer: iframeHost,
+    });
+    const activeTab = metricTabs.querySelector(".bench-metric-tab.active");
+    if (activeTab) runner.chart.setMetric(activeTab.dataset.metric);
+    runner.resizeChart();
+
+    runBtn.disabled = true;
+    abortBtn.disabled = false;
+
+    if (typeof gtag === "function") {
+      gtag("event", "benchmark_start", {
+        event_category: "benchmark",
+        event_label: selected.join(","),
+      });
+    }
+
+    await runner.run(selected);
+
+    runBtn.disabled = false;
+    abortBtn.disabled = true;
+  });
+
+  // Abort
+  abortBtn.addEventListener("click", () => {
+    if (runner) runner.abort();
+    runBtn.disabled = false;
+    abortBtn.disabled = true;
+  });
+
+  // Resize chart on window resize
+  window.addEventListener("resize", () => {
+    if (runner) runner.resizeChart();
+  });
+})();

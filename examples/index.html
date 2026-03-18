@@ -120,6 +120,74 @@
     .version-switcher .version-loading {
       color: #666; font-style: italic;
     }
+
+    /* Benchmark modal */
+    .bench-overlay {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+    }
+    .bench-overlay.open { display: flex; }
+    .bench-modal {
+      background: #141414; border: 1px solid #333; border-radius: 12px;
+      width: 90vw; max-width: 800px; max-height: 90vh; overflow-y: auto;
+      padding: 28px 32px; position: relative;
+    }
+    .bench-modal h2 { color: #fff; font-size: 1.3rem; margin-bottom: 16px; }
+    .bench-close {
+      position: absolute; top: 12px; right: 16px;
+      background: none; border: none; color: #888; font-size: 1.5rem;
+      cursor: pointer; line-height: 1;
+    }
+    .bench-close:hover { color: #fff; }
+    .bench-versions {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+    }
+    .bench-versions label {
+      display: flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border: 1px solid #333; border-radius: 4px;
+      font-size: 0.85rem; color: #ccc; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .bench-versions label:hover { border-color: #4fc3f7; }
+    .bench-versions input:checked + span { color: #4fc3f7; }
+    .bench-versions input { accent-color: #4fc3f7; }
+    .bench-actions { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+    .bench-btn {
+      padding: 8px 20px; border-radius: 6px; border: 1px solid #4fc3f7;
+      background: transparent; color: #4fc3f7; font-size: 0.9rem;
+      cursor: pointer; transition: background 0.2s, color 0.2s;
+    }
+    .bench-btn:hover { background: #4fc3f7; color: #0a0a0a; }
+    .bench-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .bench-btn:disabled:hover { background: transparent; color: #4fc3f7; }
+    .bench-btn.abort { border-color: #ef5350; color: #ef5350; }
+    .bench-btn.abort:hover { background: #ef5350; color: #fff; }
+    .bench-status { color: #888; font-size: 0.85rem; flex: 1; }
+    .bench-chart-wrap {
+      width: 100%; height: 300px; border: 1px solid #222; border-radius: 8px;
+      overflow: hidden; background: #111;
+    }
+    .bench-chart-wrap canvas { display: block; }
+    .bench-iframe-host {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      opacity: 0; pointer-events: none;
+    }
+    .bench-select-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+    .bench-select-btn {
+      background: none; border: none; color: #4fc3f7; font-size: 0.8rem;
+      cursor: pointer; text-decoration: underline; padding: 0;
+    }
+    .bench-select-btn:hover { color: #81d4fa; }
+    .bench-metric-tabs {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;
+    }
+    .bench-metric-tab {
+      padding: 4px 12px; border-radius: 4px; border: 1px solid #333;
+      background: transparent; color: #888; font-size: 0.8rem;
+      cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .bench-metric-tab:hover { border-color: #4fc3f7; color: #ccc; }
+    .bench-metric-tab.active { border-color: #4fc3f7; color: #4fc3f7; background: #1a1a2e; }
   </style>
 </head>
 <body>
@@ -131,6 +199,7 @@
       <a href="https://www.npmjs.com/package/@newkrok/three-particles" onclick="gtag('event','navigation',{event_category:'header',event_label:'npm'})">npm</a>
       <a href="https://newkrok.github.io/three-particles/" onclick="gtag('event','navigation',{event_category:'header',event_label:'api_docs'})">API Docs</a>
       <a href="https://newkrok.com/three-particles-editor/index.html" onclick="gtag('event','navigation',{event_category:'header',event_label:'visual_editor'})">Visual Editor</a>
+      <a href="#" id="bench-open-btn" onclick="event.preventDefault()">Benchmark</a>
     </div>
     <div class="version-switcher">
       <label for="version-select">Version:</label>
@@ -139,6 +208,36 @@
       </select>
     </div>
   </header>
+
+  <!-- Benchmark modal -->
+  <div class="bench-overlay" id="bench-overlay">
+    <div class="bench-modal">
+      <button class="bench-close" id="bench-close">&times;</button>
+      <h2>Performance Benchmark</h2>
+      <p style="color:#888;font-size:0.85rem;margin-bottom:14px;">
+        Compare FPS across versions. Each version runs a stress test with 5 000 particles and multiple active modifiers.
+      </p>
+      <div class="bench-select-actions">
+        <button class="bench-select-btn" id="bench-select-all">Select all</button>
+        <button class="bench-select-btn" id="bench-select-none">Deselect all</button>
+      </div>
+      <div class="bench-versions" id="bench-versions">
+        <!-- populated by JS -->
+      </div>
+      <div class="bench-actions">
+        <button class="bench-btn" id="bench-run">Run benchmark</button>
+        <button class="bench-btn abort" id="bench-abort" disabled>Abort</button>
+        <span class="bench-status" id="bench-status"></span>
+      </div>
+      <div class="bench-metric-tabs" id="bench-metric-tabs">
+        <!-- populated by JS -->
+      </div>
+      <div class="bench-chart-wrap" id="bench-chart-wrap">
+        <canvas id="bench-chart"></canvas>
+      </div>
+      <div class="bench-iframe-host" id="bench-iframe-host"></div>
+    </div>
+  </div>
 
   <div class="grid" id="examples-grid"></div>
 
