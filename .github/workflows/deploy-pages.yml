@@ -43,9 +43,9 @@ jobs:
       - name: Disable Jekyll
         run: touch docs/.nojekyll
 
-      - name: Copy examples & assets to docs
+      - name: Copy examples to docs root & assets
         run: |
-          cp -r examples/ docs/examples/
+          cp -r examples/* docs/
           cp llms.txt docs/llms.txt 2>/dev/null || true
           cp llms-full.txt docs/llms-full.txt 2>/dev/null || true
 

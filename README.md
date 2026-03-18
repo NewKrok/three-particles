@@ -65,7 +65,7 @@ updateParticleSystems({now, delta, elapsed});
 
 # Documentation
 
-Automatically generated TypeDoc: [https://newkrok.github.io/three-particles/](https://newkrok.github.io/three-particles/)
+Automatically generated TypeDoc: [https://newkrok.github.io/three-particles/api/](https://newkrok.github.io/three-particles/api/)
 
 ## Important Notes
 

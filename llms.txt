@@ -115,7 +115,7 @@ Values support: constant `number`, random `{ min, max }`, or curves:
 ## Links
 
 - Repository: https://github.com/NewKrok/three-particles
-- API Docs: https://newkrok.github.io/three-particles/
+- API Docs: https://newkrok.github.io/three-particles/api/
 - Visual Editor: https://github.com/NewKrok/three-particles-editor
 - Editor Demo: https://newkrok.com/three-particles-editor/index.html
 - Full LLM Reference: https://github.com/NewKrok/three-particles/blob/master/llms-full.txt

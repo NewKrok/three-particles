@@ -13,7 +13,7 @@
 - Visual editor for creating and fine-tuning effects: [THREE Particles Editor](https://github.com/NewKrok/three-particles-editor)
 - Highly customizable particle properties (position, velocity, size, color, alpha, rotation, etc.)
 - Support for various emitter shapes and parameters
-- TypeDoc API documentation: https://newkrok.github.io/three-particles/
+- TypeDoc API documentation: https://newkrok.github.io/three-particles/api/
 
 ### Live Demos
 - Editor & Live Demo: https://newkrok.com/three-particles-editor/index.html
@@ -258,7 +258,7 @@ npx typedoc               # Generate documentation
 ## Additional Resources
 
 - **Documentation**: `.claude/doc/` folder for additional project documentation
-- **TypeDoc**: Auto-generated at https://newkrok.github.io/three-particles/
+- **TypeDoc**: Auto-generated at https://newkrok.github.io/three-particles/api/
 - **Editor**: Visual particle editor for testing configurations
 - **Examples**: CodePen examples show real-world usage patterns
 
