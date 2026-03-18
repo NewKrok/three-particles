@@ -1,6 +1,12 @@
 import * as THREE from "three";
-import { createParticleSystem } from "./three-particles.esm.js";
 import { examples } from "./examples-data.js";
+import { initVersionSwitcher, cdnUrl } from "./version-switcher.js";
+
+// ─── Bootstrap: load the particle library from CDN ──────────────────
+const version = await initVersionSwitcher() || "2.4.0";
+
+const particleModule = await import(cdnUrl(version));
+const { createParticleSystem, updateParticleSystems } = particleModule;
 
 // Texture ID to file mapping
 const TEXTURE_MAP = {
@@ -102,11 +108,12 @@ class LiveDemo {
     const delta = this.clock.getDelta();
     const elapsed = this.clock.getElapsedTime();
 
-    this.particleSystem.update({
-      now: Date.now(),
-      delta,
-      elapsed,
-    });
+    const cycleData = { now: Date.now(), delta, elapsed };
+    if (this.particleSystem.update) {
+      this.particleSystem.update(cycleData);
+    } else {
+      updateParticleSystems(cycleData);
+    }
 
     this.renderer.render(this.scene, this.camera);
     this.animationId = requestAnimationFrame(() => this.animate());

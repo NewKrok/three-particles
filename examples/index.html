@@ -107,6 +107,19 @@
     .icon-btn:hover { background: #1a1a2e; border-color: #4fc3f7; }
     .icon-btn svg { width: 16px; height: 16px; }
     .icon-btn.copied { color: #66bb6a; border-color: #66bb6a; }
+    .version-switcher {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-top: 12px; font-size: 0.85rem; color: #888;
+    }
+    .version-switcher select {
+      background: #1a1a2e; color: #4fc3f7; border: 1px solid #333;
+      border-radius: 4px; padding: 4px 8px; font-size: 0.85rem;
+      cursor: pointer; outline: none;
+    }
+    .version-switcher select:hover { border-color: #4fc3f7; }
+    .version-switcher .version-loading {
+      color: #666; font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -119,6 +132,12 @@
       <a href="https://newkrok.github.io/three-particles/" onclick="gtag('event','navigation',{event_category:'header',event_label:'api_docs'})">API Docs</a>
       <a href="https://newkrok.com/three-particles-editor/index.html" onclick="gtag('event','navigation',{event_category:'header',event_label:'visual_editor'})">Visual Editor</a>
     </div>
+    <div class="version-switcher">
+      <label for="version-select">Version:</label>
+      <select id="version-select" disabled>
+        <option>loading...</option>
+      </select>
+    </div>
   </header>
 
   <div class="grid" id="examples-grid"></div>
@@ -127,7 +146,8 @@
   {
     "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
-      "three/": "https://cdn.jsdelivr.net/npm/three@0.182.0/"
+      "three/": "https://cdn.jsdelivr.net/npm/three@0.182.0/",
+      "THREE": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js"
     }
   }
   </script>
