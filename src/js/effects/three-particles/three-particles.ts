@@ -1207,7 +1207,9 @@ const updateParticleSystemInstance = (
       currentWorldPosition.z - lastWorldPosition.z
     );
   }
-  generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
+  if (isEnabled) {
+    generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
+  }
   particleSystem.getWorldPosition(lastWorldPosition);
   particleSystem.getWorldQuaternion(worldQuaternion);
   if (
