@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Three Particles — Examples</title>
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-V3NGXP6M8X"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-V3NGXP6M8X');
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -106,10 +114,10 @@
     <h1>@newkrok/three-particles</h1>
     <p>Interactive examples for the Three.js particle system library</p>
     <div class="links">
-      <a href="https://github.com/NewKrok/three-particles">GitHub</a>
-      <a href="https://www.npmjs.com/package/@newkrok/three-particles">npm</a>
-      <a href="https://newkrok.github.io/three-particles/">API Docs</a>
-      <a href="https://newkrok.com/three-particles-editor/index.html">Visual Editor</a>
+      <a href="https://github.com/NewKrok/three-particles" onclick="gtag('event','navigation',{event_category:'header',event_label:'github'})">GitHub</a>
+      <a href="https://www.npmjs.com/package/@newkrok/three-particles" onclick="gtag('event','navigation',{event_category:'header',event_label:'npm'})">npm</a>
+      <a href="https://newkrok.github.io/three-particles/" onclick="gtag('event','navigation',{event_category:'header',event_label:'api_docs'})">API Docs</a>
+      <a href="https://newkrok.com/three-particles-editor/index.html" onclick="gtag('event','navigation',{event_category:'header',event_label:'visual_editor'})">Visual Editor</a>
     </div>
   </header>
 

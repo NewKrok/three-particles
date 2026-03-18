@@ -141,10 +141,12 @@ function stopActiveDemo() {
 
 function startDemo(card, exampleData) {
   if (activeCard === card) {
+    gtag("event", "click", { event_category: "demo", event_label: "stop", demo: exampleData.id });
     stopActiveDemo();
     return;
   }
   stopActiveDemo();
+  gtag("event", "click", { event_category: "demo", event_label: "play", demo: exampleData.id });
   card._liveDemo = new LiveDemo(card, exampleData);
   card.classList.add("active");
   activeCard = card;
@@ -199,6 +201,7 @@ examples.forEach((example) => {
 
   card.querySelector(".copy-btn").addEventListener("click", (e) => {
     e.stopPropagation();
+    gtag("event", "click", { event_category: "config_action", event_label: "copy", demo: example.id });
     const btn = e.currentTarget;
     const json = JSON.stringify(example.config, null, 2);
     navigator.clipboard.writeText(json).then(() => {
@@ -209,6 +212,7 @@ examples.forEach((example) => {
 
   card.querySelector(".download-btn").addEventListener("click", (e) => {
     e.stopPropagation();
+    gtag("event", "click", { event_category: "config_action", event_label: "download", demo: example.id });
     const json = JSON.stringify(example.config, null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
