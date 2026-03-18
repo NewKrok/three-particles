@@ -10,9 +10,8 @@ build/
 out/
 docs/
 
-# Generated examples bundle and copied textures
+# Generated examples bundle
 examples/three-particles.esm.js
-examples/textures/
 
 *.log
 
