@@ -245,7 +245,7 @@ npx typedoc               # Generate documentation
 | TypeDoc API documentation | ✅ Complete |
 | Visual editor (three-particles-editor) | ✅ Complete |
 | Test coverage (90% statement, 70% branch) | 🔶 Target ≥90% stmt, ≥80% branch |
-| llms.txt / llms-full.txt | ⬜ Planned |
+| llms.txt / llms-full.txt | ✅ Complete |
 | Interactive examples page (GitHub Pages) | ✅ Complete |
 | CI/CD auto release | ✅ Complete |
 | Benchmark / performance budget | ✅ Complete |

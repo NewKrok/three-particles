@@ -1,6 +1,6 @@
 # @newkrok/three-particles — Full API Reference
 
-> Three.js-based high-performance particle system library (v2.4.0)
+> Three.js-based high-performance particle system library (v2.5.0)
 > License: MIT | Author: Istvan Krisztian Somoracz
 > Repository: https://github.com/NewKrok/three-particles
 
@@ -12,7 +12,7 @@
 npm install @newkrok/three-particles three
 ```
 
-Peer dependency: `three` ^0.182.0
+Peer dependency: `three` ^0.180.0
 
 ---
 
