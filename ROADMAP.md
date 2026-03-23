@@ -73,9 +73,12 @@
 - Automatic fallback to postMessage
 - Recommended for >1000 particles or multiple systems
 
-### Sub-Emitters
-- Emit new particle systems on particle death or collision
-- `onParticleDeath` callback with particle position
+### Sub-Emitters ✅
+- Spawn child particle systems on particle birth or death events
+- `SubEmitterTrigger.BIRTH` and `SubEmitterTrigger.DEATH` triggers
+- `SubEmitterConfig` with `config`, `trigger`, `inheritVelocity`, `maxInstances`
+- Per-config `maxInstances` cap with automatic cleanup of completed instances
+- Sub-emitters forced non-looping; disposed with parent
 
 ### Force Fields / Attractors
 - Define attraction/repulsion points in space

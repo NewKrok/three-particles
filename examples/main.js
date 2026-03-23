@@ -58,6 +58,18 @@ function prepareConfig(config, textureId) {
   }
   const tex = loadTexture(textureId);
   if (tex) prepared.map = tex;
+  if (prepared.subEmitters) {
+    for (const sub of prepared.subEmitters) {
+      if (sub.config?.renderer?.blending) {
+        sub.config.renderer.blending = resolveBlending(sub.config.renderer.blending);
+      }
+      if (sub.textureId) {
+        const subTex = loadTexture(sub.textureId);
+        if (subTex) sub.config.map = subTex;
+        delete sub.textureId;
+      }
+    }
+  }
   return prepared;
 }
 

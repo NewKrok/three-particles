@@ -10,6 +10,7 @@ import {
   LifeTimeCurve,
   Shape,
   SimulationSpace,
+  SubEmitterTrigger,
   TimeMode,
 } from './three-particles-enums';
 import { applyModifiers } from './three-particles-modifiers.js';
@@ -37,6 +38,7 @@ import {
   Point3D,
   RandomBetweenTwoConstants,
   ShapeConfig,
+  SubEmitterConfig,
 } from './types.js';
 
 export * from './types.js';
@@ -45,6 +47,7 @@ let _particleSystemId = 0;
 let createdParticleSystems: Array<ParticleSystemInstance> = [];
 
 // Pre-allocated objects for updateParticleSystemInstance to avoid GC pressure
+const _subEmitterPosition = new THREE.Vector3();
 const _lastWorldPositionSnapshot = new THREE.Vector3();
 const _distanceStep = { x: 0, y: 0, z: 0 };
 const _tempPosition = { x: 0, y: 0, z: 0 };
@@ -487,6 +490,7 @@ export const createParticleSystem = (
     onUpdate,
     onComplete,
     textureSheetAnimation,
+    subEmitters,
   } = normalizedConfig;
 
   if (typeof renderer?.blending === 'string')
@@ -1019,6 +1023,97 @@ export const createParticleSystem = (
     });
   };
 
+  // Sub-emitter setup
+  const subEmitterArr: Array<SubEmitterConfig> = subEmitters ?? [];
+  const deathSubEmitters = subEmitterArr.filter(
+    (s) => (s.trigger ?? SubEmitterTrigger.DEATH) === SubEmitterTrigger.DEATH
+  );
+  const birthSubEmitters = subEmitterArr.filter(
+    (s) => s.trigger === SubEmitterTrigger.BIRTH
+  );
+  // Track sub-emitter instances per config for per-config maxInstances enforcement
+  const subEmitterInstancesMap = new Map<
+    SubEmitterConfig,
+    Array<ParticleSystem>
+  >();
+  for (const cfg of subEmitterArr) {
+    subEmitterInstancesMap.set(cfg, []);
+  }
+
+  const cleanupCompletedInstances = (instances: Array<ParticleSystem>) => {
+    for (let i = instances.length - 1; i >= 0; i--) {
+      const sub = instances[i];
+      const points = sub.instance as THREE.Points;
+      const isActiveArr = points.geometry?.attributes?.isActive?.array;
+      if (!isActiveArr) {
+        sub.dispose();
+        instances.splice(i, 1);
+        continue;
+      }
+      let hasActive = false;
+      for (let j = 0; j < isActiveArr.length; j++) {
+        if (isActiveArr[j]) {
+          hasActive = true;
+          break;
+        }
+      }
+      if (!hasActive) {
+        sub.dispose();
+        instances.splice(i, 1);
+      }
+    }
+  };
+
+  const spawnSubEmitters = (
+    configs: Array<SubEmitterConfig>,
+    position: THREE.Vector3,
+    velocity: THREE.Vector3,
+    spawnNow: number
+  ) => {
+    for (const subConfig of configs) {
+      const instances = subEmitterInstancesMap.get(subConfig)!;
+      const maxInst = subConfig.maxInstances ?? 32;
+      if (instances.length >= maxInst) {
+        cleanupCompletedInstances(instances);
+        if (instances.length >= maxInst) continue;
+      }
+
+      const inheritVelocity = subConfig.inheritVelocity ?? 0;
+      const subSystem = createParticleSystem(
+        {
+          ...subConfig.config,
+          looping: false,
+          transform: {
+            ...subConfig.config.transform,
+            position: new THREE.Vector3(position.x, position.y, position.z),
+          },
+          ...(inheritVelocity > 0
+            ? {
+                startSpeed:
+                  (typeof subConfig.config.startSpeed === 'number'
+                    ? subConfig.config.startSpeed
+                    : typeof subConfig.config.startSpeed === 'object' &&
+                        subConfig.config.startSpeed !== null &&
+                        'min' in subConfig.config.startSpeed
+                      ? ((
+                          subConfig.config
+                            .startSpeed as RandomBetweenTwoConstants
+                        ).min ?? 0)
+                      : 0) +
+                  velocity.length() * inheritVelocity,
+              }
+            : {}),
+        },
+        spawnNow
+      );
+
+      const parentObj = (wrapper || particleSystem).parent;
+      if (parentObj) parentObj.add(subSystem.instance);
+
+      instances.push(subSystem);
+    }
+  };
+
   let particleSystem = new THREE.Points(geometry, material);
 
   particleSystem.position.copy(transform!.position!);
@@ -1035,6 +1130,53 @@ export const createParticleSystem = (
     wrapper = new Gyroscope();
     wrapper.add(particleSystem);
   }
+
+  const hasDeathSubEmitters = deathSubEmitters.length > 0;
+  const hasBirthSubEmitters = birthSubEmitters.length > 0;
+
+  const onParticleDeath = hasDeathSubEmitters
+    ? (
+        particleIndex: number,
+        positionArr: THREE.TypedArray,
+        velocity: THREE.Vector3,
+        deathNow: number
+      ) => {
+        const posIdx = particleIndex * 3;
+        _subEmitterPosition.set(
+          positionArr[posIdx],
+          positionArr[posIdx + 1],
+          positionArr[posIdx + 2]
+        );
+        spawnSubEmitters(
+          deathSubEmitters,
+          _subEmitterPosition,
+          velocity,
+          deathNow
+        );
+      }
+    : undefined;
+
+  const onParticleBirth = hasBirthSubEmitters
+    ? (
+        particleIndex: number,
+        positionArr: THREE.TypedArray,
+        velocity: THREE.Vector3,
+        birthNow: number
+      ) => {
+        const posIdx = particleIndex * 3;
+        _subEmitterPosition.set(
+          positionArr[posIdx],
+          positionArr[posIdx + 1],
+          positionArr[posIdx + 2]
+        );
+        spawnSubEmitters(
+          birthSubEmitters,
+          _subEmitterPosition,
+          velocity,
+          birthNow
+        );
+      }
+    : undefined;
 
   const instanceData: ParticleSystemInstance = {
     particleSystem,
@@ -1056,13 +1198,21 @@ export const createParticleSystem = (
     freeList,
     deactivateParticle,
     activateParticle,
+    onParticleDeath,
+    onParticleBirth,
   };
 
   createdParticleSystems.push(instanceData);
 
   const resumeEmitter = () => (generalData.isEnabled = true);
   const pauseEmitter = () => (generalData.isEnabled = false);
-  const dispose = () => destroyParticleSystem(particleSystem);
+  const dispose = () => {
+    for (const instances of subEmitterInstancesMap.values()) {
+      for (const sub of instances) sub.dispose();
+      instances.length = 0;
+    }
+    destroyParticleSystem(particleSystem);
+  };
   const update = (cycleData: CycleData) =>
     updateParticleSystemInstance(instanceData, cycleData);
 
@@ -1171,6 +1321,8 @@ const updateParticleSystemInstance = (
     activateParticle,
     simulationSpace,
     gravity,
+    onParticleDeath,
+    onParticleBirth,
   } = props;
 
   const lifetime = now - creationTime;
@@ -1248,6 +1400,8 @@ const updateParticleSystemInstance = (
     if (isActiveArr[index]) {
       const particleLifetime = now - creationTimes[index];
       if (particleLifetime > startLifetimeArr[index]) {
+        if (onParticleDeath)
+          onParticleDeath(index, positionArr, velocities[index], now);
         deactivateParticle(index);
       } else {
         const velocity = velocities[index];
@@ -1416,6 +1570,13 @@ const updateParticleSystemInstance = (
           activationTime: now,
           position: _tempPosition,
         });
+        if (onParticleBirth)
+          onParticleBirth(
+            particleIndex,
+            attributes.position.array,
+            velocities[particleIndex],
+            now
+          );
         props.lastEmissionTime = now;
       }
     }
