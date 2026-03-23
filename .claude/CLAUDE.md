@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Package:** `@newkrok/three-particles` (v2.2.0)
+**Package:** `@newkrok/three-particles` (v2.6.2)
 **Description:** Three.js-based high-performance particle system library designed for creating visually stunning particle effects with ease. Perfect for game developers and 3D applications.
 **Author:** Istvan Krisztian Somoracz
 **License:** MIT
@@ -129,7 +129,7 @@ npm test              # Jest — all tests must pass
 npm run build         # tsc + webpack — must succeed
 ```
 
-### Git Workflow
+### Git Workflow & CI/CD
 - Main branch: `master`
 - Conventional commits enforced via commitlint
 - Husky pre-commit hooks configured
@@ -138,6 +138,21 @@ npm run build         # tsc + webpack — must succeed
   ```
   Co-Authored-By: Claude <noreply@anthropic.com>
   ```
+
+### Automated Release Pipeline
+Pushing/merging to `master` triggers a **fully automated** release:
+1. **CI checks** (`ci.yml`): lint + test + build + circular dependency check (runs on PRs and master pushes)
+2. **Release** (`release.yml`): test → build → auto version bump (based on conventional commits) → npm publish → GitHub Release
+3. **Deploy Pages** (`deploy-pages.yml`): build examples → generate TypeDoc → deploy to GitHub Pages
+4. **Bundle size check** (`bundle-size-check.yml`): enforces 150 KB limit on PRs
+5. **CodeQL analysis** (`codeql-analysis.yml`): security scanning on PRs
+
+**Version bump logic** (from commit messages since last tag):
+- `BREAKING CHANGE` or `!:` → **major** (e.g. 2.6.2 → 3.0.0)
+- `feat:` → **minor** (e.g. 2.6.2 → 2.7.0)
+- `fix:`, `perf:`, `refactor:`, etc. → **patch** (e.g. 2.6.2 → 2.6.3)
+
+**No manual release steps needed** — merge to master and everything is automatic (npm publish, GitHub Release, GitHub Pages update).
 
 ---
 
@@ -239,25 +254,53 @@ npx typedoc               # Generate documentation
 | Core particle system | ✅ Complete |
 | Shape emitters (Sphere, Cone, Circle, Rectangle, Box) | ✅ Complete |
 | Lifetime modifiers (size, opacity, color, rotation, velocity) | ✅ Complete |
-| Noise module | ✅ Complete |
+| Noise module (FBM) | ✅ Complete |
+| Burst emission | ✅ Complete |
+| Rate over distance emission | ✅ Complete |
 | Texture sheet animation | ✅ Complete |
 | World/Local simulation space | ✅ Complete |
 | TypeDoc API documentation | ✅ Complete |
 | Visual editor (three-particles-editor) | ✅ Complete |
-| Test coverage (90% statement, 70% branch) | 🔶 Target ≥90% stmt, ≥80% branch |
 | llms.txt / llms-full.txt | ✅ Complete |
 | Interactive examples page (GitHub Pages) | ✅ Complete |
-| CI/CD auto release | ✅ Complete |
-| Benchmark / performance budget | ✅ Complete |
+| CI/CD auto release (npm publish on master push) | ✅ Complete |
+| PR checks (lint + test + build + bundle size + CodeQL) | ✅ Complete |
+| Bundle size monitoring (150 KB limit) | ✅ Complete |
+| Performance benchmark suite | ✅ Complete |
+| Test coverage (~87% statement) | 🔶 Target ≥90% stmt, ≥80% branch |
 | Web Worker support | ⬜ Planned |
 | Preset system | ⬜ Planned |
 | Sub-emitters | ⬜ Planned |
+| Force fields / Attractors | ⬜ Planned |
+| GPU instancing | ⬜ Planned |
 
 ---
 
+## Detailed Documentation
+
+Detailed guides are available in `.claude/doc/`:
+
+| Document | Description |
+|----------|-------------|
+| [CI/CD Pipeline](doc/ci-cd.md) | All GitHub Actions workflows, version bump logic, release process, troubleshooting |
+| [Development Workflow](doc/workflow.md) | Step-by-step workflow: implement → test → review agent → pre-commit checks → docs update |
+| [Testing Guide](doc/testing.md) | Testing patterns, mocking Three.js, coverage targets, writing effective tests |
+| [Architecture](doc/architecture.md) | Internal architecture, data flow, shader pipeline, module responsibilities |
+
+## Mandatory Workflow Rules
+
+**These rules MUST be followed for every task:**
+
+1. **Every change needs tests** — No exceptions. Write tests before or alongside implementation.
+2. **Pre-commit checks must pass** — Run `npm run lint`, `npm test`, `npm run build` before every commit. Do NOT commit if any fail.
+3. **Code review agent** — After completing implementation, spawn a review agent to check code quality, type safety, test coverage, performance, and security. Address valid feedback before committing.
+4. **Keep docs up to date** — After every task, update `CLAUDE.md`, `README.md`, `ROADMAP.md` as needed. Outdated docs are worse than no docs.
+5. **Conventional commits** — Always use conventional commit format. Always add `Co-Authored-By: Claude <noreply@anthropic.com>`.
+
+See [Development Workflow](doc/workflow.md) for the full step-by-step guide.
+
 ## Additional Resources
 
-- **Documentation**: `.claude/doc/` folder for additional project documentation
 - **TypeDoc**: Auto-generated at https://newkrok.github.io/three-particles/api/
 - **Editor**: Visual particle editor for testing configurations
 - **Examples**: CodePen examples show real-world usage patterns
