@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Package:** `@newkrok/three-particles` (v2.2.0)
+**Package:** `@newkrok/three-particles` (v2.6.2)
 **Description:** Three.js-based high-performance particle system library designed for creating visually stunning particle effects with ease. Perfect for game developers and 3D applications.
 **Author:** Istvan Krisztian Somoracz
 **License:** MIT
@@ -129,7 +129,7 @@ npm test              # Jest — all tests must pass
 npm run build         # tsc + webpack — must succeed
 ```
 
-### Git Workflow
+### Git Workflow & CI/CD
 - Main branch: `master`
 - Conventional commits enforced via commitlint
 - Husky pre-commit hooks configured
@@ -138,6 +138,21 @@ npm run build         # tsc + webpack — must succeed
   ```
   Co-Authored-By: Claude <noreply@anthropic.com>
   ```
+
+### Automated Release Pipeline
+Pushing/merging to `master` triggers a **fully automated** release:
+1. **CI checks** (`ci.yml`): lint + test + build + circular dependency check (runs on PRs and master pushes)
+2. **Release** (`release.yml`): test → build → auto version bump (based on conventional commits) → npm publish → GitHub Release
+3. **Deploy Pages** (`deploy-pages.yml`): build examples → generate TypeDoc → deploy to GitHub Pages
+4. **Bundle size check** (`bundle-size-check.yml`): enforces 150 KB limit on PRs
+5. **CodeQL analysis** (`codeql-analysis.yml`): security scanning on PRs
+
+**Version bump logic** (from commit messages since last tag):
+- `BREAKING CHANGE` or `!:` → **major** (e.g. 2.6.2 → 3.0.0)
+- `feat:` → **minor** (e.g. 2.6.2 → 2.7.0)
+- `fix:`, `perf:`, `refactor:`, etc. → **patch** (e.g. 2.6.2 → 2.6.3)
+
+**No manual release steps needed** — merge to master and everything is automatic (npm publish, GitHub Release, GitHub Pages update).
 
 ---
 
@@ -239,19 +254,25 @@ npx typedoc               # Generate documentation
 | Core particle system | ✅ Complete |
 | Shape emitters (Sphere, Cone, Circle, Rectangle, Box) | ✅ Complete |
 | Lifetime modifiers (size, opacity, color, rotation, velocity) | ✅ Complete |
-| Noise module | ✅ Complete |
+| Noise module (FBM) | ✅ Complete |
+| Burst emission | ✅ Complete |
+| Rate over distance emission | ✅ Complete |
 | Texture sheet animation | ✅ Complete |
 | World/Local simulation space | ✅ Complete |
 | TypeDoc API documentation | ✅ Complete |
 | Visual editor (three-particles-editor) | ✅ Complete |
-| Test coverage (90% statement, 70% branch) | 🔶 Target ≥90% stmt, ≥80% branch |
 | llms.txt / llms-full.txt | ✅ Complete |
 | Interactive examples page (GitHub Pages) | ✅ Complete |
-| CI/CD auto release | ✅ Complete |
-| Benchmark / performance budget | ✅ Complete |
+| CI/CD auto release (npm publish on master push) | ✅ Complete |
+| PR checks (lint + test + build + bundle size + CodeQL) | ✅ Complete |
+| Bundle size monitoring (150 KB limit) | ✅ Complete |
+| Performance benchmark suite | ✅ Complete |
+| Test coverage (~87% statement) | 🔶 Target ≥90% stmt, ≥80% branch |
 | Web Worker support | ⬜ Planned |
 | Preset system | ⬜ Planned |
 | Sub-emitters | ⬜ Planned |
+| Force fields / Attractors | ⬜ Planned |
+| GPU instancing | ⬜ Planned |
 
 ---
 

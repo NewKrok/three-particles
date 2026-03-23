@@ -15,6 +15,12 @@
 | TypeDoc API documentation | ✅ Complete |
 | Visual editor (three-particles-editor) | ✅ Complete |
 | Test coverage (~87% statement) | 🔶 Target ≥90% |
+| CI/CD auto release (npm publish on master push) | ✅ Complete |
+| PR checks (lint + test + build + bundle size) | ✅ Complete |
+| Bundle size monitoring (150 KB limit) | ✅ Complete |
+| CodeQL security analysis | ✅ Complete |
+| GitHub Pages (examples + TypeDoc) | ✅ Complete |
+| Performance benchmark suite | ✅ Complete |
 
 ---
 
@@ -25,17 +31,18 @@
 - [x] `ROADMAP.md`
 - [x] `CHANGELOG.md`
 - [x] `CONTRIBUTING.md`
-- [ ] Interactive examples page (GitHub Pages)
+- [x] Interactive examples page (GitHub Pages)
 - [ ] README improvements (Getting Started, Performance tips, Troubleshooting)
 
 ### CI/CD Improvements
-- [ ] Automated release workflow (version bump + npm publish on tag)
-- [ ] PR checks: lint + test + build on all PRs
-- [ ] Bundle size monitoring with limits
+- [x] Automated release workflow (version bump + npm publish on master push)
+- [x] PR checks: lint + test + build on all PRs
+- [x] Bundle size monitoring with limits (150 KB)
+- [x] CodeQL security analysis on PRs
 
 ### Code Quality
 - [ ] Test coverage ≥90% statement, ≥80% branch
-- [ ] Benchmark suite for performance regression detection
+- [x] Benchmark suite for performance regression detection
 
 ---
 
