@@ -188,6 +188,31 @@
     }
     .bench-metric-tab:hover { border-color: #4fc3f7; color: #ccc; }
     .bench-metric-tab.active { border-color: #4fc3f7; color: #4fc3f7; background: #1a1a2e; }
+
+    /* Error overlay */
+    .error-overlay {
+      display: none; position: fixed; bottom: 0; left: 0; right: 0;
+      max-height: 40vh; overflow-y: auto; z-index: 10000;
+      background: #1a0000; border-top: 2px solid #ef5350;
+      font-family: monospace; font-size: 0.82rem; color: #ffcdd2;
+    }
+    .error-overlay.visible { display: block; }
+    .error-header {
+      position: sticky; top: 0; background: #2c0b0b;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px; border-bottom: 1px solid #4e1a1a;
+    }
+    .error-header span { font-weight: bold; color: #ef5350; }
+    .error-header-btns { display: flex; gap: 8px; }
+    .error-header-btns button {
+      background: none; border: 1px solid #ef5350; color: #ef5350;
+      padding: 3px 10px; border-radius: 4px; font-size: 0.78rem;
+      cursor: pointer; font-family: inherit;
+    }
+    .error-header-btns button:hover { background: #ef5350; color: #fff; }
+    .error-list { padding: 10px 14px; }
+    .error-entry { padding: 6px 0; border-bottom: 1px solid #3a1111; white-space: pre-wrap; word-break: break-all; }
+    .error-entry:last-child { border-bottom: none; }
   </style>
 </head>
 <body>
@@ -240,6 +265,67 @@
   </div>
 
   <div class="grid" id="examples-grid"></div>
+
+  <!-- Error overlay for mobile debugging -->
+  <div class="error-overlay" id="error-overlay">
+    <div class="error-header">
+      <span id="error-count">0 error(s)</span>
+      <div class="error-header-btns">
+        <button id="error-copy-btn">Copy errors</button>
+        <button id="error-close-btn">Close</button>
+      </div>
+    </div>
+    <div class="error-list" id="error-list"></div>
+  </div>
+  <script>
+  (function(){
+    var overlay = document.getElementById('error-overlay');
+    var list = document.getElementById('error-list');
+    var countEl = document.getElementById('error-count');
+    var errors = [];
+
+    function addError(msg) {
+      errors.push(msg);
+      var entry = document.createElement('div');
+      entry.className = 'error-entry';
+      entry.textContent = msg;
+      list.appendChild(entry);
+      countEl.textContent = errors.length + ' error(s)';
+      overlay.classList.add('visible');
+    }
+
+    window.addEventListener('error', function(e) {
+      var msg = (e.message || 'Unknown error');
+      if (e.filename) msg += '\n  at ' + e.filename + ':' + e.lineno + ':' + e.colno;
+      if (e.error && e.error.stack) msg += '\n' + e.error.stack;
+      addError(msg);
+    });
+
+    window.addEventListener('unhandledrejection', function(e) {
+      var msg = 'Unhandled Promise Rejection: ';
+      if (e.reason instanceof Error) {
+        msg += e.reason.message;
+        if (e.reason.stack) msg += '\n' + e.reason.stack;
+      } else {
+        msg += String(e.reason);
+      }
+      addError(msg);
+    });
+
+    document.getElementById('error-copy-btn').addEventListener('click', function() {
+      var text = errors.join('\n\n---\n\n');
+      navigator.clipboard.writeText(text).then(function() {
+        var btn = document.getElementById('error-copy-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(function(){ btn.textContent = 'Copy errors'; }, 1500);
+      });
+    });
+
+    document.getElementById('error-close-btn').addEventListener('click', function() {
+      overlay.classList.remove('visible');
+    });
+  })();
+  </script>
 
   <script type="importmap">
   {
