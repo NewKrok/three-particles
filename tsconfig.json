@@ -14,9 +14,9 @@
     "baseUrl": "./",
     "paths": {
       "@newkrok/three-particles": ["./src/index.ts"]
-    }
+    },
+    "sourceMap": true
   },
-  "sourceMap": true,
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/__tests__"]
 }
