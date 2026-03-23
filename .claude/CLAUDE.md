@@ -276,9 +276,31 @@ npx typedoc               # Generate documentation
 
 ---
 
+## Detailed Documentation
+
+Detailed guides are available in `.claude/doc/`:
+
+| Document | Description |
+|----------|-------------|
+| [CI/CD Pipeline](doc/ci-cd.md) | All GitHub Actions workflows, version bump logic, release process, troubleshooting |
+| [Development Workflow](doc/workflow.md) | Step-by-step workflow: implement → test → review agent → pre-commit checks → docs update |
+| [Testing Guide](doc/testing.md) | Testing patterns, mocking Three.js, coverage targets, writing effective tests |
+| [Architecture](doc/architecture.md) | Internal architecture, data flow, shader pipeline, module responsibilities |
+
+## Mandatory Workflow Rules
+
+**These rules MUST be followed for every task:**
+
+1. **Every change needs tests** — No exceptions. Write tests before or alongside implementation.
+2. **Pre-commit checks must pass** — Run `npm run lint`, `npm test`, `npm run build` before every commit. Do NOT commit if any fail.
+3. **Code review agent** — After completing implementation, spawn a review agent to check code quality, type safety, test coverage, performance, and security. Address valid feedback before committing.
+4. **Keep docs up to date** — After every task, update `CLAUDE.md`, `README.md`, `ROADMAP.md` as needed. Outdated docs are worse than no docs.
+5. **Conventional commits** — Always use conventional commit format. Always add `Co-Authored-By: Claude <noreply@anthropic.com>`.
+
+See [Development Workflow](doc/workflow.md) for the full step-by-step guide.
+
 ## Additional Resources
 
-- **Documentation**: `.claude/doc/` folder for additional project documentation
 - **TypeDoc**: Auto-generated at https://newkrok.github.io/three-particles/api/
 - **Editor**: Visual particle editor for testing configurations
 - **Examples**: CodePen examples show real-world usage patterns
