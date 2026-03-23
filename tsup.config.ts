@@ -1,5 +1,12 @@
 import { defineConfig } from 'tsup';
 
+const sharedExternal = [
+  'three',
+  '@newkrok/three-utils',
+  'easing-functions',
+  'three-noise',
+];
+
 export default defineConfig([
   // ESM output (main library)
   {
@@ -9,7 +16,7 @@ export default defineConfig([
     sourcemap: true,
     clean: true,
     outDir: 'dist',
-    external: ['three'],
+    external: sharedExternal,
     treeshake: true,
   },
   // Minified browser bundle
@@ -20,10 +27,12 @@ export default defineConfig([
     outExtension: () => ({ js: '.js' }),
     sourcemap: true,
     minify: 'terser',
-    external: ['three'],
+    external: sharedExternal,
     treeshake: true,
-    esbuildOptions(options) {
-      options.drop = ['console'];
+    terserOptions: {
+      compress: {
+        drop_console: true,
+      },
     },
   },
 ]);
