@@ -6,6 +6,7 @@ import {
   LifeTimeCurve,
   Shape,
   SimulationSpace,
+  SubEmitterTrigger,
   TimeMode,
 } from './three-particles-enums.js';
 
@@ -619,6 +620,42 @@ export type VelocityOverLifetime = {
 };
 
 /**
+ * Configuration for a sub-emitter that spawns child particle systems
+ * based on parent particle lifecycle events.
+ *
+ * @example
+ * ```typescript
+ * const subEmitter: SubEmitterConfig = {
+ *   trigger: SubEmitterTrigger.DEATH,
+ *   config: { startLifeTime: 0.5, startSpeed: 2, emission: { rateOverTime: 20 } },
+ *   inheritVelocity: 0.5,
+ *   maxInstances: 16,
+ * };
+ * ```
+ */
+export type SubEmitterConfig = {
+  /** The particle system configuration used when spawning the sub-emitter. */
+  config: ParticleSystemConfig;
+  /**
+   * When to trigger the sub-emitter.
+   * @default SubEmitterTrigger.DEATH
+   */
+  trigger?: SubEmitterTrigger;
+  /**
+   * Multiplier (0–1) for inheriting the parent particle's velocity.
+   * 0 = no inheritance, 1 = full velocity inheritance.
+   * @default 0
+   */
+  inheritVelocity?: number;
+  /**
+   * Maximum number of concurrent sub-emitter instances for this configuration.
+   * Older completed instances are cleaned up to make room for new ones.
+   * @default 32
+   */
+  maxInstances?: number;
+};
+
+/**
  * Configuration object for the particle system.
  * Defines all aspects of the particle system, including its appearance, behavior, and runtime events.
  */
@@ -1128,6 +1165,23 @@ export type ParticleSystemConfig = {
   textureSheetAnimation?: TextureSheetAnimation;
 
   /**
+   * Sub-emitters that spawn child particle systems on particle lifecycle events.
+   * Each sub-emitter is triggered when a particle is born or dies, creating a new
+   * particle system at the parent particle's position.
+   *
+   * @example
+   * ```typescript
+   * subEmitters: [
+   *   {
+   *     trigger: SubEmitterTrigger.DEATH,
+   *     config: { startLifeTime: 0.5, startSpeed: 1, emission: { rateOverTime: 10 } },
+   *   },
+   * ]
+   * ```
+   */
+  subEmitters?: Array<SubEmitterConfig>;
+
+  /**
    * Called on every update frame with particle system data.
    */
   onUpdate?: (data: {
@@ -1228,6 +1282,20 @@ export type ParticleSystemInstance = {
     activationTime: number;
     position: Required<Point3D>;
   }) => void;
+  /** Called when a particle dies to trigger death sub-emitters */
+  onParticleDeath?: (
+    particleIndex: number,
+    positionArr: THREE.TypedArray,
+    velocity: THREE.Vector3,
+    now: number
+  ) => void;
+  /** Called when a particle is born to trigger birth sub-emitters */
+  onParticleBirth?: (
+    particleIndex: number,
+    positionArr: THREE.TypedArray,
+    velocity: THREE.Vector3,
+    now: number
+  ) => void;
 };
 
 /**

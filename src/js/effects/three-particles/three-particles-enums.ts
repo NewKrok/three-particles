@@ -125,3 +125,22 @@ export const enum LifeTimeCurve {
    */
   EASING = 'EASING',
 }
+
+/**
+ * Defines when a sub-emitter is triggered relative to a particle's lifecycle.
+ *
+ * @enum {string}
+ */
+export const enum SubEmitterTrigger {
+  /**
+   * Trigger the sub-emitter when a particle is born (activated).
+   * Useful for trail effects that start immediately with each particle.
+   */
+  BIRTH = 'BIRTH',
+
+  /**
+   * Trigger the sub-emitter when a particle dies (reaches end of lifetime).
+   * Useful for cascading effects like explosions spawning smoke.
+   */
+  DEATH = 'DEATH',
+}
