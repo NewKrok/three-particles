@@ -1,8 +1,5 @@
 import * as THREE from 'three';
-import {
-  Shape,
-  LifeTimeCurve,
-} from '../js/effects/three-particles/three-particles-enums.js';
+import { LifeTimeCurve } from '../js/effects/three-particles/three-particles-enums.js';
 import { createParticleSystem } from '../js/effects/three-particles/three-particles.js';
 import { ParticleSystem } from '../js/effects/three-particles/types.js';
 

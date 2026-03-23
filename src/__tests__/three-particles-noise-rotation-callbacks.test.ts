@@ -262,8 +262,7 @@ describe('Rotation Over Lifetime', () => {
         break;
       }
     }
-    // Rotation gets set during activation and then modified over lifetime
-    expect(ps.instance).toBeDefined();
+    expect(hasRotation).toBe(true);
 
     ps.dispose();
   });
@@ -558,20 +557,16 @@ describe('onUpdate callback', () => {
     ps.dispose();
   });
 
-  it('should not call onUpdate when system is paused', () => {
+  it('should not call onUpdate when emitter is paused', () => {
     const onUpdate = jest.fn();
     const { ps, step } = createTestSystem({ onUpdate });
 
     ps.pauseEmitter();
     step(100);
 
-    // onUpdate is still called even when paused (it's about the system being within duration)
-    // The emission is paused but the update loop still runs
-    // Actually, let's check - pauseEmitter only sets isEnabled to false
-    // The onUpdate callback is inside the isEnabled && (looping || lifetime < duration) block
-    // Wait - no. isEnabled is checked for emission, but onUpdate is also inside that block
-    // Let's just verify the system works
-    expect(ps.instance).toBeDefined();
+    // onUpdate is inside the isEnabled && (looping || lifetime < duration) block
+    // When paused (isEnabled=false), onUpdate should not be called
+    expect(onUpdate).not.toHaveBeenCalled();
 
     ps.dispose();
   });
@@ -633,16 +628,9 @@ describe('onComplete callback', () => {
     ps.dispose();
   });
 
-  it('should not call both onUpdate and onComplete in the same frame', () => {
-    let updateCalled = false;
-    let completeCalled = false;
-
-    const onUpdate = jest.fn(() => {
-      updateCalled = true;
-    });
-    const onComplete = jest.fn(() => {
-      completeCalled = true;
-    });
+  it('should not call both onUpdate and onComplete in same frame', () => {
+    const onUpdate = jest.fn();
+    const onComplete = jest.fn();
 
     const { ps, step } = createTestSystem({
       onUpdate,
@@ -651,12 +639,18 @@ describe('onComplete callback', () => {
       looping: false,
     });
 
-    // After duration expires, onComplete should be called instead of onUpdate
-    step(200);
+    // During active emission, only onUpdate is called
+    step(10);
+    expect(onUpdate).toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
 
-    // At this point, one of them should be called but not both in the same frame
-    // (they are in if/else branches)
-    expect(ps.instance).toBeDefined();
+    onUpdate.mockClear();
+
+    // After duration expires, onComplete should be called
+    step(200);
+    expect(onComplete).toHaveBeenCalled();
+    // onUpdate should not be called in the same frame as onComplete
+    expect(onUpdate).not.toHaveBeenCalled();
 
     ps.dispose();
   });

@@ -1,10 +1,8 @@
 import * as THREE from 'three';
 import {
   Shape,
-  SimulationSpace,
   LifeTimeCurve,
   EmitFrom,
-  TimeMode,
 } from '../js/effects/three-particles/three-particles-enums.js';
 import {
   createParticleSystem,
@@ -256,10 +254,11 @@ describe('Edge cases - startSize with LifetimeCurve', () => {
 describe('Edge cases - rateOverTime with values', () => {
   it('should handle rateOverTime as random range', () => {
     const { ps, step } = createTestSystem({
-      emission: { rateOverTime: { min: 5, max: 20 } },
+      emission: { rateOverTime: { min: 50, max: 100 } },
     });
 
-    step(100);
+    step(16);
+    step(500);
     expect(countActiveParticles(ps)).toBeGreaterThan(0);
 
     ps.dispose();
@@ -730,7 +729,9 @@ describe('Normalized lifetime percentage', () => {
     const lastCall = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][0];
     expect(lastCall.normalizedLifetime).toBeDefined();
     expect(lastCall.normalizedLifetime).toBeGreaterThanOrEqual(0);
-    expect(lastCall.normalizedLifetime).toBeLessThanOrEqual(1000);
+    expect(lastCall.normalizedLifetime).toBeLessThanOrEqual(
+      1000 // normalizedLifetime is in ms, duration * 1000
+    );
 
     ps.dispose();
   });

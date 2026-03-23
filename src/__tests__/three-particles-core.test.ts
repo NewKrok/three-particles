@@ -707,15 +707,19 @@ describe('Gravity', () => {
 
     // Particles should have moved due to gravity
     const attrs = getAttributes(ps);
-    let hasMoved = false;
+    let positionChanged = false;
     for (let i = 0; i < attrs.isActive.array.length; i++) {
       if (attrs.isActive.array[i]) {
-        // Position should have changed from initial due to gravity
-        hasMoved = true;
-        break;
+        const posIndex = i * 3;
+        const y = attrs.position.array[posIndex + 1];
+        // With negative gravity the particle should move in y direction
+        if (y !== 0) {
+          positionChanged = true;
+          break;
+        }
       }
     }
-    expect(hasMoved).toBe(true);
+    expect(positionChanged).toBe(true);
 
     ps.dispose();
   });
