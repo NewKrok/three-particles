@@ -111,6 +111,23 @@
         config.renderer.blending = resolveBlending(config.renderer.blending);
       }
       if (tex) config.map = tex;
+      if (config.subEmitters) {
+        for (const sub of config.subEmitters) {
+          if (sub.config?.renderer?.blending) {
+            sub.config.renderer.blending = resolveBlending(sub.config.renderer.blending);
+          }
+          if (sub.textureId && TEXTURE_MAP[sub.textureId]) {
+            try {
+              const subTex = await loadTextureAsync(TEXTURE_MAP[sub.textureId]);
+              subTex.flipY = false;
+              sub.config.map = subTex;
+            } catch (e) {
+              console.warn(`Sub-emitter texture load failed for ${sub.textureId}`, e);
+            }
+            delete sub.textureId;
+          }
+        }
+      }
 
       // Create renderer + scene
       const renderer = new THREE.WebGLRenderer({
