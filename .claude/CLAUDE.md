@@ -104,20 +104,19 @@ npm run test:watch    # Run tests in watch mode
 ```
 
 ### Build Process
-- TypeScript compilation to `dist/`
-- Webpack bundling for browser distribution
-- Generates both ES modules and minified bundles
+- **tsup** (esbuild-based) for fast, single-command builds
+- Generates ESM bundle, minified browser bundle with source maps, and declaration files
 - Declaration files (.d.ts) included
 
 **Build command:**
 ```bash
-npm run build         # Clean dist/ + TypeScript compile + Webpack bundle
+npm run build         # tsup — ESM + minified + DTS in one step
 ```
 
 **Output:**
-- `dist/index.js` - Main ES module
+- `dist/index.js` - Main ES module (with source map)
 - `dist/index.d.ts` - TypeScript declarations
-- `dist/three-particles.min.js` - Minified browser bundle
+- `dist/three-particles.min.js` - Minified browser bundle (with source map)
 
 ### Pre-Push Checklist
 
@@ -126,7 +125,7 @@ Before pushing any changes, **all** of these must pass:
 ```bash
 npm run lint          # ESLint — must pass
 npm test              # Jest — all tests must pass
-npm run build         # tsc + webpack — must succeed
+npm run build         # tsup — must succeed
 ```
 
 ### Git Workflow & CI/CD
@@ -169,7 +168,8 @@ Pushing/merging to `master` triggers a **fully automated** release:
 - Jest 30.2.0 (testing)
 - ESLint 9.18.0 (linting)
 - Prettier 3.4.2 (formatting)
-- Webpack 5.97.1 (bundling)
+- tsup 8.x / esbuild (bundling)
+- Webpack 5.x (examples/docs build only)
 - Husky 9.1.7 (git hooks)
 - Commitlint (commit message validation)
 - Madge (circular dependency detection)
@@ -322,5 +322,5 @@ When working on specific features, refer to these files:
 | Utilities | `src/js/effects/three-particles/three-particles-utils.ts` |
 | Shaders | `src/js/effects/three-particles/shaders/*.glsl.ts` |
 | Tests | `src/__tests__/*.test.ts` |
-| Build config | `webpack.config.js`, `tsconfig.json` |
+| Build config | `tsup.config.ts`, `tsconfig.json` |
 | Package info | `package.json` |

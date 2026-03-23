@@ -59,9 +59,9 @@
 - Versioned config format for forward compatibility
 
 ### Build Modernization
-- Evaluate tsup for faster, simpler builds (ESM + CJS + DTS)
-- Tree-shaking improvements
-- Source maps for minified bundles
+- [x] Migrated from tsc + webpack to tsup (esbuild-based)
+- [x] Tree-shaking via esbuild
+- [x] Source maps for minified bundles
 
 ---
 
