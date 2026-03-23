@@ -3,6 +3,7 @@ const CDN_BASE =
 const BUNDLE_PATH = "/dist/three-particles.min.js";
 const NPM_API =
   "https://registry.npmjs.org/@newkrok/three-particles";
+const LOCAL_VERSION = "local";
 const MAX_VERSIONS = 10;
 const VERSION_KEY = "three-particles-version";
 
@@ -34,19 +35,23 @@ async function fetchVersions() {
   return all.slice(0, MAX_VERSIONS);
 }
 
-/** Build the CDN URL for a given version. */
+/** Build the CDN URL for a given version, or the local bundle path. */
 export function cdnUrl(version) {
+  if (version === LOCAL_VERSION) return "./three-particles.esm.js";
   return `${CDN_BASE}${version}${BUNDLE_PATH}`;
 }
 
 /**
  * Return the version to load: URL param > sessionStorage > latest.
+ * Accepts "local" as a special value to load the local build.
  */
 export function getSelectedVersion(versions) {
   const params = new URLSearchParams(window.location.search);
   const fromUrl = params.get("v");
+  if (fromUrl === LOCAL_VERSION) return LOCAL_VERSION;
   if (fromUrl && versions.includes(fromUrl)) return fromUrl;
   const stored = sessionStorage.getItem(VERSION_KEY);
+  if (stored === LOCAL_VERSION) return LOCAL_VERSION;
   if (stored && versions.includes(stored)) return stored;
   return versions[0];
 }
@@ -68,12 +73,13 @@ export async function initVersionSwitcher() {
     return null;
   }
 
+  const allVersions = [LOCAL_VERSION, ...versions];
   const current = getSelectedVersion(versions);
 
-  select.innerHTML = versions
+  select.innerHTML = allVersions
     .map(
       (v) =>
-        `<option value="${v}"${v === current ? " selected" : ""}>${v}${v === versions[0] ? " (latest)" : ""}</option>`
+        `<option value="${v}"${v === current ? " selected" : ""}>${v === LOCAL_VERSION ? "local (dev)" : v}${v === versions[0] ? " (latest)" : ""}</option>`
     )
     .join("");
   select.disabled = false;

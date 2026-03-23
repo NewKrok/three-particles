@@ -1213,8 +1213,12 @@ export const createParticleSystem = (
     }
     destroyParticleSystem(particleSystem);
   };
-  const update = (cycleData: CycleData) =>
+  const update = (cycleData: CycleData) => {
     updateParticleSystemInstance(instanceData, cycleData);
+    for (const instances of subEmitterInstancesMap.values()) {
+      for (const sub of instances) sub.update(cycleData);
+    }
+  };
 
   return {
     instance: wrapper || particleSystem,

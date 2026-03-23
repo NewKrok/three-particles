@@ -279,6 +279,51 @@ describe('Sub-emitters', () => {
     });
   });
 
+  describe('update propagation', () => {
+    it('should update sub-emitter particles when using instance update()', () => {
+      const scene = new THREE.Group();
+
+      const { ps, step } = createTestSystem({
+        subEmitters: [
+          {
+            trigger: SubEmitterTrigger.DEATH,
+            config: {
+              ...subEmitterConfig,
+              startLifetime: 2,
+              emission: { rateOverTime: 50, rateOverDistance: 0 },
+            },
+          },
+        ],
+      });
+
+      scene.add(ps.instance);
+
+      emitAndWaitForDeath(step);
+
+      // Sub-emitters should exist
+      expect(scene.children.length).toBeGreaterThan(1);
+
+      // Step forward a bit so sub-emitter particles have time to emit
+      step(600, 100);
+      step(700, 100);
+
+      // Check that at least one sub-emitter has active particles
+      let totalSubActive = 0;
+      for (let i = 1; i < scene.children.length; i++) {
+        const child = scene.children[i] as THREE.Points;
+        const isActiveArr = child.geometry?.attributes?.isActive?.array;
+        if (isActiveArr) {
+          for (let j = 0; j < isActiveArr.length; j++) {
+            if (isActiveArr[j]) totalSubActive++;
+          }
+        }
+      }
+      expect(totalSubActive).toBeGreaterThan(0);
+
+      ps.dispose();
+    });
+  });
+
   describe('sub-emitter lifecycle', () => {
     it('sub-emitters should be created as non-looping', () => {
       const scene = new THREE.Group();
