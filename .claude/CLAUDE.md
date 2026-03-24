@@ -202,6 +202,12 @@ Pushing/merging to `master` triggers a **fully automated** release:
 3. Implement shape logic in `three-particles.ts`
 4. Add tests
 
+### Adding Examples / Demos
+- Examples are defined in `examples/examples-data.js` as an array of config objects
+- **New examples must always be added at the beginning of the array** (newest first) so they appear first on the examples page
+- Each example needs: `id`, `title`, `description`, `tags`, `textureId`, and `config`
+- Optional: `previewTime` for non-looping or delayed effects
+
 ---
 
 ## Useful Commands
@@ -271,7 +277,7 @@ npx typedoc               # Generate documentation
 | Web Worker support | ⬜ Planned |
 | Preset system | ⬜ Planned |
 | Sub-emitters | ✅ Complete |
-| Force fields / Attractors | ⬜ Planned |
+| Force fields / Attractors | ✅ Complete |
 | GPU instancing | ⬜ Planned |
 
 ---

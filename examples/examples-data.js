@@ -1,6 +1,31 @@
 
 export const examples = [
   {
+    id: "shield",
+    title: "Shield",
+    description: "Energy shield using a repulsive force field to confine particles on a spherical shell.",
+    tags: ["force-field", "advanced"],
+    textureId: "STARBURST",
+    config: {"duration":5,"looping":true,"startLifetime":{"min":1.5,"max":3.0},"startSpeed":{"min":0.05,"max":0.15},"startSize":{"min":3,"max":8},"startOpacity":{"min":0.6,"max":0.9},"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":0.2,"g":0.6,"b":1.0},"max":{"r":0.4,"g":0.8,"b":1.0}},"maxParticles":200,"emission":{"rateOverTime":80},"shape":{"shape":"SPHERE","sphere":{"radius":2.0,"radiusThickness":0.05,"arc":360}},"renderer":{"blending":"THREE.AdditiveBlending","discardBackgroundColor":true,"backgroundColorTolerance":0.2,"backgroundColor":{"r":0,"g":0,"b":0}},"forceFields":[{"type":"POINT","position":{"x":0,"y":0,"z":0},"strength":-3.0,"range":2.5,"falloff":"QUADRATIC"}],"velocityOverLifetime":{"isActive":true,"orbital":{"y":{"min":0.3,"max":0.8}}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.2,"y":1},{"x":0.8,"y":1,"percentage":0.8},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.1,"y":0.8},{"x":0.7,"y":0.9,"percentage":0.7},{"x":1,"y":0,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.1,"frequency":0.3,"positionAmount":0.08,"rotationAmount":1.0}},
+  },
+  {
+    id: "fireworks-v2",
+    title: "Fireworks v2",
+    description: "Burst explosion with attractor pulling particles back toward center.",
+    tags: ["force-field", "burst", "advanced"],
+    textureId: "STARBURST",
+    previewTime: 1.5,
+    config: {"duration":3,"looping":true,"startLifetime":{"min":1.5,"max":2.5},"startSpeed":{"min":3.0,"max":5.0},"startSize":{"min":2,"max":6},"startOpacity":1.0,"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":1.0,"g":0.4,"b":0.1},"max":{"r":1.0,"g":0.9,"b":0.3}},"maxParticles":150,"emission":{"rateOverTime":0,"bursts":[{"time":0,"count":{"min":80,"max":120},"cycles":1,"probability":1}]},"shape":{"shape":"SPHERE","sphere":{"radius":0.1,"radiusThickness":1.0,"arc":360}},"renderer":{"blending":"THREE.AdditiveBlending","discardBackgroundColor":true,"backgroundColorTolerance":0.2,"backgroundColor":{"r":0,"g":0,"b":0}},"forceFields":[{"type":"POINT","position":{"x":0,"y":0,"z":0},"strength":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.3,"y":0.2},{"x":0.5,"y":2.0,"percentage":0.5},{"x":0.8,"y":5.0},{"x":1,"y":8.0,"percentage":1}],"scale":1},"range":20,"falloff":"NONE"}],"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.8},{"x":1,"y":0.3,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.9,"percentage":0},{"x":0.3,"y":0.5},{"x":1,"y":0.1,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.5,"y":0.6},{"x":1,"y":1.0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.7,"y":0.9},{"x":0.9,"y":0.3},{"x":1,"y":0,"percentage":1}]}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.5,"percentage":0},{"x":0.2,"y":1.0},{"x":0.8,"y":0.8,"percentage":0.8},{"x":1,"y":0.2,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-180,"max":180}},
+  },
+  {
+    id: "magnetic-field",
+    title: "Magnetic Field",
+    description: "Two poles (attract + repel) with particles tracing field lines between them.",
+    tags: ["force-field", "advanced"],
+    textureId: "SOFT_SMOKE",
+    config: {"duration":5,"looping":true,"startLifetime":{"min":2.0,"max":4.0},"startSpeed":{"min":0.5,"max":1.5},"startSize":{"min":2,"max":5},"startOpacity":{"min":0.7,"max":1.0},"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":0.3,"g":0.7,"b":1.0},"max":{"r":0.8,"g":0.3,"b":1.0}},"gravity":0,"maxParticles":250,"emission":{"rateOverTime":60},"shape":{"shape":"SPHERE","sphere":{"radius":0.3,"radiusThickness":1.0,"arc":360}},"transform":{"position":{"y":-3}},"renderer":{"blending":"THREE.AdditiveBlending","discardBackgroundColor":true,"backgroundColorTolerance":0.2,"backgroundColor":{"r":0,"g":0,"b":0}},"forceFields":[{"type":"POINT","position":{"x":0,"y":6,"z":0},"strength":4.0,"range":8,"falloff":"QUADRATIC"},{"type":"POINT","position":{"x":0,"y":-3,"z":0},"strength":-2.5,"range":4,"falloff":"LINEAR"},{"type":"DIRECTIONAL","direction":{"x":0,"y":0.3,"z":0},"strength":0.5}],"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.15,"y":0.8},{"x":0.5,"y":1,"percentage":0.5},{"x":0.85,"y":0.8},{"x":1,"y":0.2,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.2,"percentage":0},{"x":0.1,"y":0.9},{"x":0.5,"y":1,"percentage":0.5},{"x":0.9,"y":0.6},{"x":1,"y":0,"percentage":1}]}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.5,"y":0.8,"percentage":0.5},{"x":1,"y":1.0,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.7,"percentage":0},{"x":0.5,"y":0.4,"percentage":0.5},{"x":1,"y":0.2,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":1.0,"percentage":0},{"x":0.5,"y":0.6,"percentage":0.5},{"x":1,"y":0.8,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-45,"max":45},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.15,"frequency":0.3,"positionAmount":0.2,"rotationAmount":1.5}},
+  },
+  {
     id: "explosion-with-smoke",
     title: "Explosion with Smoke",
     description: "Fiery sparks burst outward, spawning smoke puffs on death via sub-emitters.",

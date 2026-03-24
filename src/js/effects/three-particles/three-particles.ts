@@ -7,12 +7,15 @@ import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.
 import { removeBezierCurveFunction } from './three-particles-bezier.js';
 import {
   EmitFrom,
+  ForceFieldFalloff,
+  ForceFieldType,
   LifeTimeCurve,
   Shape,
   SimulationSpace,
   SubEmitterTrigger,
   TimeMode,
 } from './three-particles-enums';
+import { applyForceFields } from './three-particles-forces.js';
 import { applyModifiers } from './three-particles-modifiers.js';
 import {
   calculateRandomPositionAndVelocityOnBox,
@@ -29,8 +32,10 @@ import {
 import {
   Constant,
   CycleData,
+  ForceFieldConfig,
   GeneralData,
   LifetimeCurve,
+  NormalizedForceFieldConfig,
   NormalizedParticleSystemConfig,
   ParticleSystem,
   ParticleSystemConfig,
@@ -253,6 +258,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
     fps: 30.0,
     startFrame: 0,
   },
+  forceFields: [],
 };
 
 const createFloat32Attributes = ({
@@ -492,7 +498,20 @@ export const createParticleSystem = (
     onComplete,
     textureSheetAnimation,
     subEmitters,
+    forceFields: rawForceFields,
   } = normalizedConfig;
+
+  const normalizedForceFields: Array<NormalizedForceFieldConfig> = (
+    rawForceFields ?? []
+  ).map((ff: ForceFieldConfig) => ({
+    isActive: ff.isActive ?? true,
+    type: ff.type ?? ForceFieldType.POINT,
+    position: ff.position ?? new THREE.Vector3(0, 0, 0),
+    direction: (ff.direction ?? new THREE.Vector3(0, 1, 0)).clone().normalize(),
+    strength: ff.strength ?? 1,
+    range: Math.max(0, ff.range ?? Infinity),
+    falloff: ff.falloff ?? ForceFieldFalloff.LINEAR,
+  }));
 
   if (typeof renderer?.blending === 'string')
     renderer.blending = blendingMap[renderer.blending];
@@ -1195,6 +1214,7 @@ export const createParticleSystem = (
     looping,
     simulationSpace,
     gravity,
+    normalizedForceFields,
     emission,
     normalizedConfig,
     iterationCount: 0,
@@ -1329,9 +1349,12 @@ const updateParticleSystemInstance = (
     activateParticle,
     simulationSpace,
     gravity,
+    normalizedForceFields,
     onParticleDeath,
     onParticleBirth,
   } = props;
+
+  const hasForceFields = normalizedForceFields.length > 0;
 
   const lifetime = now - creationTime;
   const normalizedLifetime = lifetime % (duration * 1000);
@@ -1416,6 +1439,18 @@ const updateParticleSystemInstance = (
         velocity.x -= gravityVelocity.x * delta;
         velocity.y -= gravityVelocity.y * delta;
         velocity.z -= gravityVelocity.z * delta;
+
+        if (hasForceFields) {
+          applyForceFields({
+            particleSystemId: generalData.particleSystemId,
+            forceFields: normalizedForceFields,
+            velocity,
+            positionArr,
+            positionIndex: index * 3,
+            delta,
+            systemLifetimePercentage: generalData.normalizedLifetimePercentage,
+          });
+        }
 
         if (
           gravity !== 0 ||

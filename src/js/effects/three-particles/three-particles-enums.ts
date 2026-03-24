@@ -144,3 +144,47 @@ export const enum SubEmitterTrigger {
    */
   DEATH = 'DEATH',
 }
+
+/**
+ * Defines the type of force field that affects particles.
+ *
+ * @enum {string}
+ */
+export const enum ForceFieldType {
+  /**
+   * Attract or repel particles toward/from a point in space.
+   * Positive strength attracts, negative strength repels.
+   * Configure with position, strength, range, and falloff.
+   */
+  POINT = 'POINT',
+
+  /**
+   * Apply a constant directional force to all particles (like wind).
+   * Configure with direction and strength.
+   */
+  DIRECTIONAL = 'DIRECTIONAL',
+}
+
+/**
+ * Defines how force diminishes with distance from a POINT force field center.
+ * Only applicable to {@link ForceFieldType.POINT} force fields.
+ *
+ * @enum {string}
+ */
+export const enum ForceFieldFalloff {
+  /**
+   * No falloff — force is constant within range.
+   */
+  NONE = 'NONE',
+
+  /**
+   * Force decreases linearly with distance: `1 - d/range`.
+   */
+  LINEAR = 'LINEAR',
+
+  /**
+   * Force decreases with the square of distance: `1 - (d/range)²`.
+   * More physically realistic than linear falloff.
+   */
+  QUADRATIC = 'QUADRATIC',
+}

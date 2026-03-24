@@ -4,12 +4,17 @@ import {
   curveFunctionIdMap,
   getCurveFunction,
 } from './three-particles-curves.js';
-import { LifeTimeCurve } from './three-particles-enums.js';
+import {
+  ForceFieldFalloff,
+  ForceFieldType,
+  LifeTimeCurve,
+} from './three-particles-enums.js';
 import { blendingMap } from './three-particles.js';
 import type {
   BezierCurve,
   CurveFunction,
   EasingCurve,
+  ForceFieldConfig,
   LifetimeCurve,
   ParticleSystemConfig,
 } from './types.js';
@@ -341,6 +346,27 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
       ...(se as ParticleSystemConfig['subEmitters'][number]),
       config: deserializeConfig(se['config'] as RawObject),
     }));
+  }
+
+  // forceFields — array of ForceFieldConfig objects
+  if (Array.isArray(raw['forceFields'])) {
+    config.forceFields = (raw['forceFields'] as RawObject[]).map((ff) => {
+      const result: ForceFieldConfig = {};
+      if ('isActive' in ff) result.isActive = ff['isActive'] as boolean;
+      if ('type' in ff) result.type = ff['type'] as ForceFieldType;
+      if (ff['position']) result.position = deserializeVector3(ff['position']);
+      if (ff['direction'])
+        result.direction = deserializeVector3(ff['direction']);
+      if ('strength' in ff)
+        result.strength = deserializeCurveOrValue(
+          ff['strength']
+        ) as ForceFieldConfig['strength'];
+      if ('range' in ff)
+        result.range =
+          ff['range'] === null ? Infinity : (ff['range'] as number);
+      if ('falloff' in ff) result.falloff = ff['falloff'] as ForceFieldFalloff;
+      return result;
+    });
   }
 
   // _editorData and any other unknown fields — preserve as-is

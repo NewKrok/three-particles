@@ -3,6 +3,8 @@ import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 import {
   EmitFrom,
+  ForceFieldFalloff,
+  ForceFieldType,
   LifeTimeCurve,
   Shape,
   SimulationSpace,
@@ -656,6 +658,80 @@ export type SubEmitterConfig = {
 };
 
 /**
+ * Configuration for a force field that affects particle velocities.
+ * Force fields can attract, repel, or push particles in a direction.
+ *
+ * @example
+ * ```typescript
+ * // Point attractor at origin
+ * const attractor: ForceFieldConfig = {
+ *   type: ForceFieldType.POINT,
+ *   position: new THREE.Vector3(0, 0, 0),
+ *   strength: 5.0,
+ *   range: 10,
+ *   falloff: ForceFieldFalloff.QUADRATIC,
+ * };
+ *
+ * // Repulsion shield
+ * const shield: ForceFieldConfig = {
+ *   type: ForceFieldType.POINT,
+ *   position: new THREE.Vector3(0, 0, 0),
+ *   strength: -3.0,
+ *   range: 5,
+ *   falloff: ForceFieldFalloff.LINEAR,
+ * };
+ *
+ * // Wind effect
+ * const wind: ForceFieldConfig = {
+ *   type: ForceFieldType.DIRECTIONAL,
+ *   direction: new THREE.Vector3(1, 0, 0),
+ *   strength: 2.0,
+ * };
+ * ```
+ */
+export type ForceFieldConfig = {
+  /** Whether this force field is active. @default true */
+  isActive?: boolean;
+  /** Type of the force field. @default ForceFieldType.POINT */
+  type?: ForceFieldType;
+  /** Position in 3D space for POINT type force fields. @default (0,0,0) */
+  position?: THREE.Vector3;
+  /** Direction vector for DIRECTIONAL type force fields. @default (0,1,0) */
+  direction?: THREE.Vector3;
+  /**
+   * Force strength. Positive = attract (POINT) or push along direction (DIRECTIONAL).
+   * Negative = repel (POINT) or push against direction (DIRECTIONAL).
+   * Supports constant, random range, or lifetime curve (evaluated against system lifetime).
+   * @default 1
+   */
+  strength?: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+  /**
+   * Maximum effective range for POINT type. Particles beyond this distance are unaffected.
+   * @default Infinity
+   */
+  range?: number;
+  /**
+   * How force diminishes with distance for POINT type.
+   * @default ForceFieldFalloff.LINEAR
+   */
+  falloff?: ForceFieldFalloff;
+};
+
+/**
+ * Internal normalized force field configuration where all properties are required.
+ * Created during particle system initialization from user-provided {@link ForceFieldConfig}.
+ */
+export type NormalizedForceFieldConfig = {
+  isActive: boolean;
+  type: ForceFieldType;
+  position: THREE.Vector3;
+  direction: THREE.Vector3;
+  strength: Constant | RandomBetweenTwoConstants | LifetimeCurve;
+  range: number;
+  falloff: ForceFieldFalloff;
+};
+
+/**
  * Configuration object for the particle system.
  * Defines all aspects of the particle system, including its appearance, behavior, and runtime events.
  */
@@ -1182,6 +1258,28 @@ export type ParticleSystemConfig = {
   subEmitters?: Array<SubEmitterConfig>;
 
   /**
+   * Force fields that affect particle velocities.
+   * Each force field can attract, repel, or push particles in a direction.
+   * Multiple force fields are applied cumulatively.
+   *
+   * @default []
+   *
+   * @example
+   * ```typescript
+   * forceFields: [
+   *   {
+   *     type: ForceFieldType.POINT,
+   *     position: new THREE.Vector3(0, 0, 0),
+   *     strength: 5.0,
+   *     range: 10,
+   *     falloff: ForceFieldFalloff.QUADRATIC,
+   *   },
+   * ]
+   * ```
+   */
+  forceFields?: Array<ForceFieldConfig>;
+
+  /**
    * Called on every update frame with particle system data.
    */
   onUpdate?: (data: {
@@ -1271,6 +1369,7 @@ export type ParticleSystemInstance = {
   looping: boolean;
   simulationSpace: SimulationSpace;
   gravity: number;
+  normalizedForceFields: Array<NormalizedForceFieldConfig>;
   emission: Emission;
   normalizedConfig: NormalizedParticleSystemConfig;
   iterationCount: number;

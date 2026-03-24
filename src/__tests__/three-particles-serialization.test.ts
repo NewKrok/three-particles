@@ -4,6 +4,8 @@ import {
   getCurveFunction,
 } from '../js/effects/three-particles/three-particles-curves.js';
 import {
+  ForceFieldFalloff,
+  ForceFieldType,
   LifeTimeCurve,
   SimulationSpace,
   Shape,
@@ -641,5 +643,171 @@ describe('editor JSON compatibility', () => {
     expect(config.duration).toBe(0.36);
     expect(config.gravity).toBe(-0.64);
     expect(config.maxParticles).toBe(40);
+  });
+});
+
+// ─── Force Fields Serialization ──────────────────────────────────────────────
+
+describe('forceFields serialization', () => {
+  it('should serialize and deserialize POINT force field', () => {
+    const config: ParticleSystemConfig = {
+      forceFields: [
+        {
+          isActive: true,
+          type: ForceFieldType.POINT,
+          position: new THREE.Vector3(1, 2, 3),
+          direction: new THREE.Vector3(0, 1, 0),
+          strength: 5,
+          range: 10,
+          falloff: ForceFieldFalloff.QUADRATIC,
+        },
+      ],
+    };
+
+    const json = serializeParticleSystem(config);
+    const result = deserializeParticleSystem(json);
+
+    expect(result.forceFields).toHaveLength(1);
+    const ff = result.forceFields![0];
+    expect(ff.isActive).toBe(true);
+    expect(ff.type).toBe(ForceFieldType.POINT);
+    expect(ff.position).toBeInstanceOf(THREE.Vector3);
+    expect(ff.position!.x).toBe(1);
+    expect(ff.position!.y).toBe(2);
+    expect(ff.position!.z).toBe(3);
+    expect(ff.strength).toBe(5);
+    expect(ff.range).toBe(10);
+    expect(ff.falloff).toBe(ForceFieldFalloff.QUADRATIC);
+  });
+
+  it('should serialize and deserialize DIRECTIONAL force field', () => {
+    const config: ParticleSystemConfig = {
+      forceFields: [
+        {
+          isActive: true,
+          type: ForceFieldType.DIRECTIONAL,
+          direction: new THREE.Vector3(0.5, 0.5, 0),
+          strength: 3,
+        },
+      ],
+    };
+
+    const json = serializeParticleSystem(config);
+    const result = deserializeParticleSystem(json);
+
+    expect(result.forceFields).toHaveLength(1);
+    const ff = result.forceFields![0];
+    expect(ff.type).toBe(ForceFieldType.DIRECTIONAL);
+    expect(ff.direction).toBeInstanceOf(THREE.Vector3);
+    expect(ff.direction!.x).toBe(0.5);
+    expect(ff.direction!.y).toBe(0.5);
+    expect(ff.strength).toBe(3);
+  });
+
+  it('should handle Infinity range (serialized as null)', () => {
+    const config: ParticleSystemConfig = {
+      forceFields: [
+        {
+          type: ForceFieldType.POINT,
+          strength: 1,
+          range: Infinity,
+        },
+      ],
+    };
+
+    const json = serializeParticleSystem(config);
+    const parsed = JSON.parse(json);
+    // JSON.stringify converts Infinity to null
+    expect(parsed.forceFields[0].range).toBeNull();
+
+    const result = deserializeParticleSystem(json);
+    expect(result.forceFields![0].range).toBe(Infinity);
+  });
+
+  it('should serialize and deserialize multiple force fields', () => {
+    const config: ParticleSystemConfig = {
+      forceFields: [
+        {
+          type: ForceFieldType.POINT,
+          position: new THREE.Vector3(0, 0, 0),
+          strength: 5,
+          range: 10,
+          falloff: ForceFieldFalloff.LINEAR,
+        },
+        {
+          type: ForceFieldType.DIRECTIONAL,
+          direction: new THREE.Vector3(1, 0, 0),
+          strength: 2,
+        },
+      ],
+    };
+
+    const json = serializeParticleSystem(config);
+    const result = deserializeParticleSystem(json);
+
+    expect(result.forceFields).toHaveLength(2);
+    expect(result.forceFields![0].type).toBe(ForceFieldType.POINT);
+    expect(result.forceFields![1].type).toBe(ForceFieldType.DIRECTIONAL);
+  });
+
+  it('should deserialize force field with bezier strength curve', () => {
+    const json = JSON.stringify({
+      forceFields: [
+        {
+          type: 'POINT',
+          position: { x: 0, y: 0, z: 0 },
+          strength: {
+            bezierPoints: [
+              { x: 0, y: 0, percentage: 0 },
+              { x: 1, y: 10, percentage: 1 },
+            ],
+          },
+          range: 5,
+          falloff: 'LINEAR',
+        },
+      ],
+    });
+
+    const result = deserializeParticleSystem(json);
+    const ff = result.forceFields![0];
+    expect(ff.strength).toBeDefined();
+    expect(typeof ff.strength).toBe('object');
+  });
+
+  it('should handle missing optional fields in deserialization', () => {
+    const json = JSON.stringify({
+      forceFields: [
+        {
+          type: 'POINT',
+          strength: 3,
+        },
+      ],
+    });
+
+    const result = deserializeParticleSystem(json);
+    const ff = result.forceFields![0];
+    expect(ff.type).toBe(ForceFieldType.POINT);
+    expect(ff.strength).toBe(3);
+    // Optional fields not set → undefined (will be defaulted during normalization)
+    expect(ff.position).toBeUndefined();
+    expect(ff.range).toBeUndefined();
+    expect(ff.falloff).toBeUndefined();
+  });
+
+  it('should preserve empty forceFields array', () => {
+    const config: ParticleSystemConfig = {
+      forceFields: [],
+    };
+
+    const json = serializeParticleSystem(config);
+    const result = deserializeParticleSystem(json);
+
+    expect(result.forceFields).toEqual([]);
+  });
+
+  it('should not have forceFields when not present in JSON', () => {
+    const json = JSON.stringify({ duration: 5 });
+    const result = deserializeParticleSystem(json);
+    expect(result.forceFields).toBeUndefined();
   });
 });
