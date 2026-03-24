@@ -501,13 +501,18 @@ export const createParticleSystem = (
     forceFields: rawForceFields,
   } = normalizedConfig;
 
+  const toVector3 = (
+    v: { x?: number; y?: number; z?: number } | undefined,
+    fallback: THREE.Vector3
+  ) => (v ? new THREE.Vector3(v.x ?? 0, v.y ?? 0, v.z ?? 0) : fallback.clone());
+
   const normalizedForceFields: Array<NormalizedForceFieldConfig> = (
     rawForceFields ?? []
   ).map((ff: ForceFieldConfig) => ({
     isActive: ff.isActive ?? true,
     type: ff.type ?? ForceFieldType.POINT,
-    position: ff.position ?? new THREE.Vector3(0, 0, 0),
-    direction: (ff.direction ?? new THREE.Vector3(0, 1, 0)).clone().normalize(),
+    position: toVector3(ff.position, new THREE.Vector3(0, 0, 0)),
+    direction: toVector3(ff.direction, new THREE.Vector3(0, 1, 0)).normalize(),
     strength: ff.strength ?? 1,
     range: Math.max(0, ff.range ?? Infinity),
     falloff: ff.falloff ?? ForceFieldFalloff.LINEAR,
