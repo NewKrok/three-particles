@@ -23,3 +23,7 @@ examples/three-particles.esm.js
 .eslintcache
 
 tmp/
+
+# Local tool configs
+.claude/settings.local.json
+.serena/
