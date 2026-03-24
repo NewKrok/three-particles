@@ -93,7 +93,9 @@ export const enum CurveFunctionId {
   BOUNCE_IN_OUT = 'BOUNCE_IN_OUT',
 }
 
-const CurveFunctionIdMap: Partial<Record<CurveFunctionId, CurveFunction>> = {
+export const curveFunctionIdMap: Partial<
+  Record<CurveFunctionId, CurveFunction>
+> = {
   [CurveFunctionId.LINEAR]: Easing.Linear.None,
   [CurveFunctionId.QUADRATIC_IN]: Easing.Quadratic.In,
   [CurveFunctionId.QUADRATIC_OUT]: Easing.Quadratic.Out,
@@ -157,4 +159,4 @@ export const getCurveFunction = (
 ): CurveFunction =>
   typeof curveFunctionId === 'function'
     ? curveFunctionId
-    : CurveFunctionIdMap[curveFunctionId]!;
+    : curveFunctionIdMap[curveFunctionId]!;
