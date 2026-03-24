@@ -231,14 +231,16 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
   if (raw['emission'] && typeof raw['emission'] === 'object') {
     const e = raw['emission'] as RawObject;
     config.emission = {
-      rateOverTime: deserializeCurveOrValue(
-        e['rateOverTime']
-      ) as NonNullable<ParticleSystemConfig['emission']>['rateOverTime'],
+      rateOverTime: deserializeCurveOrValue(e['rateOverTime']) as NonNullable<
+        ParticleSystemConfig['emission']
+      >['rateOverTime'],
       rateOverDistance: deserializeCurveOrValue(
         e['rateOverDistance']
       ) as NonNullable<ParticleSystemConfig['emission']>['rateOverDistance'],
       bursts: Array.isArray(e['bursts'])
-        ? (e['bursts'] as NonNullable<ParticleSystemConfig['emission']>['bursts'])
+        ? (e['bursts'] as NonNullable<
+            ParticleSystemConfig['emission']
+          >['bursts'])
         : [],
     };
   }
@@ -276,12 +278,12 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
     };
     config.velocityOverLifetime = {
       isActive: (vol['isActive'] as boolean) ?? false,
-      linear: deserializeAxis(
-        vol['linear']
-      ) as NonNullable<ParticleSystemConfig['velocityOverLifetime']>['linear'],
-      orbital: deserializeAxis(
-        vol['orbital']
-      ) as NonNullable<ParticleSystemConfig['velocityOverLifetime']>['orbital'],
+      linear: deserializeAxis(vol['linear']) as NonNullable<
+        ParticleSystemConfig['velocityOverLifetime']
+      >['linear'],
+      orbital: deserializeAxis(vol['orbital']) as NonNullable<
+        ParticleSystemConfig['velocityOverLifetime']
+      >['orbital'],
     };
   }
 
@@ -334,9 +336,9 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
     config.textureSheetAnimation = {
       ...(tsa as ParticleSystemConfig['textureSheetAnimation']),
       tiles: deserializeVector2(tsa['tiles']),
-      startFrame: deserializeCurveOrValue(
-        tsa['startFrame']
-      ) as NonNullable<ParticleSystemConfig['textureSheetAnimation']>['startFrame'],
+      startFrame: deserializeCurveOrValue(tsa['startFrame']) as NonNullable<
+        ParticleSystemConfig['textureSheetAnimation']
+      >['startFrame'],
     };
   }
 

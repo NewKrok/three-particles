@@ -360,6 +360,7 @@ export const createDefaultParticleTexture = (): THREE.CanvasTexture | null => {
       texture.needsUpdate = true;
       return texture;
     } else {
+      // eslint-disable-next-line no-console
       console.warn(
         'Could not get 2D context to generate default particle texture.'
       );
@@ -367,6 +368,7 @@ export const createDefaultParticleTexture = (): THREE.CanvasTexture | null => {
     }
   } catch (error) {
     // Handle potential errors (e.g., document not available in non-browser env)
+    // eslint-disable-next-line no-console
     console.warn('Error creating default particle texture:', error);
     return null;
   }
