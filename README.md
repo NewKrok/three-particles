@@ -16,6 +16,9 @@ Particle system for ThreeJS.
 *   Visual editor for creating and fine-tuning effects: [THREE Particles Editor](https://github.com/NewKrok/three-particles-editor)
 *   Highly customizable particle properties (position, velocity, size, color, alpha, rotation, etc.).
 *   Support for various emitter shapes and parameters.
+*   Force fields and attractors for dynamic particle behavior (point attraction/repulsion, directional wind).
+*   Sub-emitters triggered on particle birth or death events.
+*   Serialization support for saving and loading particle system configs.
 *   TypeDoc API documentation available.
 
 # Live Demo & Examples

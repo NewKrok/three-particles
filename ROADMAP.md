@@ -14,7 +14,7 @@
 | Rate over distance emission | ✅ Complete |
 | TypeDoc API documentation | ✅ Complete |
 | Visual editor (three-particles-editor) | ✅ Complete |
-| Test coverage (~87% statement) | 🔶 Target ≥90% |
+| Test coverage (~96% statement) | ✅ Target ≥90% |
 | CI/CD auto release (npm publish on master push) | ✅ Complete |
 | PR checks (lint + test + build + bundle size) | ✅ Complete |
 | Bundle size monitoring (150 KB limit) | ✅ Complete |
@@ -41,7 +41,7 @@
 - [x] CodeQL security analysis on PRs
 
 ### Code Quality
-- [ ] Test coverage ≥90% statement, ≥80% branch
+- [x] Test coverage ≥90% statement, ≥80% branch
 - [x] Benchmark suite for performance regression detection
 
 ---
@@ -53,8 +53,8 @@
 - Easy starting point for new users
 - Fully customizable — presets are just `ParticleSystemConfig` objects
 
-### Serialization
-- `particleSystemToJSON()` / `particleSystemFromJSON()`
+### Serialization ✅
+- `serializeParticleSystem()` / `deserializeParticleSystem()`
 - Compatibility with three-particles-editor output
 - Versioned config format for forward compatibility
 
@@ -80,10 +80,12 @@
 - Per-config `maxInstances` cap with automatic cleanup of completed instances
 - Sub-emitters forced non-looping; disposed with parent
 
-### Force Fields / Attractors
-- Define attraction/repulsion points in space
-- Wind effects, gravity wells
-- Configurable falloff curves
+### Force Fields / Attractors ✅
+- POINT type: attract/repel particles from a position with configurable range and falloff (LINEAR, QUADRATIC, NONE)
+- DIRECTIONAL type: apply constant force in a direction (wind, drift)
+- Multiple force fields per system, applied cumulatively
+- Strength supports constant, random range, or lifetime curves
+- Full serialization/deserialization support
 
 ### GPU Instancing
 - `THREE.InstancedMesh`-based renderer for extreme particle counts
