@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { SubEmitterTrigger } from '../js/effects/three-particles/three-particles-enums.js';
+import {
+  SimulationSpace,
+  SubEmitterTrigger,
+} from '../js/effects/three-particles/three-particles-enums.js';
 import { createParticleSystem } from '../js/effects/three-particles/three-particles.js';
 import { ParticleSystem } from '../js/effects/three-particles/types.js';
 
@@ -319,6 +322,86 @@ describe('Sub-emitters', () => {
         }
       }
       expect(totalSubActive).toBeGreaterThan(0);
+
+      ps.dispose();
+    });
+  });
+
+  describe('WORLD space sub-emitters', () => {
+    it('should not prematurely dispose WORLD space sub-emitters that have active particles', () => {
+      const scene = new THREE.Group();
+      const startTime = 1000;
+
+      // Parent: LOCAL space, burst(1) at t=0 + continuous emission to trigger cleanup
+      // Sub-emitter: WORLD space, burst(5) at t=0, 3s particle lifetime, maxInstances=1
+      const ps = createParticleSystem(
+        {
+          maxParticles: 10,
+          duration: 5,
+          looping: true,
+          startLifetime: 5,
+          startSpeed: 1,
+          startSize: 1,
+          startOpacity: 1,
+          startRotation: 0,
+          emission: {
+            rateOverTime: 50,
+            rateOverDistance: 0,
+            bursts: [{ time: 0, count: 1 }],
+          },
+          subEmitters: [
+            {
+              trigger: SubEmitterTrigger.BIRTH,
+              config: {
+                maxParticles: 10,
+                duration: 5,
+                looping: false,
+                startLifetime: 3,
+                startSpeed: 0,
+                startSize: 1,
+                startOpacity: 1,
+                startRotation: 0,
+                simulationSpace: SimulationSpace.WORLD,
+                emission: {
+                  rateOverTime: 0,
+                  rateOverDistance: 0,
+                  bursts: [{ time: 0, count: 5 }],
+                },
+              },
+              maxInstances: 1,
+            },
+          ],
+        } as any,
+        startTime
+      );
+
+      scene.add(ps.instance);
+
+      // t=0: initial burst(1) fires → sub-emitter #1 (WORLD space) spawned
+      // Sub-emitter #1 is updated same-frame: burst(5) fires → 5 active particles
+      ps.update({ now: startTime, delta: 0.016, elapsed: 0 });
+
+      // t=100ms: rateOverTime=50 emits 5 more parent particles
+      // Each birth attempt triggers cleanupCompletedInstances since maxInstances=1
+      // Sub-emitter #1 has 5 active particles (3s lifetime, only 100ms old)
+      // Fix: should NOT be disposed; Bug: would be disposed (isActiveArr was undefined for WORLD)
+      ps.update({ now: startTime + 100, delta: 0.1, elapsed: 0.1 });
+
+      // Sub-emitter wrapper must still be in scene
+      expect(scene.children.length).toBe(2);
+
+      // The sub-emitter wrapper's child (THREE.Points) must have active particles
+      const subWrapper = scene.children.find((c) => c !== ps.instance)!;
+      expect(subWrapper).toBeDefined();
+      const subPoints = subWrapper.children[0] as THREE.Points;
+      expect(subPoints?.geometry?.attributes?.isActive).toBeDefined();
+
+      const isActiveArr = subPoints.geometry.attributes.isActive.array;
+      let activeCount = 0;
+      for (let i = 0; i < isActiveArr.length; i++) {
+        if (isActiveArr[i]) activeCount++;
+      }
+      expect(activeCount).toBe(5);
 
       ps.dispose();
     });

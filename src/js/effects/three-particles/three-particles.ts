@@ -365,6 +365,7 @@ const destroyParticleSystem = (particleSystem: THREE.Points) => {
 
       if (savedParticleSystem.parent)
         savedParticleSystem.parent.remove(savedParticleSystem);
+      if (wrapper?.parent) wrapper.parent.remove(wrapper);
       return false;
     }
   );
@@ -1043,8 +1044,11 @@ export const createParticleSystem = (
   const cleanupCompletedInstances = (instances: Array<ParticleSystem>) => {
     for (let i = instances.length - 1; i >= 0; i--) {
       const sub = instances[i];
-      const points = sub.instance as THREE.Points;
-      const isActiveArr = points.geometry?.attributes?.isActive?.array;
+      const points =
+        sub.instance instanceof THREE.Points
+          ? sub.instance
+          : (sub.instance.children[0] as THREE.Points | undefined);
+      const isActiveArr = points?.geometry?.attributes?.isActive?.array;
       if (!isActiveArr) {
         sub.dispose();
         instances.splice(i, 1);
