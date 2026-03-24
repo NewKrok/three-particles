@@ -233,12 +233,12 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
     config.emission = {
       rateOverTime: deserializeCurveOrValue(
         e['rateOverTime']
-      ) as ParticleSystemConfig['emission']['rateOverTime'],
+      ) as NonNullable<ParticleSystemConfig['emission']>['rateOverTime'],
       rateOverDistance: deserializeCurveOrValue(
         e['rateOverDistance']
-      ) as ParticleSystemConfig['emission']['rateOverDistance'],
+      ) as NonNullable<ParticleSystemConfig['emission']>['rateOverDistance'],
       bursts: Array.isArray(e['bursts'])
-        ? (e['bursts'] as ParticleSystemConfig['emission']['bursts'])
+        ? (e['bursts'] as NonNullable<ParticleSystemConfig['emission']>['bursts'])
         : [],
     };
   }
@@ -278,10 +278,10 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
       isActive: (vol['isActive'] as boolean) ?? false,
       linear: deserializeAxis(
         vol['linear']
-      ) as ParticleSystemConfig['velocityOverLifetime']['linear'],
+      ) as NonNullable<ParticleSystemConfig['velocityOverLifetime']>['linear'],
       orbital: deserializeAxis(
         vol['orbital']
-      ) as ParticleSystemConfig['velocityOverLifetime']['orbital'],
+      ) as NonNullable<ParticleSystemConfig['velocityOverLifetime']>['orbital'],
     };
   }
 
@@ -336,14 +336,14 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
       tiles: deserializeVector2(tsa['tiles']),
       startFrame: deserializeCurveOrValue(
         tsa['startFrame']
-      ) as ParticleSystemConfig['textureSheetAnimation']['startFrame'],
+      ) as NonNullable<ParticleSystemConfig['textureSheetAnimation']>['startFrame'],
     };
   }
 
   // subEmitters — recursively deserialize nested configs
   if (Array.isArray(raw['subEmitters'])) {
     config.subEmitters = (raw['subEmitters'] as RawObject[]).map((se) => ({
-      ...(se as ParticleSystemConfig['subEmitters'][number]),
+      ...(se as NonNullable<ParticleSystemConfig['subEmitters']>[number]),
       config: deserializeConfig(se['config'] as RawObject),
     }));
   }
