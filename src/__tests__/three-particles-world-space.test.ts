@@ -155,6 +155,19 @@ describe('World Simulation Space', () => {
     ps.dispose();
   });
 
+  it('should remove the Gyroscope wrapper from scene when disposed', () => {
+    const scene = new THREE.Group();
+    const { ps, step } = createWorldSpaceSystem();
+    scene.add(ps.instance);
+
+    step(16);
+    expect(scene.children.length).toBe(1);
+
+    ps.dispose();
+
+    expect(scene.children.length).toBe(0);
+  });
+
   it('should handle pause/resume in world space', () => {
     const { ps, step } = createWorldSpaceSystem();
 
