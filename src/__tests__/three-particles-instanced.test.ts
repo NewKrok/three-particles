@@ -381,4 +381,200 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       ps.dispose();
     });
   });
+
+  describe('colorOverLifetime', () => {
+    it('should modify color channels over particle lifetime', () => {
+      const { ps, step } = createInstancedSystem({
+        maxParticles: 20,
+        emission: { rateOverTime: 100 },
+        startLifetime: 2,
+        startColor: {
+          min: { r: 1, g: 1, b: 1 },
+          max: { r: 1, g: 1, b: 1 },
+        },
+        colorOverLifetime: {
+          isActive: true,
+          r: {
+            type: 'BEZIER',
+            scale: 1,
+            bezierPoints: [
+              { x: 0, y: 1, percentage: 0 },
+              { x: 1, y: 0, percentage: 1 },
+            ],
+          },
+          g: {
+            type: 'BEZIER',
+            scale: 1,
+            bezierPoints: [
+              { x: 0, y: 1, percentage: 0 },
+              { x: 1, y: 0, percentage: 1 },
+            ],
+          },
+          b: {
+            type: 'BEZIER',
+            scale: 1,
+            bezierPoints: [
+              { x: 0, y: 1, percentage: 0 },
+              { x: 1, y: 0, percentage: 1 },
+            ],
+          },
+        },
+      });
+
+      step(200);
+      step(800, 600);
+
+      const geom = getGeometry(ps);
+      const rArr = geom.getAttribute('instanceColorR').array;
+      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+
+      let hasReducedColor = false;
+      for (let i = 0; i < 20; i++) {
+        if (isActiveArr[i] && rArr[i] < 1 && rArr[i] > 0) {
+          hasReducedColor = true;
+          break;
+        }
+      }
+      expect(hasReducedColor).toBe(true);
+
+      ps.dispose();
+    });
+  });
+
+  describe('rotationOverLifetime', () => {
+    it('should modify rotation over particle lifetime', () => {
+      const { ps, step } = createInstancedSystem({
+        maxParticles: 20,
+        emission: { rateOverTime: 100 },
+        startLifetime: 2,
+        startRotation: 0,
+        rotationOverLifetime: {
+          isActive: true,
+          min: 5,
+          max: 5,
+        },
+      });
+
+      step(200);
+      step(600, 400);
+
+      const geom = getGeometry(ps);
+      const rotArr = geom.getAttribute('instanceRotation').array;
+      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+
+      let hasRotated = false;
+      for (let i = 0; i < 20; i++) {
+        if (isActiveArr[i] && Math.abs(rotArr[i]) > 0.001) {
+          hasRotated = true;
+          break;
+        }
+      }
+      expect(hasRotated).toBe(true);
+
+      ps.dispose();
+    });
+  });
+
+  describe('velocityOverLifetime', () => {
+    it('should apply linear velocity over lifetime', () => {
+      const { ps, step } = createInstancedSystem({
+        maxParticles: 20,
+        emission: { rateOverTime: 100 },
+        startLifetime: 2,
+        startSpeed: 0,
+        velocityOverLifetime: {
+          isActive: true,
+          linear: { x: 0, y: 10, z: 0 },
+          orbital: { x: 0, y: 0, z: 0 },
+        },
+      });
+
+      step(200);
+      step(600, 400);
+
+      const geom = getGeometry(ps);
+      const offsetArr = geom.getAttribute('instanceOffset').array;
+      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+
+      let hasMovedY = false;
+      for (let i = 0; i < 20; i++) {
+        if (isActiveArr[i] && Math.abs(offsetArr[i * 3 + 1]) > 0.1) {
+          hasMovedY = true;
+          break;
+        }
+      }
+      expect(hasMovedY).toBe(true);
+
+      ps.dispose();
+    });
+  });
+
+  describe('burst emission', () => {
+    it('should emit burst particles', () => {
+      const { ps, step } = createInstancedSystem({
+        maxParticles: 50,
+        emission: {
+          rateOverTime: 0,
+          bursts: [{ time: 0, count: 20 }],
+        },
+        startLifetime: 5,
+      });
+
+      step(100);
+      const count = countActiveParticles(ps);
+      expect(count).toBe(20);
+
+      ps.dispose();
+    });
+  });
+
+  describe('gravity', () => {
+    it('should apply gravity to instanced particles', () => {
+      const { ps, step } = createInstancedSystem({
+        maxParticles: 20,
+        emission: { rateOverTime: 100 },
+        startLifetime: 2,
+        startSpeed: 0,
+        gravity: 10,
+      });
+
+      step(200);
+      step(600, 400);
+
+      const geom = getGeometry(ps);
+      const offsetArr = geom.getAttribute('instanceOffset').array;
+      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+
+      // Gravity should have moved particles in the -Y direction
+      let hasGravity = false;
+      for (let i = 0; i < 20; i++) {
+        if (isActiveArr[i] && offsetArr[i * 3 + 1] < -0.01) {
+          hasGravity = true;
+          break;
+        }
+      }
+      expect(hasGravity).toBe(true);
+
+      ps.dispose();
+    });
+  });
+
+  describe('shader features', () => {
+    it('should include perspective size scaling in vertex shader', () => {
+      const { ps } = createInstancedSystem();
+      const mesh = ps.instance as THREE.Mesh;
+      const material = mesh.material as THREE.ShaderMaterial;
+      expect(material.vertexShader).toContain('100.0 / length(mvPosition.xyz)');
+      ps.dispose();
+    });
+
+    it('should include UV rotation in fragment shader', () => {
+      const { ps } = createInstancedSystem();
+      const mesh = ps.instance as THREE.Mesh;
+      const material = mesh.material as THREE.ShaderMaterial;
+      expect(material.fragmentShader).toContain('vRotation');
+      expect(material.fragmentShader).toContain('rotation * centeredPoint');
+      ps.dispose();
+    });
+  });
 });

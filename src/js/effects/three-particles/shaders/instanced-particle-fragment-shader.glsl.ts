@@ -13,6 +13,7 @@ const InstancedParticleFragmentShader = `
   varying float vLifetime;
   varying float vStartLifetime;
   varying float vStartFrame;
+  varying float vRotation;
 
   #include <common>
   #include <logdepthbuf_pars_fragment>
@@ -21,8 +22,20 @@ const InstancedParticleFragmentShader = `
   {
     gl_FragColor = vColor;
 
-    // Discard pixels outside the inscribed circle (same as Points renderer)
-    float dist = distance(vUv, vec2(0.5));
+    // Rotate UV around centre (matches Points renderer behaviour)
+    vec2 center = vec2(0.5);
+    vec2 centeredPoint = vUv - center;
+
+    mat2 rotation = mat2(
+      cos(vRotation), sin(vRotation),
+      -sin(vRotation), cos(vRotation)
+    );
+
+    centeredPoint = rotation * centeredPoint;
+    vec2 centeredMiddlePoint = centeredPoint + center;
+
+    // Discard pixels outside the inscribed circle
+    float dist = distance(centeredMiddlePoint, center);
     if (dist > 0.5) discard;
 
     float frameIndex = round(vStartFrame) + (
@@ -37,8 +50,8 @@ const InstancedParticleFragmentShader = `
     float spriteYIndex = floor(mod(frameIndex / tiles.x, tiles.y));
 
     vec2 uvPoint = vec2(
-      vUv.x / tiles.x + spriteXIndex / tiles.x,
-      vUv.y / tiles.y + spriteYIndex / tiles.y
+      centeredMiddlePoint.x / tiles.x + spriteXIndex / tiles.x,
+      centeredMiddlePoint.y / tiles.y + spriteYIndex / tiles.y
     );
 
     vec4 rotatedTexture = texture2D(map, uvPoint);

@@ -842,24 +842,6 @@ export const createParticleSystem = (
 
   createFloat32Attributes({
     geometry,
-    propertyName: attr('opacity'),
-    maxParticles,
-    factory: () =>
-      calculateValue(generalData.particleSystemId, startOpacity, 0),
-    instanced: useInstancing,
-  });
-
-  createFloat32Attributes({
-    geometry,
-    propertyName: attr('rotation'),
-    maxParticles,
-    factory: () =>
-      calculateValue(generalData.particleSystemId, startRotation, 0),
-    instanced: useInstancing,
-  });
-
-  createFloat32Attributes({
-    geometry,
     propertyName: attr('size'),
     maxParticles,
     factory: (_, index) => generalData.startValues.startSize[index],

@@ -185,7 +185,6 @@ describe('createParticleSystem', () => {
     expect(attrs.isActive).toBeDefined();
     expect(attrs.lifetime).toBeDefined();
     expect(attrs.startLifetime).toBeDefined();
-    expect(attrs.opacity).toBeDefined();
     expect(attrs.rotation).toBeDefined();
     expect(attrs.size).toBeDefined();
     expect(attrs.colorR).toBeDefined();

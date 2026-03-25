@@ -15,6 +15,7 @@ const InstancedParticleVertexShader = `
   varying float vLifetime;
   varying float vStartLifetime;
   varying float vStartFrame;
+  varying float vRotation;
 
   #include <common>
   #include <logdepthbuf_pars_vertex>
@@ -25,16 +26,18 @@ const InstancedParticleVertexShader = `
     vLifetime = instanceLifetime;
     vStartLifetime = instanceStartLifetime;
     vStartFrame = instanceStartFrame;
-
-    // Billboard: rotate the quad vertex to face the camera
-    float cosR = cos(instanceRotation);
-    float sinR = sin(instanceRotation);
-    mat2 rot = mat2(cosR, sinR, -sinR, cosR);
-    vec2 rotatedPosition = rot * position.xy;
+    vRotation = instanceRotation;
 
     vec4 mvPosition = modelViewMatrix * vec4(instanceOffset, 1.0);
-    // Scale the quad by instanceSize and apply perspective
-    mvPosition.xy += rotatedPosition * instanceSize;
+
+    // Perspective-correct size: match Points renderer behaviour
+    // (size * 100.0 / distance) so particles shrink with distance.
+    float perspectiveSize = instanceSize * (100.0 / length(mvPosition.xyz));
+
+    // Billboard: offset quad vertices in view space (no rotation here;
+    // rotation is applied to UVs in the fragment shader to keep behaviour
+    // identical to the Points renderer).
+    mvPosition.xy += position.xy * perspectiveSize;
 
     gl_Position = projectionMatrix * mvPosition;
 
