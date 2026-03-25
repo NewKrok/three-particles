@@ -213,6 +213,7 @@ Pushing/merging to `master` triggers a **fully automated** release:
 - **New examples must always be added at the beginning of the array** (newest first) so they appear first on the examples page
 - Each example needs: `id`, `title`, `description`, `tags`, `textureId`, and `config`
 - Optional: `previewTime` for non-looping or delayed effects
+- Examples page features: renderer type toggle (POINTS/INSTANCED) per card, fullscreen expand modal with FPS/tick stats, version switcher (including local dev build)
 
 ---
 
@@ -279,7 +280,7 @@ npx typedoc               # Generate documentation
 | PR checks (lint + test + build + bundle size + CodeQL) | ✅ Complete |
 | Bundle size monitoring (150 KB limit) | ✅ Complete |
 | Performance benchmark suite | ✅ Complete |
-| Test coverage (99.6% stmt, 96.4% branch, 536 tests) | ✅ Target ≥90% stmt, ≥80% branch |
+| Test coverage (99.4% stmt, 96.4% branch, 546 tests) | ✅ Target ≥90% stmt, ≥80% branch |
 | Sub-emitters | ✅ Complete |
 | Force fields / Attractors | ✅ Complete |
 | GPU instancing (`RendererType.INSTANCED`) | ✅ Complete |

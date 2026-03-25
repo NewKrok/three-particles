@@ -19,6 +19,7 @@ Particle system for ThreeJS.
 *   Force fields and attractors for dynamic particle behavior (point attraction/repulsion, directional wind).
 *   Sub-emitters triggered on particle birth or death events.
 *   Serialization support for saving and loading particle system configs.
+*   GPU instancing renderer (`RendererType.INSTANCED`) — removes `gl_PointSize` hardware limit, ideal for large particles or high particle counts.
 *   TypeDoc API documentation available.
 
 # Live Demo & Examples

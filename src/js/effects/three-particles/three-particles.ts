@@ -732,7 +732,7 @@ export const createParticleSystem = (
   // Position attribute is special: Points uses 'position', instanced uses 'instanceOffset'
   const posAttr = useInstancing ? 'instanceOffset' : 'position';
 
-  const sharedUniforms = {
+  const sharedUniforms: Record<string, { value: unknown }> = {
     elapsed: { value: 0.0 },
     map: { value: particleMap },
     tiles: { value: textureSheetAnimation.tiles },
@@ -743,6 +743,7 @@ export const createParticleSystem = (
     backgroundColor: { value: renderer.backgroundColor },
     discardBackgroundColor: { value: renderer.discardBackgroundColor },
     backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
+    ...(useInstancing ? { viewportHeight: { value: 1.0 } } : {}),
   };
 
   const material = new THREE.ShaderMaterial({
@@ -1159,6 +1160,10 @@ export const createParticleSystem = (
             ...subConfig.config.transform,
             position: new THREE.Vector3(position.x, position.y, position.z),
           },
+          renderer: {
+            ...(subConfig.config.renderer ?? {}),
+            rendererType: renderer.rendererType,
+          } as typeof subConfig.config.renderer,
           ...(inheritVelocity > 0
             ? {
                 startSpeed:
@@ -1189,6 +1194,13 @@ export const createParticleSystem = (
   let particleSystem: THREE.Points | THREE.Mesh = useInstancing
     ? new THREE.Mesh(geometry, material)
     : new THREE.Points(geometry, material);
+
+  if (useInstancing) {
+    particleSystem.onBeforeRender = (glRenderer: THREE.WebGLRenderer) => {
+      const size = glRenderer.getSize(new THREE.Vector2());
+      sharedUniforms.viewportHeight.value = size.y * glRenderer.getPixelRatio();
+    };
+  }
 
   particleSystem.position.copy(transform!.position!);
   particleSystem.rotation.x = THREE.MathUtils.degToRad(transform.rotation!.x);

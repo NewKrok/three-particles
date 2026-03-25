@@ -69,6 +69,12 @@ function animate() {
 | emission | Emission | rateOverTime: 10 | Emission config |
 | shape | ShapeConfig | — | Emitter shape |
 | map | THREE.Texture | undefined | Particle texture |
+| renderer | Renderer | — | Renderer settings (blending, rendererType, etc.) |
+
+## Renderer Types
+
+- `RendererType.POINTS` (default) — Classic point sprites via `THREE.Points`
+- `RendererType.INSTANCED` — Camera-facing quads via `InstancedBufferGeometry`, removes `gl_PointSize` hardware limit
 
 ## Emitter Shapes
 

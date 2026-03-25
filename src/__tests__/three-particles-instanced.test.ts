@@ -310,6 +310,27 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
 
       ps.dispose();
     });
+
+    it('should have a viewportHeight uniform for pixel-correct sizing', () => {
+      const { ps } = createInstancedSystem();
+      const mesh = ps.instance as THREE.Mesh;
+      const material = mesh.material as THREE.ShaderMaterial;
+
+      expect(material.uniforms.viewportHeight).toBeDefined();
+      expect(material.uniforms.viewportHeight.value).toBe(1.0);
+
+      ps.dispose();
+    });
+
+    it('should set onBeforeRender to update viewportHeight', () => {
+      const { ps } = createInstancedSystem();
+      const mesh = ps.instance as THREE.Mesh;
+
+      expect(mesh.onBeforeRender).toBeDefined();
+      expect(typeof mesh.onBeforeRender).toBe('function');
+
+      ps.dispose();
+    });
   });
 
   describe('pause, resume, and dispose', () => {
@@ -378,6 +399,26 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
         1000
       );
       expect(ps.instance).toBeInstanceOf(THREE.Points);
+      ps.dispose();
+    });
+
+    it('should not have viewportHeight uniform on Points renderer', () => {
+      const ps = createParticleSystem(
+        {
+          maxParticles: 10,
+          duration: 5,
+          looping: true,
+          startLifetime: 2,
+          startSpeed: 1,
+          startSize: 1,
+          startOpacity: 1,
+          emission: { rateOverTime: 10 },
+        } as any,
+        1000
+      );
+      const points = ps.instance as THREE.Points;
+      const material = points.material as THREE.ShaderMaterial;
+      expect(material.uniforms.viewportHeight).toBeUndefined();
       ps.dispose();
     });
   });
@@ -564,7 +605,8 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       const { ps } = createInstancedSystem();
       const mesh = ps.instance as THREE.Mesh;
       const material = mesh.material as THREE.ShaderMaterial;
-      expect(material.vertexShader).toContain('100.0 / length(mvPosition.xyz)');
+      expect(material.vertexShader).toContain('instanceSize * 100.0 / dist');
+      expect(material.vertexShader).toContain('viewportHeight');
       ps.dispose();
     });
 

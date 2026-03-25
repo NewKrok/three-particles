@@ -1,6 +1,6 @@
 # @newkrok/three-particles — Full API Reference
 
-> Three.js-based high-performance particle system library (v2.5.0)
+> Three.js-based high-performance particle system library (v2.10.4)
 > License: MIT | Author: Istvan Krisztian Somoracz
 > Repository: https://github.com/NewKrok/three-particles
 
@@ -62,7 +62,7 @@ function animate() {
 
 | Property/Method | Type | Description |
 |-----------------|------|-------------|
-| `instance` | `THREE.Points \| Gyroscope` | The renderable object — add to scene |
+| `instance` | `THREE.Points \| THREE.Mesh \| Gyroscope` | The renderable object — add to scene (Mesh when using RendererType.INSTANCED) |
 | `pauseEmitter()` | `() => void` | Stop emitting new particles |
 | `resumeEmitter()` | `() => void` | Resume emitting particles |
 | `dispose()` | `() => void` | Destroy system, free resources |
@@ -337,7 +337,15 @@ type Renderer = {
   transparent: boolean;                 // Default: true
   depthTest: boolean;                   // Default: true
   depthWrite: boolean;                  // Default: false
+  rendererType?: RendererType;          // Default: RendererType.POINTS
 };
+
+enum RendererType {
+  POINTS = 'POINTS',       // Classic point sprites (THREE.Points). Default.
+  INSTANCED = 'INSTANCED', // Camera-facing quads via InstancedBufferGeometry.
+                            // Removes gl_PointSize hardware limit, supports large particles.
+                            // Recommended for 10 000+ particles or large on-screen sizes.
+}
 ```
 
 Common blending modes: `THREE.NormalBlending`, `THREE.AdditiveBlending`, `THREE.SubtractiveBlending`
@@ -417,6 +425,9 @@ const system = createParticleSystem({
 ### LifeTimeCurve
 `BEZIER` | `EASING`
 
+### RendererType
+`POINTS` (default — classic point sprites) | `INSTANCED` (GPU instanced quads, no gl_PointSize limit)
+
 ---
 
 ## Callbacks
@@ -425,7 +436,7 @@ const system = createParticleSystem({
 createParticleSystem({
   // Called every frame
   onUpdate: ({ particleSystem, delta, elapsed, lifetime, iterationCount }) => {
-    // particleSystem: THREE.Points instance
+    // particleSystem: THREE.Points or THREE.Mesh instance
     // delta: seconds since last frame
     // elapsed: total seconds
     // lifetime: system duration
