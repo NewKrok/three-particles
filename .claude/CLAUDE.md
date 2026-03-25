@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Package:** `@newkrok/three-particles` (v2.6.2)
+**Package:** `@newkrok/three-particles` (v2.10.3)
 **Description:** Three.js-based high-performance particle system library designed for creating visually stunning particle effects with ease. Perfect for game developers and 3D applications.
 **Author:** Istvan Krisztian Somoracz
 **License:** MIT
@@ -13,6 +13,10 @@
 - Visual editor for creating and fine-tuning effects: [THREE Particles Editor](https://github.com/NewKrok/three-particles-editor)
 - Highly customizable particle properties (position, velocity, size, color, alpha, rotation, etc.)
 - Support for various emitter shapes and parameters
+- Sub-emitters triggered on particle birth or death events
+- Force fields and attractors (point attraction/repulsion, directional wind)
+- Serialization support for saving and loading particle system configs
+- FBM noise module for organic particle motion
 - TypeDoc API documentation: https://newkrok.github.io/three-particles/api/
 
 ### Live Demos
@@ -158,7 +162,7 @@ Pushing/merging to `master` triggers a **fully automated** release:
 ## Dependencies
 
 ### Core Dependencies
-- **three** (^0.180.0) - Peer dependency, must be installed by consumer
+- **three** (^0.182.0) - Peer dependency, must be installed by consumer
 - **@newkrok/three-utils** (^2.0.1) - Utility functions for Three.js
 - **easing-functions** (1.3.0) - Easing functions for animations
 - **three-noise** (1.1.2) - Noise generation for particle effects
@@ -237,7 +241,7 @@ npx typedoc               # Generate documentation
 - **Always check types.ts first** - This file contains comprehensive type definitions and examples
 - **Shader changes** - If modifying GLSL shaders, test thoroughly across different browsers/devices
 - **Performance** - This is a high-performance library, avoid unnecessary allocations in update loops
-- **Three.js compatibility** - Currently targets Three.js ^0.180.0
+- **Three.js compatibility** - Currently targets Three.js ^0.182.0
 - **ES Modules** - Project uses ES modules (type: "module" in package.json)
 
 ### Known Patterns
@@ -274,11 +278,14 @@ npx typedoc               # Generate documentation
 | Bundle size monitoring (150 KB limit) | ✅ Complete |
 | Performance benchmark suite | ✅ Complete |
 | Test coverage (99.6% stmt, 96.6% branch, 519 tests) | ✅ Target ≥90% stmt, ≥80% branch |
-| Web Worker support | ⬜ Planned |
-| Preset system | ⬜ Planned |
 | Sub-emitters | ✅ Complete |
 | Force fields / Attractors | ✅ Complete |
 | GPU instancing | ⬜ Planned |
+| React Three Fiber integration | ⬜ Planned |
+| Trail / Ribbon renderer | ⬜ Planned |
+| WebGPU compute support | ⬜ Planned |
+| Preset system | ⬜ Planned |
+| Mesh particle renderer | ⬜ Planned |
 
 ---
 

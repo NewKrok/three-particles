@@ -1,95 +1,96 @@
 # Roadmap
 
-## Current Status
+## Completed
 
 | Feature | Status |
 |---------|--------|
-| Core particle system | ✅ Complete |
-| Shape emitters (Sphere, Cone, Circle, Rectangle, Box) | ✅ Complete |
-| Lifetime modifiers (size, opacity, color, rotation, velocity) | ✅ Complete |
-| Noise module (FBM) | ✅ Complete |
-| Texture sheet animation | ✅ Complete |
-| World/Local simulation space | ✅ Complete |
-| Burst emission | ✅ Complete |
-| Rate over distance emission | ✅ Complete |
-| TypeDoc API documentation | ✅ Complete |
-| Visual editor (three-particles-editor) | ✅ Complete |
-| Test coverage (99.6% stmt, 96.6% branch, 519 tests) | ✅ Target ≥90% |
-| CI/CD auto release (npm publish on master push) | ✅ Complete |
-| PR checks (lint + test + build + bundle size) | ✅ Complete |
-| Bundle size monitoring (150 KB limit) | ✅ Complete |
-| CodeQL security analysis | ✅ Complete |
-| GitHub Pages (examples + TypeDoc) | ✅ Complete |
-| Performance benchmark suite | ✅ Complete |
+| Core particle system | ✅ |
+| Shape emitters (Sphere, Cone, Circle, Rectangle, Box) | ✅ |
+| Lifetime modifiers (size, opacity, color, rotation, velocity) | ✅ |
+| Noise module (FBM) | ✅ |
+| Texture sheet animation | ✅ |
+| World/Local simulation space | ✅ |
+| Burst emission | ✅ |
+| Rate over distance emission | ✅ |
+| Sub-emitters (birth/death triggers) | ✅ |
+| Force fields / Attractors (point, directional) | ✅ |
+| Serialization / Deserialization | ✅ |
+| Visual editor (three-particles-editor) | ✅ |
+| TypeDoc API documentation | ✅ |
+| Interactive examples page (GitHub Pages) | ✅ |
+| CI/CD auto release (npm publish on master push) | ✅ |
+| PR checks (lint + test + build + bundle size + CodeQL) | ✅ |
+| Bundle size monitoring (150 KB limit) | ✅ |
+| Performance benchmark suite | ✅ |
+| Test coverage ≥90% stmt, ≥80% branch | ✅ |
+| `llms.txt` / `llms-full.txt` | ✅ |
+| `CHANGELOG.md`, `CONTRIBUTING.md` | ✅ |
+| tsup build (ESM + minified + DTS) | ✅ |
 
 ---
 
-## Short Term
+## High Priority — Performance & Ecosystem
 
-### Improved Documentation & DX
-- [x] `llms.txt` / `llms-full.txt` for LLM context
-- [x] `ROADMAP.md`
-- [x] `CHANGELOG.md`
-- [x] `CONTRIBUTING.md`
-- [x] Interactive examples page (GitHub Pages)
-- [ ] README improvements (Getting Started, Performance tips, Troubleshooting)
+### GPU Instancing
+- `THREE.InstancedMesh`-based renderer for extreme particle counts
+- Significant performance improvement for 10,000+ particles
+- Batched rendering: multiple emitters in fewer draw calls
 
-### CI/CD Improvements
-- [x] Automated release workflow (version bump + npm publish on master push)
-- [x] PR checks: lint + test + build on all PRs
-- [x] Bundle size monitoring with limits (150 KB)
-- [x] CodeQL security analysis on PRs
+### React Three Fiber Integration
+- First-class R3F components (`<ParticleSystem />`, `<useParticleSystem />`)
+- Declarative API that fits the R3F ecosystem
+- Hooks for lifecycle management (`useFrame` integration)
 
-### Code Quality
-- [x] Test coverage ≥90% statement, ≥80% branch
-- [x] Benchmark suite for performance regression detection
+### Trail / Ribbon Renderer
+- Continuous trail behind moving particles (projectiles, lightning, light streaks)
+- Configurable width, fade, and color over trail length
+- Billboard or camera-facing trail geometry
+
+### WebGPU Compute Support
+- Leverage Three.js WebGPU renderer (production-ready since r171)
+- Compute shaders for particle simulation on GPU — 10-100x performance for large systems
+- Automatic fallback to WebGL when WebGPU is unavailable
 
 ---
 
-## Medium Term
+## Medium Priority — Features & DX
 
 ### Preset System
 - Built-in particle configurations: `Presets.FIRE`, `Presets.SMOKE`, `Presets.SPARKS`, `Presets.RAIN`, etc.
 - Easy starting point for new users
 - Fully customizable — presets are just `ParticleSystemConfig` objects
 
-### Serialization ✅
-- `serializeParticleSystem()` / `deserializeParticleSystem()`
-- Compatibility with three-particles-editor output
-- Versioned config format for forward compatibility
+### Mesh Particle Renderer
+- Use 3D meshes as individual particles (shards, leaves, debris)
+- Support for custom geometry with per-particle transforms
+- Combine with GPU instancing for performance
 
-### Build Modernization
-- [x] Migrated from tsc + webpack to tsup (esbuild-based)
-- [x] Tree-shaking via esbuild
-- [x] Source maps for minified bundles
+### Additional Emitter Shapes
+- Point emitter (single origin)
+- Hemisphere
+- Mesh surface emitter (spawn particles on arbitrary mesh surfaces)
+
+### Event System
+- `onParticleBirth`, `onParticleDeath` callbacks per particle
+- Enable gameplay integration (damage on hit, sound on spawn, etc.)
 
 ---
 
-## Long Term
+## Lower Priority — Nice to Have
 
-### Web Worker Support
-- Off-main-thread particle updates via `ParticleWorkerManager`
-- SharedArrayBuffer for zero-copy position/size data
-- Automatic fallback to postMessage
-- Recommended for >1000 particles or multiple systems
+### Stretched Billboard Mode
+- Velocity-aligned billboard particles (sparks, rain, speed lines)
+- Configurable stretch factor based on particle speed
 
-### Sub-Emitters ✅
-- Spawn child particle systems on particle birth or death events
-- `SubEmitterTrigger.BIRTH` and `SubEmitterTrigger.DEATH` triggers
-- `SubEmitterConfig` with `config`, `trigger`, `inheritVelocity`, `maxInstances`
-- Per-config `maxInstances` cap with automatic cleanup of completed instances
-- Sub-emitters forced non-looping; disposed with parent
+### LOD (Level of Detail)
+- Reduce particle count for distant particle systems
+- Configurable distance thresholds and reduction factors
+- Seamless transitions between LOD levels
 
-### Force Fields / Attractors ✅
-- POINT type: attract/repel particles from a position with configurable range and falloff (LINEAR, QUADRATIC, NONE)
-- DIRECTIONAL type: apply constant force in a direction (wind, drift)
-- Multiple force fields per system, applied cumulatively
-- Strength supports constant, random range, or lifetime curves
-- Full serialization/deserialization support
-
-### GPU Instancing
-- `THREE.InstancedMesh`-based renderer for extreme particle counts
-- Significant performance improvement for 10,000+ particles
+### README Improvements
+- Getting Started guide with step-by-step tutorial
+- Performance tips and best practices
+- Troubleshooting section for common issues
 
 ---
 
