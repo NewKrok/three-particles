@@ -26,15 +26,11 @@
 | `llms.txt` / `llms-full.txt` | ✅ |
 | `CHANGELOG.md`, `CONTRIBUTING.md` | ✅ |
 | tsup build (ESM + minified + DTS) | ✅ |
+| GPU Instancing (`InstancedBufferGeometry` renderer) | ✅ |
 
 ---
 
 ## High Priority — Performance & Ecosystem
-
-### GPU Instancing
-- `THREE.InstancedMesh`-based renderer for extreme particle counts
-- Significant performance improvement for 10,000+ particles
-- Batched rendering: multiple emitters in fewer draw calls
 
 ### React Three Fiber Integration
 - First-class R3F components (`<ParticleSystem />`, `<useParticleSystem />`)

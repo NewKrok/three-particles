@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 
 import { calculateValue } from './three-particles-utils.js';
-import { GeneralData, NormalizedParticleSystemConfig } from './types.js';
+import {
+  GeneralData,
+  MappedAttributes,
+  NormalizedParticleSystemConfig,
+} from './types.js';
 
 const noiseInput = new THREE.Vector3(0, 0, 0);
 const orbitalEuler = new THREE.Euler();
@@ -79,7 +83,7 @@ export const applyModifiers = ({
   delta: number;
   generalData: GeneralData;
   normalizedConfig: NormalizedParticleSystemConfig;
-  attributes: THREE.NormalBufferAttributes;
+  attributes: MappedAttributes;
   particleLifetimePercentage: number;
   particleIndex: number;
 }) => {

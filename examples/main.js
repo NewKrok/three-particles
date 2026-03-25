@@ -75,11 +75,13 @@ function prepareConfig(config, textureId) {
 
 // ─── Active demo management — only one demo runs at a time ───────────
 let activeCard = null;
+const cardRendererTypes = new Map();
 
 class LiveDemo {
-  constructor(container, exampleData) {
+  constructor(container, exampleData, rendererType = "POINTS") {
     this.container = container;
     this.data = exampleData;
+    this.rendererType = rendererType;
     this.clock = new THREE.Clock();
     this.init();
   }
@@ -111,6 +113,8 @@ class LiveDemo {
     this.camera.lookAt(0, 0, 0);
 
     const config = prepareConfig(this.data.config, this.data.textureId);
+    config.renderer = config.renderer || {};
+    config.renderer.rendererType = this.rendererType;
     const system = createParticleSystem(config);
     this.scene.add(system.instance);
     this.particleSystem = system;
@@ -168,10 +172,172 @@ function startDemo(card, exampleData) {
   }
   stopActiveDemo();
   gtag("event", "click", { event_category: "demo", event_label: "play", demo: exampleData.id });
-  card._liveDemo = new LiveDemo(card, exampleData);
+  const rendererType = cardRendererTypes.get(card) || "POINTS";
+  card._liveDemo = new LiveDemo(card, exampleData, rendererType);
   card.classList.add("active");
   activeCard = card;
 }
+
+// ─── Expanded demo for fullscreen modal ─────────────────────────────
+let expandDemo = null;
+let expandExampleData = null;
+let expandRendererType = "POINTS";
+
+class ExpandedDemo {
+  constructor(canvas, exampleData, rendererType = "POINTS") {
+    this.canvas = canvas;
+    this.data = exampleData;
+    this.rendererType = rendererType;
+    this.clock = new THREE.Clock();
+    this.frames = 0;
+    this.fpsAccum = 0;
+    this.tickAccum = 0;
+    this.lastFpsUpdate = 0;
+    this.init();
+  }
+
+  init() {
+    const width = this.canvas.clientWidth || 800;
+    const height = this.canvas.clientHeight || 600;
+
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: true,
+      alpha: true,
+    });
+    this.renderer.setSize(width, height);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(45, width / height, 1, 100);
+    this.camera.position.set(0, 0, 15);
+    this.camera.lookAt(0, 0, 0);
+
+    const config = prepareConfig(this.data.config, this.data.textureId);
+    config.renderer = config.renderer || {};
+    config.renderer.rendererType = this.rendererType;
+    const system = createParticleSystem(config);
+    this.scene.add(system.instance);
+    this.particleSystem = system;
+
+    const label = document.getElementById("expand-renderer-label");
+    if (label) {
+      const actual = system.instance instanceof THREE.Mesh ? "INSTANCED" : "POINTS";
+      label.textContent = actual;
+    }
+
+    this.startTime = performance.now();
+    this.animate();
+  }
+
+  animate() {
+    if (!this.particleSystem) return;
+    const delta = this.clock.getDelta();
+    const elapsed = this.clock.getElapsedTime();
+    const now = performance.now();
+
+    const tickStart = performance.now();
+
+    const cycleData = { now: Date.now(), delta, elapsed };
+    if (this.particleSystem.update) {
+      this.particleSystem.update(cycleData);
+    } else {
+      updateParticleSystems(cycleData);
+    }
+
+    this.renderer.render(this.scene, this.camera);
+
+    const tickTime = performance.now() - tickStart;
+
+    this.frames++;
+    this.fpsAccum += delta;
+    this.tickAccum += tickTime;
+    if (now - this.lastFpsUpdate > 500) {
+      const fps = this.fpsAccum > 0 ? this.frames / this.fpsAccum : 0;
+      const avgTick = this.frames > 0 ? this.tickAccum / this.frames : 0;
+      const fpsEl = document.getElementById("expand-fps");
+      const ftEl = document.getElementById("expand-frametime");
+      const elEl = document.getElementById("expand-elapsed");
+      if (fpsEl) fpsEl.textContent = `${fps.toFixed(1)} FPS`;
+      if (ftEl) ftEl.textContent = `${avgTick.toFixed(2)} ms/tick`;
+      if (elEl) elEl.textContent = `${elapsed.toFixed(1)}s`;
+      this.frames = 0;
+      this.fpsAccum = 0;
+      this.tickAccum = 0;
+      this.lastFpsUpdate = now;
+    }
+
+    this.animationId = requestAnimationFrame(() => this.animate());
+  }
+
+  resize() {
+    if (!this.renderer) return;
+    const width = this.canvas.clientWidth;
+    const height = this.canvas.clientHeight;
+    this.renderer.setSize(width, height);
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+  }
+
+  dispose() {
+    if (this.animationId) cancelAnimationFrame(this.animationId);
+    if (this.particleSystem) this.particleSystem.dispose();
+    if (this.renderer) this.renderer.dispose();
+  }
+}
+
+function closeExpandModal() {
+  const overlay = document.getElementById("expand-overlay");
+  overlay.classList.remove("open");
+  if (expandDemo) {
+    expandDemo.dispose();
+    expandDemo = null;
+  }
+  expandExampleData = null;
+}
+
+function openExpandModal(exampleData, rendererType) {
+  const overlay = document.getElementById("expand-overlay");
+  const canvas = document.getElementById("expand-canvas");
+  const titleEl = document.getElementById("expand-title");
+
+  closeExpandModal();
+
+  titleEl.textContent = exampleData.title;
+  expandExampleData = exampleData;
+  expandRendererType = rendererType;
+
+  const toggle = document.getElementById("expand-renderer-toggle");
+  toggle.querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.type === rendererType);
+  });
+
+  overlay.classList.add("open");
+
+  requestAnimationFrame(() => {
+    expandDemo = new ExpandedDemo(canvas, exampleData, rendererType);
+  });
+}
+
+// Expand modal event handlers
+document.getElementById("expand-close").addEventListener("click", closeExpandModal);
+document.getElementById("expand-overlay").addEventListener("click", (e) => {
+  if (e.target === document.getElementById("expand-overlay")) closeExpandModal();
+});
+document.getElementById("expand-renderer-toggle").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-type]");
+  if (!btn) return;
+  const type = btn.dataset.type;
+  const toggle = document.getElementById("expand-renderer-toggle");
+  toggle.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+  expandRendererType = type;
+  if (expandDemo && expandExampleData) {
+    expandDemo.dispose();
+    const canvas = document.getElementById("expand-canvas");
+    expandDemo = new ExpandedDemo(canvas, expandExampleData, type);
+  }
+});
 
 // ─── Build the page ──────────────────────────────────────────────────
 const grid = document.getElementById("examples-grid");
@@ -201,6 +367,18 @@ examples.forEach((example) => {
           ${example.tags.map((t) => `<span class="tag">${t}</span>`).join(" ")}
         </div>
         <div class="card-btns">
+          <div class="renderer-toggle">
+            <button class="active" data-type="POINTS" title="Point sprites (THREE.Points)">PTS</button>
+            <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INST</button>
+          </div>
+          <button class="icon-btn expand-btn" title="Open fullscreen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 3 21 3 21 9"/>
+              <polyline points="9 21 3 21 3 15"/>
+              <line x1="21" y1="3" x2="14" y2="10"/>
+              <line x1="3" y1="21" x2="10" y2="14"/>
+            </svg>
+          </button>
           <button class="icon-btn copy-btn" title="Copy config to clipboard">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
@@ -219,6 +397,27 @@ examples.forEach((example) => {
     </div>
   `;
   grid.appendChild(card);
+
+  cardRendererTypes.set(card, "POINTS");
+
+  card.querySelector(".renderer-toggle").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const btn = e.target.closest("button[data-type]");
+    if (!btn) return;
+    const type = btn.dataset.type;
+    card.querySelector(".renderer-toggle").querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    cardRendererTypes.set(card, type);
+    if (activeCard === card) {
+      stopActiveDemo();
+      startDemo(card, example);
+    }
+  });
+
+  card.querySelector(".expand-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    openExpandModal(example, cardRendererTypes.get(card) || "POINTS");
+  });
 
   card.querySelector(".copy-btn").addEventListener("click", (e) => {
     e.stopPropagation();
@@ -367,8 +566,9 @@ examples.forEach((example) => {
     abortBtn.disabled = true;
   });
 
-  // Resize chart on window resize
+  // Resize chart and expand modal on window resize
   window.addEventListener("resize", () => {
     if (runner) runner.resizeChart();
+    if (expandDemo) expandDemo.resize();
   });
 })();

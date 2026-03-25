@@ -2,6 +2,8 @@ import { ObjectUtils } from '@newkrok/three-utils';
 import * as THREE from 'three';
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
+import InstancedParticleFragmentShader from './shaders/instanced-particle-fragment-shader.glsl.js';
+import InstancedParticleVertexShader from './shaders/instanced-particle-vertex-shader.glsl.js';
 import ParticleSystemFragmentShader from './shaders/particle-system-fragment-shader.glsl.js';
 import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.glsl.js';
 import { removeBezierCurveFunction } from './three-particles-bezier.js';
@@ -10,6 +12,7 @@ import {
   ForceFieldFalloff,
   ForceFieldType,
   LifeTimeCurve,
+  RendererType,
   Shape,
   SimulationSpace,
   SubEmitterTrigger,
@@ -35,6 +38,7 @@ import {
   ForceFieldConfig,
   GeneralData,
   LifetimeCurve,
+  MappedAttributes,
   NormalizedForceFieldConfig,
   NormalizedParticleSystemConfig,
   ParticleSystem,
@@ -60,7 +64,7 @@ const _modifierParams = {
   delta: 0,
   generalData: null as unknown as GeneralData,
   normalizedConfig: null as unknown as NormalizedParticleSystemConfig,
-  attributes: null as unknown as THREE.NormalBufferAttributes,
+  attributes: null as unknown as MappedAttributes,
   particleLifetimePercentage: 0,
   particleIndex: 0,
 };
@@ -266,11 +270,13 @@ const createFloat32Attributes = ({
   propertyName,
   maxParticles,
   factory,
+  instanced,
 }: {
   geometry: THREE.BufferGeometry;
   propertyName: string;
   maxParticles: number;
   factory: ((value: never, index: number) => number) | number;
+  instanced?: boolean;
 }) => {
   const array = new Float32Array(maxParticles);
   if (typeof factory === 'function') {
@@ -280,7 +286,10 @@ const createFloat32Attributes = ({
   } else {
     array.fill(factory);
   }
-  geometry.setAttribute(propertyName, new THREE.BufferAttribute(array, 1));
+  const attr = instanced
+    ? new THREE.InstancedBufferAttribute(array, 1)
+    : new THREE.BufferAttribute(array, 1);
+  geometry.setAttribute(propertyName, attr);
 };
 
 const calculatePositionAndVelocity = (
@@ -349,7 +358,7 @@ const calculatePositionAndVelocity = (
   }
 };
 
-const destroyParticleSystem = (particleSystem: THREE.Points) => {
+const destroyParticleSystem = (particleSystem: THREE.Points | THREE.Mesh) => {
   createdParticleSystems = createdParticleSystems.filter(
     ({
       particleSystem: savedParticleSystem,
@@ -711,42 +720,65 @@ export const createParticleSystem = (
     }));
   }
 
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      elapsed: {
-        value: 0.0,
-      },
-      map: {
-        value: particleMap,
-      },
-      tiles: {
-        value: textureSheetAnimation.tiles,
-      },
-      fps: {
-        value: textureSheetAnimation.fps,
-      },
-      useFPSForFrameIndex: {
-        value: textureSheetAnimation.timeMode === TimeMode.FPS,
-      },
-      backgroundColor: {
-        value: renderer.backgroundColor,
-      },
-      discardBackgroundColor: {
-        value: renderer.discardBackgroundColor,
-      },
-      backgroundColorTolerance: {
-        value: renderer.backgroundColorTolerance,
-      },
+  const useInstancing = renderer.rendererType === RendererType.INSTANCED;
+
+  // Attribute name prefix: instanced renderer uses 'instance'-prefixed names
+  // to avoid collision with the base quad geometry's own 'position' attribute.
+  const attr = (name: string) =>
+    useInstancing
+      ? `instance${name.charAt(0).toUpperCase()}${name.slice(1)}`
+      : name;
+
+  // Position attribute is special: Points uses 'position', instanced uses 'instanceOffset'
+  const posAttr = useInstancing ? 'instanceOffset' : 'position';
+
+  const sharedUniforms: Record<string, { value: unknown }> = {
+    elapsed: { value: 0.0 },
+    map: { value: particleMap },
+    tiles: { value: textureSheetAnimation.tiles },
+    fps: { value: textureSheetAnimation.fps },
+    useFPSForFrameIndex: {
+      value: textureSheetAnimation.timeMode === TimeMode.FPS,
     },
-    vertexShader: ParticleSystemVertexShader,
-    fragmentShader: ParticleSystemFragmentShader,
+    backgroundColor: { value: renderer.backgroundColor },
+    discardBackgroundColor: { value: renderer.discardBackgroundColor },
+    backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
+    ...(useInstancing ? { viewportHeight: { value: 1.0 } } : {}),
+  };
+
+  const material = new THREE.ShaderMaterial({
+    uniforms: sharedUniforms,
+    vertexShader: useInstancing
+      ? InstancedParticleVertexShader
+      : ParticleSystemVertexShader,
+    fragmentShader: useInstancing
+      ? InstancedParticleFragmentShader
+      : ParticleSystemFragmentShader,
     transparent: renderer.transparent,
     blending: renderer.blending,
     depthTest: renderer.depthTest,
     depthWrite: renderer.depthWrite,
   });
 
-  const geometry = new THREE.BufferGeometry();
+  let geometry: THREE.BufferGeometry | THREE.InstancedBufferGeometry;
+
+  if (useInstancing) {
+    const instancedGeometry = new THREE.InstancedBufferGeometry();
+    // Base quad: 1x1 plane centred at origin (vertices from -0.5 to 0.5)
+    const quadPositions = new Float32Array([
+      -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0,
+    ]);
+    const quadIndices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+    instancedGeometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(quadPositions, 3)
+    );
+    instancedGeometry.setIndex(new THREE.BufferAttribute(quadIndices, 1));
+    instancedGeometry.instanceCount = maxParticles;
+    geometry = instancedGeometry;
+  } else {
+    geometry = new THREE.BufferGeometry();
+  }
 
   for (let i = 0; i < maxParticles; i++)
     calculatePositionAndVelocity(
@@ -757,42 +789,46 @@ export const createParticleSystem = (
       velocities[i]
     );
 
+  // Per-particle (or per-instance) position offsets
   const positionArray = new Float32Array(maxParticles * 3);
   for (let i = 0; i < maxParticles; i++) {
     positionArray[i * 3] = startPositions[i].x;
     positionArray[i * 3 + 1] = startPositions[i].y;
     positionArray[i * 3 + 2] = startPositions[i].z;
   }
-  geometry.setAttribute(
-    'position',
-    new THREE.BufferAttribute(positionArray, 3)
-  );
+  const positionAttribute = useInstancing
+    ? new THREE.InstancedBufferAttribute(positionArray, 3)
+    : new THREE.BufferAttribute(positionArray, 3);
+  geometry.setAttribute(posAttr, positionAttribute);
 
   createFloat32Attributes({
     geometry,
-    propertyName: 'isActive',
+    propertyName: attr('isActive'),
     maxParticles,
     factory: 0,
+    instanced: useInstancing,
   });
 
   createFloat32Attributes({
     geometry,
-    propertyName: 'lifetime',
+    propertyName: attr('lifetime'),
     maxParticles,
     factory: 0,
+    instanced: useInstancing,
   });
 
   createFloat32Attributes({
     geometry,
-    propertyName: 'startLifetime',
+    propertyName: attr('startLifetime'),
     maxParticles,
     factory: () =>
       calculateValue(generalData.particleSystemId, startLifetime, 0) * 1000,
+    instanced: useInstancing,
   });
 
   createFloat32Attributes({
     geometry,
-    propertyName: 'startFrame',
+    propertyName: attr('startFrame'),
     maxParticles,
     factory: () =>
       textureSheetAnimation.startFrame
@@ -802,74 +838,79 @@ export const createParticleSystem = (
             0
           )
         : 0,
+    instanced: useInstancing,
   });
 
   createFloat32Attributes({
     geometry,
-    propertyName: 'opacity',
-    maxParticles,
-    factory: () =>
-      calculateValue(generalData.particleSystemId, startOpacity, 0),
-  });
-
-  createFloat32Attributes({
-    geometry,
-    propertyName: 'rotation',
-    maxParticles,
-    factory: () =>
-      calculateValue(generalData.particleSystemId, startRotation, 0),
-  });
-
-  createFloat32Attributes({
-    geometry,
-    propertyName: 'size',
+    propertyName: attr('size'),
     maxParticles,
     factory: (_, index) => generalData.startValues.startSize[index],
+    instanced: useInstancing,
   });
 
   createFloat32Attributes({
     geometry,
-    propertyName: 'rotation',
+    propertyName: attr('rotation'),
     maxParticles,
     factory: 0,
+    instanced: useInstancing,
   });
 
   const colorRandomRatio = Math.random();
   createFloat32Attributes({
     geometry,
-    propertyName: 'colorR',
+    propertyName: attr('colorR'),
     maxParticles,
     factory: () =>
       startColor.min!.r! +
       colorRandomRatio * (startColor.max!.r! - startColor.min!.r!),
+    instanced: useInstancing,
   });
   createFloat32Attributes({
     geometry,
-    propertyName: 'colorG',
+    propertyName: attr('colorG'),
     maxParticles,
     factory: () =>
       startColor.min!.g! +
       colorRandomRatio * (startColor.max!.g! - startColor.min!.g!),
+    instanced: useInstancing,
   });
   createFloat32Attributes({
     geometry,
-    propertyName: 'colorB',
+    propertyName: attr('colorB'),
     maxParticles,
     factory: () =>
       startColor.min!.b! +
       colorRandomRatio * (startColor.max!.b! - startColor.min!.b!),
+    instanced: useInstancing,
   });
   createFloat32Attributes({
     geometry,
-    propertyName: 'colorA',
+    propertyName: attr('colorA'),
     maxParticles,
     factory: 0,
+    instanced: useInstancing,
   });
 
+  // Resolve per-particle attribute accessors (instanced uses prefixed names)
+  const a = geometry.attributes;
+  const aIsActive = a[attr('isActive')];
+  const aColorR = a[attr('colorR')];
+  const aColorG = a[attr('colorG')];
+  const aColorB = a[attr('colorB')];
+  const aColorA = a[attr('colorA')];
+  const aStartFrame = a[attr('startFrame')];
+  const aStartLifetime = a[attr('startLifetime')];
+  const aSize = a[attr('size')];
+  const aRotation = a[attr('rotation')];
+  const aLifetime = a[attr('lifetime')];
+  const aPosition = a[posAttr];
+
   const deactivateParticle = (particleIndex: number) => {
-    geometry.attributes.isActive.array[particleIndex] = 0;
-    geometry.attributes.colorA.array[particleIndex] = 0;
-    geometry.attributes.colorA.needsUpdate = true;
+    aIsActive.array[particleIndex] = 0;
+    aColorA.array[particleIndex] = 0;
+    aColorA.needsUpdate = true;
     freeList.push(particleIndex);
   };
 
@@ -882,7 +923,7 @@ export const createParticleSystem = (
     activationTime: number;
     position: Required<Point3D>;
   }) => {
-    geometry.attributes.isActive.array[particleIndex] = 1;
+    aIsActive.array[particleIndex] = 1;
     generalData.creationTimes[particleIndex] = activationTime;
 
     if (generalData.noise.offsets)
@@ -890,70 +931,69 @@ export const createParticleSystem = (
 
     const colorRandomRatio = Math.random();
 
-    geometry.attributes.colorR.array[particleIndex] =
+    aColorR.array[particleIndex] =
       startColor.min!.r! +
       colorRandomRatio * (startColor.max!.r! - startColor.min!.r!);
-    geometry.attributes.colorR.needsUpdate = true;
+    aColorR.needsUpdate = true;
 
-    geometry.attributes.colorG.array[particleIndex] =
+    aColorG.array[particleIndex] =
       startColor.min!.g! +
       colorRandomRatio * (startColor.max!.g! - startColor.min!.g!);
-    geometry.attributes.colorG.needsUpdate = true;
+    aColorG.needsUpdate = true;
 
-    geometry.attributes.colorB.array[particleIndex] =
+    aColorB.array[particleIndex] =
       startColor.min!.b! +
       colorRandomRatio * (startColor.max!.b! - startColor.min!.b!);
-    geometry.attributes.colorB.needsUpdate = true;
+    aColorB.needsUpdate = true;
 
     generalData.startValues.startColorR[particleIndex] =
-      geometry.attributes.colorR.array[particleIndex];
+      aColorR.array[particleIndex];
     generalData.startValues.startColorG[particleIndex] =
-      geometry.attributes.colorG.array[particleIndex];
+      aColorG.array[particleIndex];
     generalData.startValues.startColorB[particleIndex] =
-      geometry.attributes.colorB.array[particleIndex];
+      aColorB.array[particleIndex];
 
-    geometry.attributes.startFrame.array[particleIndex] =
-      textureSheetAnimation.startFrame
-        ? calculateValue(
-            generalData.particleSystemId,
-            textureSheetAnimation.startFrame,
-            0
-          )
-        : 0;
-    geometry.attributes.startFrame.needsUpdate = true;
+    aStartFrame.array[particleIndex] = textureSheetAnimation.startFrame
+      ? calculateValue(
+          generalData.particleSystemId,
+          textureSheetAnimation.startFrame,
+          0
+        )
+      : 0;
+    aStartFrame.needsUpdate = true;
 
-    geometry.attributes.startLifetime.array[particleIndex] =
+    aStartLifetime.array[particleIndex] =
       calculateValue(
         generalData.particleSystemId,
         startLifetime,
         generalData.normalizedLifetimePercentage
       ) * 1000;
-    geometry.attributes.startLifetime.needsUpdate = true;
+    aStartLifetime.needsUpdate = true;
 
     generalData.startValues.startSize[particleIndex] = calculateValue(
       generalData.particleSystemId,
       startSize,
       generalData.normalizedLifetimePercentage
     );
-    geometry.attributes.size.array[particleIndex] =
+    aSize.array[particleIndex] =
       generalData.startValues.startSize[particleIndex];
-    geometry.attributes.size.needsUpdate = true;
+    aSize.needsUpdate = true;
 
     generalData.startValues.startOpacity[particleIndex] = calculateValue(
       generalData.particleSystemId,
       startOpacity,
       generalData.normalizedLifetimePercentage
     );
-    geometry.attributes.colorA.array[particleIndex] =
+    aColorA.array[particleIndex] =
       generalData.startValues.startOpacity[particleIndex];
-    geometry.attributes.colorA.needsUpdate = true;
+    aColorA.needsUpdate = true;
 
-    geometry.attributes.rotation.array[particleIndex] = calculateValue(
+    aRotation.array[particleIndex] = calculateValue(
       generalData.particleSystemId,
       startRotation,
       generalData.normalizedLifetimePercentage
     );
-    geometry.attributes.rotation.needsUpdate = true;
+    aRotation.needsUpdate = true;
 
     if (normalizedConfig.rotationOverLifetime.isActive)
       generalData.lifetimeValues.rotationOverLifetime[particleIndex] =
@@ -970,13 +1010,13 @@ export const createParticleSystem = (
       velocities[particleIndex]
     );
     const positionIndex = Math.floor(particleIndex * 3);
-    geometry.attributes.position.array[positionIndex] =
+    aPosition.array[positionIndex] =
       position.x + startPositions[particleIndex].x;
-    geometry.attributes.position.array[positionIndex + 1] =
+    aPosition.array[positionIndex + 1] =
       position.y + startPositions[particleIndex].y;
-    geometry.attributes.position.array[positionIndex + 2] =
+    aPosition.array[positionIndex + 2] =
       position.z + startPositions[particleIndex].z;
-    geometry.attributes.position.needsUpdate = true;
+    aPosition.needsUpdate = true;
 
     if (generalData.linearVelocityData) {
       generalData.linearVelocityData[particleIndex].speed.set(
@@ -1035,14 +1075,14 @@ export const createParticleSystem = (
       );
     }
 
-    geometry.attributes.lifetime.array[particleIndex] = 0;
-    geometry.attributes.lifetime.needsUpdate = true;
+    aLifetime.array[particleIndex] = 0;
+    aLifetime.needsUpdate = true;
 
     applyModifiers({
       delta: 0,
       generalData,
       normalizedConfig,
-      attributes: particleSystem.geometry.attributes,
+      attributes: mappedAttributes,
       particleLifetimePercentage: 0,
       particleIndex,
     });
@@ -1068,11 +1108,16 @@ export const createParticleSystem = (
   const cleanupCompletedInstances = (instances: Array<ParticleSystem>) => {
     for (let i = instances.length - 1; i >= 0; i--) {
       const sub = instances[i];
-      const points =
-        sub.instance instanceof THREE.Points
+      const obj3d =
+        sub.instance instanceof THREE.Points ||
+        sub.instance instanceof THREE.Mesh
           ? sub.instance
-          : (sub.instance.children[0] as THREE.Points | undefined);
-      const isActiveArr = points?.geometry?.attributes?.isActive?.array;
+          : (sub.instance.children[0] as THREE.Points | THREE.Mesh | undefined);
+      const geomAttrs = (obj3d as THREE.Points | THREE.Mesh | undefined)
+        ?.geometry?.attributes;
+      const isActiveArr = geomAttrs
+        ? (geomAttrs.isActive?.array ?? geomAttrs.instanceIsActive?.array)
+        : undefined;
       if (!isActiveArr) {
         sub.dispose();
         instances.splice(i, 1);
@@ -1115,6 +1160,10 @@ export const createParticleSystem = (
             ...subConfig.config.transform,
             position: new THREE.Vector3(position.x, position.y, position.z),
           },
+          renderer: {
+            ...(subConfig.config.renderer ?? {}),
+            rendererType: renderer.rendererType,
+          } as typeof subConfig.config.renderer,
           ...(inheritVelocity > 0
             ? {
                 startSpeed:
@@ -1142,13 +1191,38 @@ export const createParticleSystem = (
     }
   };
 
-  let particleSystem = new THREE.Points(geometry, material);
+  let particleSystem: THREE.Points | THREE.Mesh = useInstancing
+    ? new THREE.Mesh(geometry, material)
+    : new THREE.Points(geometry, material);
+
+  if (useInstancing) {
+    particleSystem.onBeforeRender = (glRenderer: THREE.WebGLRenderer) => {
+      const size = glRenderer.getSize(new THREE.Vector2());
+      sharedUniforms.viewportHeight.value = size.y * glRenderer.getPixelRatio();
+    };
+  }
 
   particleSystem.position.copy(transform!.position!);
   particleSystem.rotation.x = THREE.MathUtils.degToRad(transform.rotation!.x);
   particleSystem.rotation.y = THREE.MathUtils.degToRad(transform.rotation!.y);
   particleSystem.rotation.z = THREE.MathUtils.degToRad(transform.rotation!.z);
   particleSystem.scale.copy(transform.scale!);
+
+  // Create a mapped view of attributes so the update loop and modifiers can
+  // use standard names regardless of the renderer type.
+  const mappedAttributes = {
+    position: aPosition,
+    isActive: aIsActive,
+    lifetime: aLifetime,
+    startLifetime: aStartLifetime,
+    startFrame: aStartFrame,
+    size: aSize,
+    rotation: aRotation,
+    colorR: aColorR,
+    colorG: aColorG,
+    colorB: aColorB,
+    colorA: aColorA,
+  };
 
   const calculatedCreationTime =
     now + calculateValue(generalData.particleSystemId, startDelay) * 1000;
@@ -1209,6 +1283,7 @@ export const createParticleSystem = (
   const instanceData: ParticleSystemInstance = {
     particleSystem,
     wrapper,
+    mappedAttributes,
     elapsedUniform: material.uniforms.elapsed,
     generalData,
     onUpdate,
@@ -1357,6 +1432,7 @@ const updateParticleSystemInstance = (
     normalizedForceFields,
     onParticleDeath,
     onParticleBirth,
+    mappedAttributes: ma,
   } = props;
 
   const hasForceFields = normalizedForceFields.length > 0;
@@ -1417,11 +1493,10 @@ const updateParticleSystemInstance = (
   }
 
   const creationTimes = generalData.creationTimes;
-  const attributes = particleSystem.geometry.attributes;
-  const isActiveArr = attributes.isActive.array;
-  const startLifetimeArr = attributes.startLifetime.array;
-  const positionArr = attributes.position.array;
-  const lifetimeArr = attributes.lifetime.array;
+  const isActiveArr = ma.isActive.array;
+  const startLifetimeArr = ma.startLifetime.array;
+  const positionArr = ma.position.array;
+  const lifetimeArr = ma.lifetime.array;
   const creationTimesLength = creationTimes.length;
 
   let positionNeedsUpdate = false;
@@ -1430,7 +1505,7 @@ const updateParticleSystemInstance = (
   _modifierParams.delta = delta;
   _modifierParams.generalData = generalData;
   _modifierParams.normalizedConfig = normalizedConfig;
-  _modifierParams.attributes = attributes;
+  _modifierParams.attributes = ma;
 
   for (let index = 0; index < creationTimesLength; index++) {
     if (isActiveArr[index]) {
@@ -1491,8 +1566,8 @@ const updateParticleSystemInstance = (
     }
   }
 
-  if (positionNeedsUpdate) attributes.position.needsUpdate = true;
-  if (lifetimeNeedsUpdate) attributes.lifetime.needsUpdate = true;
+  if (positionNeedsUpdate) ma.position.needsUpdate = true;
+  if (lifetimeNeedsUpdate) ma.lifetime.needsUpdate = true;
 
   if (isEnabled && (looping || lifetime < duration * 1000)) {
     const emissionDelta = now - lastEmissionTime;
@@ -1621,7 +1696,7 @@ const updateParticleSystemInstance = (
         if (onParticleBirth)
           onParticleBirth(
             particleIndex,
-            attributes.position.array,
+            ma.position.array,
             velocities[particleIndex],
             now
           );

@@ -6,6 +6,7 @@ import {
   ForceFieldFalloff,
   ForceFieldType,
   LifeTimeCurve,
+  RendererType,
   Shape,
   SimulationSpace,
   SubEmitterTrigger,
@@ -503,6 +504,16 @@ export type Renderer = {
   transparent: boolean;
   depthTest: boolean;
   depthWrite: boolean;
+  /**
+   * Selects the rendering technique for particles.
+   *
+   * - `RendererType.POINTS` (default) — classic point-sprite renderer using `THREE.Points`.
+   * - `RendererType.INSTANCED` — camera-facing quads via `InstancedBufferGeometry`,
+   *   removing the `gl_PointSize` hardware limit and enabling stretched billboards.
+   *
+   * @default RendererType.POINTS
+   */
+  rendererType?: RendererType;
 };
 
 /**
@@ -1283,7 +1294,7 @@ export type ParticleSystemConfig = {
    * Called on every update frame with particle system data.
    */
   onUpdate?: (data: {
-    particleSystem: THREE.Points;
+    particleSystem: THREE.Points | THREE.Mesh;
     delta: number;
     elapsed: number;
     lifetime: number;
@@ -1349,20 +1360,46 @@ export type GeneralData = {
   burstStates?: Array<BurstState>;
 };
 
+/** Union of all buffer attribute types Three.js uses in geometry. */
+type AnyBufferAttribute =
+  | THREE.BufferAttribute
+  | THREE.InstancedBufferAttribute
+  | THREE.InterleavedBufferAttribute;
+
+/**
+ * A view that maps standard attribute names (e.g. 'position', 'size') to
+ * their actual geometry attribute objects, which may have different names
+ * in the instanced renderer (e.g. 'instanceOffset', 'instanceSize').
+ */
+export type MappedAttributes = {
+  position: AnyBufferAttribute;
+  isActive: AnyBufferAttribute;
+  lifetime: AnyBufferAttribute;
+  startLifetime: AnyBufferAttribute;
+  startFrame: AnyBufferAttribute;
+  size: AnyBufferAttribute;
+  rotation: AnyBufferAttribute;
+  colorR: AnyBufferAttribute;
+  colorG: AnyBufferAttribute;
+  colorB: AnyBufferAttribute;
+  colorA: AnyBufferAttribute;
+};
+
 export type ParticleSystemInstance = {
-  particleSystem: THREE.Points;
+  particleSystem: THREE.Points | THREE.Mesh;
   wrapper?: Gyroscope;
+  mappedAttributes: MappedAttributes;
   elapsedUniform: { value: number };
   generalData: GeneralData;
   onUpdate: (data: {
-    particleSystem: THREE.Points;
+    particleSystem: THREE.Points | THREE.Mesh;
     delta: number;
     elapsed: number;
     lifetime: number;
     normalizedLifetime: number;
     iterationCount: number;
   }) => void;
-  onComplete: (data: { particleSystem: THREE.Points }) => void;
+  onComplete: (data: { particleSystem: THREE.Points | THREE.Mesh }) => void;
   creationTime: number;
   lastEmissionTime: number;
   duration: number;
@@ -1418,7 +1455,7 @@ export type ParticleSystemInstance = {
  * particleSystem.dispose(); // Cleanup the particle system
  */
 export type ParticleSystem = {
-  instance: THREE.Points | Gyroscope;
+  instance: THREE.Points | THREE.Mesh | Gyroscope;
   resumeEmitter: () => void;
   pauseEmitter: () => void;
   dispose: () => void;
