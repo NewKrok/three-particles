@@ -166,6 +166,28 @@ export const enum ForceFieldType {
 }
 
 /**
+ * Defines the rendering technique used for particles.
+ *
+ * @enum {string}
+ */
+export const enum RendererType {
+  /**
+   * Render particles as point sprites using `THREE.Points`.
+   * This is the default renderer, efficient for small to medium particle counts.
+   * Note: point size is limited by `gl_PointSize` hardware caps (typically 64–256 px).
+   */
+  POINTS = 'POINTS',
+
+  /**
+   * Render particles as camera-facing quads using `THREE.InstancedBufferGeometry`.
+   * Removes the `gl_PointSize` hardware limit, supports stretched billboards,
+   * and enables batching multiple emitters into fewer draw calls.
+   * Recommended for 10 000+ particles or when large on-screen particle sizes are needed.
+   */
+  INSTANCED = 'INSTANCED',
+}
+
+/**
  * Defines how force diminishes with distance from a POINT force field center.
  * Only applicable to {@link ForceFieldType.POINT} force fields.
  *
