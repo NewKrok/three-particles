@@ -14,7 +14,7 @@
 | Rate over distance emission | ✅ Complete |
 | TypeDoc API documentation | ✅ Complete |
 | Visual editor (three-particles-editor) | ✅ Complete |
-| Test coverage (~96% statement) | ✅ Target ≥90% |
+| Test coverage (99.6% stmt, 96.6% branch, 519 tests) | ✅ Target ≥90% |
 | CI/CD auto release (npm publish on master push) | ✅ Complete |
 | PR checks (lint + test + build + bundle size) | ✅ Complete |
 | Bundle size monitoring (150 KB limit) | ✅ Complete |
