@@ -462,6 +462,58 @@ export type TextureSheetAnimation = {
 };
 
 /**
+ * Configuration for the trail/ribbon renderer.
+ * Controls how particle trails are drawn when using `RendererType.TRAIL`.
+ *
+ * @property length - Number of position history samples per particle (trail segments).
+ *   Higher values produce longer, smoother trails but cost more memory.
+ *   @default 20
+ * @property widthOverTrail - Lifetime curve that controls the ribbon width along its length.
+ *   At 0 the trail head (current position), at 1 the trail tail (oldest position).
+ *   @default constant 1.0
+ * @property opacityOverTrail - Lifetime curve that controls opacity along the trail length.
+ *   @default linear fade from 1 (head) to 0 (tail)
+ *
+ * @example
+ * ```typescript
+ * // Long comet-style trail tapering to nothing
+ * trail: {
+ *   length: 40,
+ *   widthOverTrail: {
+ *     type: LifeTimeCurve.BEZIER,
+ *     scale: 1,
+ *     bezierPoints: [
+ *       { x: 0, y: 1, percentage: 0 },
+ *       { x: 0.5, y: 0.4 },
+ *       { x: 1, y: 0, percentage: 1 },
+ *     ],
+ *   },
+ * }
+ * ```
+ */
+export type TrailConfig = {
+  /** Number of position history samples per particle. @default 20 */
+  length?: number;
+  /** Base ribbon width in world units. @default 1.0 */
+  width?: number;
+  /** Curve controlling ribbon width from head (0) to tail (1). */
+  widthOverTrail?: LifetimeCurve;
+  /** Curve controlling opacity from head (0) to tail (1). */
+  opacityOverTrail?: LifetimeCurve;
+  /**
+   * Per-channel color multiplier curves along the trail (head=0, tail=1).
+   * Works as multipliers on the particle's current color, same as colorOverLifetime.
+   * To achieve full color transitions, use white startColor.
+   */
+  colorOverTrail?: {
+    isActive: boolean;
+    r: LifetimeCurve;
+    g: LifetimeCurve;
+    b: LifetimeCurve;
+  };
+};
+
+/**
  * Configuration for the particle system renderer, controlling blending, transparency, depth, and background color behavior.
  *
  * @property blending - Defines the blending mode for the particle system (e.g., additive blending).
@@ -514,6 +566,14 @@ export type Renderer = {
    * @default RendererType.POINTS
    */
   rendererType?: RendererType;
+
+  /**
+   * Trail/ribbon renderer configuration.
+   * Only used when `rendererType` is `RendererType.TRAIL`.
+   *
+   * @see TrailConfig
+   */
+  trail?: TrailConfig;
 };
 
 /**
@@ -1358,6 +1418,20 @@ export type GeneralData = {
   isEnabled: boolean;
   /** Tracks the state of each burst emission event */
   burstStates?: Array<BurstState>;
+  /**
+   * Circular buffer storing position history for trail renderer.
+   * Each particle has `trailLength` slots of (x, y, z) positions.
+   * Only allocated when `RendererType.TRAIL` is used.
+   */
+  positionHistory?: Float32Array;
+  /** Write index per particle into the circular position history buffer. */
+  positionHistoryIndex?: Uint16Array;
+  /** Number of valid history samples per particle (fills up from 0 to trailLength). */
+  positionHistoryCount?: Uint16Array;
+  /** Trail length (number of history samples per particle). */
+  trailLength?: number;
+  /** Cached camera world position, updated each frame via onBeforeRender for billboard trails. */
+  trailCameraPosition?: THREE.Vector3;
 };
 
 /** Union of all buffer attribute types Three.js uses in geometry. */
@@ -1432,6 +1506,26 @@ export type ParticleSystemInstance = {
     velocity: THREE.Vector3,
     now: number
   ) => void;
+  /** Trail mesh for RendererType.TRAIL */
+  trailMesh?: THREE.Mesh;
+  /** Trail geometry position attribute */
+  trailPositionAttr?: THREE.BufferAttribute;
+  /** Trail geometry alpha attribute */
+  trailAlphaAttr?: THREE.BufferAttribute;
+  /** Trail geometry color attribute */
+  trailColorAttr?: THREE.BufferAttribute;
+  /** Trail width curve function */
+  trailWidthCurveFn?: CurveFunction;
+  /** Trail opacity curve function */
+  trailOpacityCurveFn?: CurveFunction;
+  /** Trail color-over-trail curve functions (r, g, b multipliers) */
+  trailColorOverTrailFns?: {
+    r: CurveFunction;
+    g: CurveFunction;
+    b: CurveFunction;
+  };
+  /** Trail config (length, width) */
+  trailConfig?: { length: number; width: number };
 };
 
 /**

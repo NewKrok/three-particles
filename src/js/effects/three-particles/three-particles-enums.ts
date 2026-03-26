@@ -185,6 +185,18 @@ export const enum RendererType {
    * Recommended for 10 000+ particles or when large on-screen particle sizes are needed.
    */
   INSTANCED = 'INSTANCED',
+
+  /**
+   * Render each particle as a ribbon trail connecting its current and previous positions.
+   * Each particle stores a configurable number of position history samples, and the
+   * renderer builds a camera-facing triangle-strip ribbon through those samples.
+   *
+   * Trail width and opacity can taper along the ribbon length for effects like
+   * sword slashes, magic missiles, comet tails, and speed lines.
+   *
+   * Configure trail-specific properties via {@link TrailConfig} on the renderer.
+   */
+  TRAIL = 'TRAIL',
 }
 
 /**

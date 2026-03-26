@@ -285,7 +285,8 @@ npx typedoc               # Generate documentation
 | Force fields / Attractors | ✅ Complete |
 | GPU instancing (`RendererType.INSTANCED`) | ✅ Complete |
 | React Three Fiber integration (docs + usage guide) | ✅ Complete |
-| Trail / Ribbon renderer | ⬜ Planned |
+| Trail / Ribbon renderer (`RendererType.TRAIL`) with `colorOverTrail` | ✅ Complete |
+| Trail improvements (tangent smoothing, adaptive sampling, max time) | ⬜ Planned |
 | WebGPU compute support | ⬜ Planned |
 | Preset system | ⬜ Planned |
 | Mesh particle renderer | ⬜ Planned |

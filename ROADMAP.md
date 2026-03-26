@@ -28,20 +28,42 @@
 | tsup build (ESM + minified + DTS) | ✅ |
 | GPU Instancing (`InstancedBufferGeometry` renderer) | ✅ |
 | React Three Fiber integration (docs + usage guide) | ✅ |
+| Trail / Ribbon Renderer (`RendererType.TRAIL`) | ✅ |
 
 ---
 
 ## High Priority — Performance & Ecosystem
 
-### Trail / Ribbon Renderer
-- Continuous trail behind moving particles (projectiles, lightning, light streaks)
-- Configurable width, fade, and color over trail length
-- Billboard or camera-facing trail geometry
-
 ### WebGPU Compute Support
 - Leverage Three.js WebGPU renderer (production-ready since r171)
 - Compute shaders for particle simulation on GPU — 10-100x performance for large systems
 - Automatic fallback to WebGL when WebGPU is unavailable
+
+---
+
+## High Priority — Trail Renderer Improvements
+
+### Trail Tangent Smoothing
+- Catmull-Rom spline interpolation between history samples
+- Eliminates sharp kinks at trail bends
+- Smoother visual quality, especially at low frame rates
+
+### Adaptive Trail Sampling
+- Distance-based history recording (only push samples when particle moves enough)
+- Frame-rate independent trail appearance
+- Configurable minimum sample distance
+
+### Trail Max Time
+- Time-based trail length (e.g., 2 seconds) in addition to segment count
+- Trail segments fade/expire based on age, not just ring buffer overflow
+
+### Connected Ribbons
+- Multiple particles contributing to a single continuous ribbon
+- Useful for sword slashes, laser beams, rope physics
+
+### Trail Twist Prevention
+- Frame-tracking to detect and prevent self-intersecting ribbons
+- Consistent ribbon orientation during rapid direction changes
 
 ---
 

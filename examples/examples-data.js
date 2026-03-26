@@ -1,6 +1,43 @@
 
 export const examples = [
   {
+    id: "aurora-trail",
+    title: "Aurora Trail",
+    description: "Ethereal aurora ribbons shifting from green through cyan to purple along the trail length.",
+    tags: ["trail", "colorOverTrail", "advanced"],
+    config: {"duration":5,"looping":true,"startLifetime":{"min":2.0,"max":3.5},"startSpeed":{"min":1.5,"max":3.0},"startSize":1,"startOpacity":1.0,"startRotation":0,"startColor":{"min":{"r":1.0,"g":1.0,"b":1.0},"max":{"r":1.0,"g":1.0,"b":1.0}},"maxParticles":25,"emission":{"rateOverTime":10},"shape":{"shape":"CONE","cone":{"angle":15,"radius":0.2,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"trail":{"length":60,"width":0.6,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.4,"y":0.8},{"x":0.8,"y":0.3},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.7},{"x":0.85,"y":0.2},{"x":1,"y":0,"percentage":1}]},"colorOverTrail":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.2,"percentage":0},{"x":0.3,"y":0.1},{"x":0.7,"y":0.6},{"x":1,"y":0.8,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":1.0,"percentage":0},{"x":0.3,"y":0.8},{"x":0.7,"y":0.2},{"x":1,"y":0.1,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.4,"percentage":0},{"x":0.3,"y":0.8},{"x":0.7,"y":1.0},{"x":1,"y":0.9,"percentage":1}]}}}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.9},{"x":0.85,"y":0.4},{"x":1,"y":0,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.2,"frequency":0.4,"octaves":2,"positionAmount":0.3}},
+  },
+  {
+    id: "flame-trail",
+    title: "Flame Trail",
+    description: "Fiery ribbon trail with a flame texture mapped along its length.",
+    tags: ["trail", "texture", "advanced"],
+    textureId: "FLAME",
+    config: {"duration":5,"looping":true,"startLifetime":{"min":1.0,"max":2.0},"startSpeed":{"min":2.5,"max":4.0},"startSize":1,"startOpacity":1.0,"startRotation":0,"startColor":{"min":{"r":1.0,"g":0.6,"b":0.1},"max":{"r":1.0,"g":0.9,"b":0.3}},"maxParticles":20,"emission":{"rateOverTime":12},"shape":{"shape":"CONE","cone":{"angle":6,"radius":0.1,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"trail":{"length":40,"width":0.6,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.4,"y":0.6},{"x":0.8,"y":0.15},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.7},{"x":0.7,"y":0.2},{"x":1,"y":0,"percentage":1}]}}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.6,"y":0.8},{"x":0.9,"y":0.3},{"x":1,"y":0,"percentage":1}]}}},
+  },
+  {
+    id: "comet-trail",
+    title: "Comet Trail",
+    description: "Glowing comet with a long tapering ribbon trail that fades from white-hot to deep blue.",
+    tags: ["trail", "ribbon", "advanced"],
+    config: {"duration":5,"looping":true,"startLifetime":{"min":1.5,"max":3.0},"startSpeed":{"min":2.0,"max":4.0},"startSize":1,"startOpacity":1.0,"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":1.0,"g":0.8,"b":0.4},"max":{"r":1.0,"g":0.95,"b":0.7}},"maxParticles":30,"emission":{"rateOverTime":15},"shape":{"shape":"CONE","cone":{"angle":8,"radius":0.1,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"discardBackgroundColor":true,"backgroundColorTolerance":0.2,"backgroundColor":{"r":0,"g":0,"b":0},"trail":{"length":60,"width":0.5,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.7},{"x":0.7,"y":0.2},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.4,"y":0.6},{"x":0.8,"y":0.15},{"x":1,"y":0,"percentage":1}]}}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.8},{"x":1,"y":0.4,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.95,"percentage":0},{"x":0.5,"y":0.5},{"x":1,"y":0.2,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.7,"percentage":0},{"x":0.5,"y":0.8},{"x":1,"y":1.0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.8},{"x":0.85,"y":0.3},{"x":1,"y":0,"percentage":1}]}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.5,"percentage":0},{"x":0.1,"y":1},{"x":0.6,"y":0.8,"percentage":0.6},{"x":1,"y":0.3,"percentage":1}]}}},
+  },
+  {
+    id: "magic-missile-trail",
+    title: "Magic Missile Trail",
+    description: "Spiraling arcane missile with a vibrant purple-blue ribbon trail and noise-driven wobble.",
+    tags: ["trail", "ribbon", "noise", "advanced"],
+    textureId: "STARBURST",
+    config: {"duration":3,"looping":true,"startLifetime":{"min":0.8,"max":1.5},"startSpeed":{"min":3.0,"max":5.0},"startSize":1,"startOpacity":1.0,"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":0.7,"g":0.4,"b":1.0},"max":{"r":1.0,"g":0.7,"b":1.0}},"maxParticles":50,"emission":{"rateOverTime":40},"shape":{"shape":"CONE","cone":{"angle":5,"radius":0.05,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"trail":{"length":50,"width":0.6,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.5},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.6,"y":0.5},{"x":1,"y":0,"percentage":1}]}}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.5,"percentage":0},{"x":0.3,"y":0.7},{"x":0.7,"y":0.9},{"x":1,"y":1.0,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.2,"percentage":0},{"x":0.3,"y":0.4},{"x":0.7,"y":0.6},{"x":1,"y":0.8,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":1.0,"percentage":0},{"x":0.5,"y":0.9},{"x":1,"y":0.7,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.4,"y":0.9},{"x":0.8,"y":0.4},{"x":1,"y":0,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.3,"frequency":0.8,"octaves":2,"positionAmount":0.4,"rotationAmount":1.5,"sizeAmount":0.1}},
+  },
+  {
+    id: "fire-whip-trail",
+    title: "Fire Whip Trail",
+    description: "Fiery trail ribbons arcing upward with gravity pull, transitioning from white-hot to smoky red.",
+    tags: ["trail", "ribbon", "color", "advanced"],
+    config: {"duration":4,"looping":true,"startLifetime":{"min":1.2,"max":2.0},"startSpeed":{"min":4.0,"max":6.0},"startSize":1,"startOpacity":1.0,"startRotation":0,"gravity":4.0,"startColor":{"min":{"r":1.0,"g":0.9,"b":0.7},"max":{"r":1.0,"g":1.0,"b":0.9}},"maxParticles":20,"emission":{"rateOverTime":12},"shape":{"shape":"CONE","cone":{"angle":35,"radius":0.1,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"trail":{"length":60,"width":0.5,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.2,"y":0.9},{"x":0.6,"y":0.4},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.7},{"x":0.7,"y":0.2},{"x":1,"y":0,"percentage":1}]}}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":1},{"x":0.6,"y":0.9,"percentage":0.6},{"x":1,"y":0.4,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.9,"percentage":0},{"x":0.2,"y":0.6},{"x":0.5,"y":0.3,"percentage":0.5},{"x":1,"y":0.05,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.7,"percentage":0},{"x":0.15,"y":0.2},{"x":0.4,"y":0.05,"percentage":0.4},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.9},{"x":0.7,"y":0.5},{"x":1,"y":0,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.15,"frequency":0.6,"octaves":1,"positionAmount":0.2}},
+  },
+  {
     id: "shield",
     title: "Shield",
     description: "Energy shield using a repulsive force field to confine particles on a spherical shell.",
