@@ -75,6 +75,33 @@ function animate() {
 
 - `RendererType.POINTS` (default) — Classic point sprites via `THREE.Points`
 - `RendererType.INSTANCED` — Camera-facing quads via `InstancedBufferGeometry`, removes `gl_PointSize` hardware limit
+- `RendererType.TRAIL` — Ribbon trails behind particles with configurable width, opacity, and color tapering
+
+## Trail / Ribbon Renderer
+
+Configure via `renderer.trail`:
+
+```typescript
+renderer: {
+  rendererType: RendererType.TRAIL,
+  blending: THREE.AdditiveBlending,
+  transparent: true,
+  trail: {
+    length: 40,           // History samples per particle (default: 20)
+    width: 0.5,           // Ribbon width in world units (default: 1.0)
+    widthOverTrail: { ... },    // LifetimeCurve: width taper (0=head, 1=tail)
+    opacityOverTrail: { ... },  // LifetimeCurve: opacity taper
+    colorOverTrail: {           // Optional per-channel color multipliers
+      isActive: true,
+      r: { type: LifeTimeCurve.BEZIER, bezierPoints: [...] },
+      g: { type: LifeTimeCurve.BEZIER, bezierPoints: [...] },
+      b: { type: LifeTimeCurve.BEZIER, bezierPoints: [...] },
+    },
+  },
+}
+```
+
+Trails use GPU billboard rendering (vertex shader). Supports optional textures and soft-edge fade.
 
 ## Emitter Shapes
 

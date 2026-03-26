@@ -41,6 +41,32 @@
 
 ---
 
+## High Priority — Trail Renderer Improvements
+
+### Trail Tangent Smoothing
+- Catmull-Rom spline interpolation between history samples
+- Eliminates sharp kinks at trail bends
+- Smoother visual quality, especially at low frame rates
+
+### Adaptive Trail Sampling
+- Distance-based history recording (only push samples when particle moves enough)
+- Frame-rate independent trail appearance
+- Configurable minimum sample distance
+
+### Trail Max Time
+- Time-based trail length (e.g., 2 seconds) in addition to segment count
+- Trail segments fade/expire based on age, not just ring buffer overflow
+
+### Connected Ribbons
+- Multiple particles contributing to a single continuous ribbon
+- Useful for sword slashes, laser beams, rope physics
+
+### Trail Twist Prevention
+- Frame-tracking to detect and prevent self-intersecting ribbons
+- Consistent ribbon orientation during rapid direction changes
+
+---
+
 ## Medium Priority — Features & DX
 
 ### React Three Fiber Wrapper Package

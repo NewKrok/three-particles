@@ -95,14 +95,14 @@
     .card-info h3 { font-size: 1.1rem; color: #fff; margin-bottom: 4px; }
     .card-info p { font-size: 0.85rem; color: #888; line-height: 1.4; flex: 1; }
     .card-info .tag {
-      display: inline-block; margin-top: 8px; padding: 2px 8px;
+      display: inline-block; padding: 2px 8px;
       background: #1a1a2e; color: #4fc3f7; border-radius: 3px; font-size: 0.75rem;
     }
-    .card-info .card-actions {
-      display: flex; align-items: center; justify-content: space-between; margin-top: 10px;
+    .card-info .card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .card-info .card-controls {
+      display: flex; align-items: center; justify-content: flex-end; margin-top: 10px;
     }
-    .card-info .card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-    .card-btns { display: flex; gap: 6px; flex-shrink: 0; }
+    .card-btns { display: flex; align-items: center; gap: 6px; margin-left: auto; }
     .icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
       width: 30px; height: 30px; border: 1px solid #333; border-radius: 4px;
@@ -221,7 +221,7 @@
 
     /* Renderer type toggle */
     .renderer-toggle {
-      display: inline-flex; border: 1px solid #333; border-radius: 4px;
+      display: inline-flex; align-items: center; border: 1px solid #333; border-radius: 4px;
       overflow: hidden; font-size: 0.7rem; flex-shrink: 0;
     }
     .renderer-toggle button {
@@ -232,6 +232,11 @@
     }
     .renderer-toggle button.active { background: #1a1a2e; color: #4fc3f7; }
     .renderer-toggle button:hover:not(.active) { color: #ccc; }
+    .trail-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 4px 8px; color: #f7a14f; font-size: inherit; font-family: inherit;
+      letter-spacing: 0.02em; line-height: 1;
+    }
 
     /* Expand modal */
     .expand-overlay {
@@ -331,10 +336,7 @@
       <div class="expand-header">
         <h2 id="expand-title"></h2>
         <div class="expand-controls">
-          <div class="renderer-toggle" id="expand-renderer-toggle">
-            <button class="active" data-type="POINTS" title="Point sprites (THREE.Points)">POINTS</button>
-            <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INSTANCED</button>
-          </div>
+          <div class="renderer-toggle" id="expand-renderer-toggle"></div>
         </div>
       </div>
       <div class="expand-canvas-wrapper">

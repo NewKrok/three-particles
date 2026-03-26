@@ -56,6 +56,18 @@ import {
 
 export * from './types.js';
 
+const normalizeTrailCurve = (
+  curve: LifetimeCurve | undefined,
+  defaultCurve: LifetimeCurve
+): LifetimeCurve => {
+  if (!curve) return defaultCurve;
+  const raw = curve as Record<string, unknown>;
+  if (!raw.type && Array.isArray(raw.bezierPoints)) {
+    return { type: LifeTimeCurve.BEZIER, ...raw } as LifetimeCurve;
+  }
+  return curve;
+};
+
 let _particleSystemId = 0;
 let createdParticleSystems: Array<ParticleSystemInstance> = [];
 
@@ -65,6 +77,7 @@ const _lastWorldPositionSnapshot = new THREE.Vector3();
 // Trail ribbon helpers (reused across frames to avoid allocations)
 const _trailDir = new THREE.Vector3();
 const _trailPerp = new THREE.Vector3();
+const _trailToCam = new THREE.Vector3();
 const _distanceStep = { x: 0, y: 0, z: 0 };
 const _tempPosition = { x: 0, y: 0, z: 0 };
 const _modifierParams = {
@@ -743,25 +756,27 @@ export const createParticleSystem = (
     !useTrail && renderer.rendererType === RendererType.INSTANCED;
 
   // Trail config defaults
-  const trailConfig: Required<TrailConfig> | undefined = useTrail
+  const defaultTrailCurve: LifetimeCurve = {
+    type: LifeTimeCurve.BEZIER,
+    scale: 1,
+    bezierPoints: [
+      { x: 0, y: 1, percentage: 0 },
+      { x: 1, y: 0, percentage: 1 },
+    ],
+  };
+  const trailConfig = useTrail
     ? {
         length: renderer.trail?.length ?? 20,
-        widthOverTrail: renderer.trail?.widthOverTrail ?? {
-          type: LifeTimeCurve.BEZIER,
-          scale: 1,
-          bezierPoints: [
-            { x: 0, y: 1, percentage: 0 },
-            { x: 1, y: 0, percentage: 1 },
-          ],
-        },
-        opacityOverTrail: renderer.trail?.opacityOverTrail ?? {
-          type: LifeTimeCurve.BEZIER,
-          scale: 1,
-          bezierPoints: [
-            { x: 0, y: 1, percentage: 0 },
-            { x: 1, y: 0, percentage: 1 },
-          ],
-        },
+        width: renderer.trail?.width ?? 1.0,
+        widthOverTrail: normalizeTrailCurve(
+          renderer.trail?.widthOverTrail,
+          defaultTrailCurve
+        ),
+        opacityOverTrail: normalizeTrailCurve(
+          renderer.trail?.opacityOverTrail,
+          defaultTrailCurve
+        ),
+        colorOverTrail: renderer.trail?.colorOverTrail,
       }
     : undefined;
 
@@ -979,6 +994,12 @@ export const createParticleSystem = (
   }) => {
     aIsActive.array[particleIndex] = 1;
     generalData.creationTimes[particleIndex] = activationTime;
+
+    // Reset trail history so a recycled particle doesn't inherit old trail
+    if (generalData.positionHistoryCount) {
+      generalData.positionHistoryCount[particleIndex] = 0;
+      generalData.positionHistoryIndex![particleIndex] = 0;
+    }
 
     if (generalData.noise.offsets)
       generalData.noise.offsets[particleIndex] = Math.random() * 100;
@@ -1254,6 +1275,9 @@ export const createParticleSystem = (
   let trailIndexAttr: THREE.BufferAttribute | undefined;
   let trailWidthCurveFn: CurveFunction | undefined;
   let trailOpacityCurveFn: CurveFunction | undefined;
+  let trailColorOverTrailFns:
+    | { r: CurveFunction; g: CurveFunction; b: CurveFunction }
+    | undefined;
 
   if (useTrail && trailConfig) {
     const trailLength = trailConfig.length;
@@ -1267,18 +1291,25 @@ export const createParticleSystem = (
 
     trailGeometry = new THREE.BufferGeometry();
     const trailPositions = new Float32Array(totalVertices * 3);
+    const trailNextPositions = new Float32Array(totalVertices * 3);
     const trailAlphas = new Float32Array(totalVertices);
     const trailColors = new Float32Array(totalVertices * 4);
+    const trailOffsets = new Float32Array(totalVertices);
+    const trailHalfWidths = new Float32Array(totalVertices);
+    const trailUVs = new Float32Array(totalVertices * 2);
     const trailIndices = new Uint32Array(totalIndices);
 
-    // Pre-build index buffer (fixed topology, never changes)
+    // Pre-build index buffer and static offset attribute (-1/+1 per side)
     for (let p = 0; p < maxParticles; p++) {
       const vertBase = p * verticesPerParticle;
       const idxBase = p * indicesPerParticle;
+      for (let s = 0; s < trailLength; s++) {
+        trailOffsets[vertBase + s * 2] = -1.0; // left
+        trailOffsets[vertBase + s * 2 + 1] = 1.0; // right
+      }
       for (let s = 0; s < trailLength - 1; s++) {
         const i = idxBase + s * 6;
         const v = vertBase + s * 2;
-        // Two triangles forming a quad between segment s and s+1
         trailIndices[i] = v;
         trailIndices[i + 1] = v + 1;
         trailIndices[i + 2] = v + 2;
@@ -1290,20 +1321,34 @@ export const createParticleSystem = (
 
     trailPositionAttr = new THREE.BufferAttribute(trailPositions, 3);
     trailPositionAttr.setUsage(THREE.DynamicDrawUsage);
+    const trailNextAttr = new THREE.BufferAttribute(trailNextPositions, 3);
+    trailNextAttr.setUsage(THREE.DynamicDrawUsage);
     trailAlphaAttr = new THREE.BufferAttribute(trailAlphas, 1);
     trailAlphaAttr.setUsage(THREE.DynamicDrawUsage);
     trailColorAttr = new THREE.BufferAttribute(trailColors, 4);
     trailColorAttr.setUsage(THREE.DynamicDrawUsage);
+    const trailHalfWidthAttr = new THREE.BufferAttribute(trailHalfWidths, 1);
+    trailHalfWidthAttr.setUsage(THREE.DynamicDrawUsage);
+    const trailUVAttr = new THREE.BufferAttribute(trailUVs, 2);
+    trailUVAttr.setUsage(THREE.DynamicDrawUsage);
     trailIndexAttr = new THREE.BufferAttribute(trailIndices, 1);
 
     trailGeometry.setAttribute('position', trailPositionAttr);
+    trailGeometry.setAttribute('trailNext', trailNextAttr);
     trailGeometry.setAttribute('trailAlpha', trailAlphaAttr);
     trailGeometry.setAttribute('trailColor', trailColorAttr);
+    trailGeometry.setAttribute(
+      'trailOffset',
+      new THREE.BufferAttribute(trailOffsets, 1)
+    );
+    trailGeometry.setAttribute('trailHalfWidth', trailHalfWidthAttr);
+    trailGeometry.setAttribute('trailUV', trailUVAttr);
     trailGeometry.setIndex(trailIndexAttr);
 
     const trailMaterial = new THREE.ShaderMaterial({
       uniforms: {
         map: { value: particleMap },
+        useMap: { value: !!particleMap },
         discardBackgroundColor: { value: renderer.discardBackgroundColor },
         backgroundColor: { value: renderer.backgroundColor },
         backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
@@ -1320,6 +1365,17 @@ export const createParticleSystem = (
     trailMesh = new THREE.Mesh(trailGeometry, trailMaterial);
     trailMesh.frustumCulled = false;
 
+    // Capture camera world position each frame for billboard trail ribbons
+    const trailCameraPos = new THREE.Vector3();
+    trailMesh.onBeforeRender = (
+      _renderer: THREE.WebGLRenderer,
+      _scene: THREE.Scene,
+      camera: THREE.Camera
+    ) => {
+      camera.getWorldPosition(trailCameraPos);
+    };
+    generalData.trailCameraPosition = trailCameraPos;
+
     // Pre-compute curve functions for trail width/opacity
     trailWidthCurveFn = getCurveFunctionFromConfig(
       generalData.particleSystemId,
@@ -1329,6 +1385,23 @@ export const createParticleSystem = (
       generalData.particleSystemId,
       trailConfig.opacityOverTrail
     );
+
+    if (trailConfig.colorOverTrail?.isActive) {
+      trailColorOverTrailFns = {
+        r: getCurveFunctionFromConfig(
+          generalData.particleSystemId,
+          normalizeTrailCurve(trailConfig.colorOverTrail.r, defaultTrailCurve)
+        ),
+        g: getCurveFunctionFromConfig(
+          generalData.particleSystemId,
+          normalizeTrailCurve(trailConfig.colorOverTrail.g, defaultTrailCurve)
+        ),
+        b: getCurveFunctionFromConfig(
+          generalData.particleSystemId,
+          normalizeTrailCurve(trailConfig.colorOverTrail.b, defaultTrailCurve)
+        ),
+      };
+    }
   }
 
   let particleSystem: THREE.Points | THREE.Mesh = useInstancing
@@ -1342,9 +1415,10 @@ export const createParticleSystem = (
     };
   }
 
-  // In trail mode, hide the particle points and attach the visible trail mesh
+  // In trail mode, hide the particle points (but keep the parent visible so
+  // the trail mesh child can render) and attach the visible trail mesh
   if (useTrail && trailMesh) {
-    particleSystem.visible = false;
+    material.visible = false;
     particleSystem.add(trailMesh);
   }
 
@@ -1458,7 +1532,11 @@ export const createParticleSystem = (
           trailColorAttr,
           trailWidthCurveFn,
           trailOpacityCurveFn,
-          trailConfig: { length: trailConfig!.length },
+          trailColorOverTrailFns,
+          trailConfig: {
+            length: trailConfig!.length,
+            width: trailConfig!.width,
+          },
         }
       : {}),
   };
@@ -1893,6 +1971,7 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
     trailColorAttr,
     trailWidthCurveFn,
     trailOpacityCurveFn,
+    trailColorOverTrailFns,
     trailConfig,
     mappedAttributes: ma,
   } = props;
@@ -1926,6 +2005,16 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
   const trailPosArr = trailPositionAttr.array as Float32Array;
   const trailAlphaArr = trailAlphaAttr.array as Float32Array;
   const trailColorArr = trailColorAttr.array as Float32Array;
+  const trailMesh = props.trailMesh!;
+  const trailNextArr = (
+    trailMesh.geometry.getAttribute('trailNext') as THREE.BufferAttribute
+  ).array as Float32Array;
+  const trailUVArr = (
+    trailMesh.geometry.getAttribute('trailUV') as THREE.BufferAttribute
+  ).array as Float32Array;
+  const trailHalfWidthArr = (
+    trailMesh.geometry.getAttribute('trailHalfWidth') as THREE.BufferAttribute
+  ).array as Float32Array;
   const verticesPerParticle = trailLength * 2;
   const creationTimesLength = generalData.creationTimes.length;
   let hasUpdates = false;
@@ -1940,7 +2029,7 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
       const py = positionArr[posIdx + 1];
       const pz = positionArr[posIdx + 2];
 
-      // Push current position into circular buffer
+      // Push current position into circular buffer every frame
       const histBase = (index * trailLength + historyIndex[index]) * 3;
       positionHistory[histBase] = px;
       positionHistory[histBase + 1] = py;
@@ -1949,8 +2038,7 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
       if (historyCount[index] < trailLength) historyCount[index]++;
 
       const count = historyCount[index];
-      const particleSize = sizeArr[index];
-      const ribbonWidth = particleSize * 0.1;
+      const ribbonWidth = trailConfig.width;
 
       // Get particle color
       const cr = colorRArr[index];
@@ -1958,20 +2046,35 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
       const cb = colorBArr[index];
       const ca = colorAArr[index];
 
-      // Build ribbon vertices from history (newest first)
+      const ringOff = index * trailLength * 3;
+
+      // Build ribbon: both left/right vertices share the center position.
+      // The shader offsets them using trailNext to compute the tangent.
       for (let s = 0; s < trailLength; s++) {
         const vIdx = (vertBase + s * 2) * 3;
         const cIdx = (vertBase + s * 2) * 4;
         const aIdx = vertBase + s * 2;
 
         if (s >= count) {
-          // No history data yet — collapse vertices to zero
           trailPosArr[vIdx] = px;
           trailPosArr[vIdx + 1] = py;
           trailPosArr[vIdx + 2] = pz;
           trailPosArr[vIdx + 3] = px;
           trailPosArr[vIdx + 4] = py;
           trailPosArr[vIdx + 5] = pz;
+          trailNextArr[vIdx] = px;
+          trailNextArr[vIdx + 1] = py;
+          trailNextArr[vIdx + 2] = pz;
+          trailNextArr[vIdx + 3] = px;
+          trailNextArr[vIdx + 4] = py;
+          trailNextArr[vIdx + 5] = pz;
+          trailHalfWidthArr[aIdx] = 0;
+          trailHalfWidthArr[aIdx + 1] = 0;
+          const uvIdx2 = (vertBase + s * 2) * 2;
+          trailUVArr[uvIdx2] = 0;
+          trailUVArr[uvIdx2 + 1] = 0;
+          trailUVArr[uvIdx2 + 2] = 0;
+          trailUVArr[uvIdx2 + 3] = 0;
           trailAlphaArr[aIdx] = 0;
           trailAlphaArr[aIdx + 1] = 0;
           trailColorArr[cIdx] = 0;
@@ -1985,83 +2088,86 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
           continue;
         }
 
-        // Read history position: s=0 is newest (head), s=count-1 is oldest (tail)
+        // History position: s=0 is head, s=count-1 is tail
         const histIdx =
           ((historyIndex[index] - 1 - s + trailLength * 2) % trailLength) * 3 +
-          index * trailLength * 3;
+          ringOff;
         const hx = positionHistory[histIdx];
         const hy = positionHistory[histIdx + 1];
         const hz = positionHistory[histIdx + 2];
 
-        // Calculate trail percentage (0=head, 1=tail)
-        const t = count > 1 ? s / (count - 1) : 0;
+        // Next position (for tangent in shader): use s-1 (newer) if available
+        let nx: number, ny: number, nz: number;
+        if (s < count - 1) {
+          const ni =
+            ((historyIndex[index] - 2 - s + trailLength * 2) % trailLength) *
+              3 +
+            ringOff;
+          nx = positionHistory[ni];
+          ny = positionHistory[ni + 1];
+          nz = positionHistory[ni + 2];
+        } else {
+          // Tail: use same direction as previous segment
+          nx = hx;
+          ny = hy + 0.001;
+          nz = hz;
+        }
 
-        // Evaluate width and opacity curves
+        // Trail percentage (0=head, 1=tail)
+        const t = count > 1 ? s / (count - 1) : 0;
         const widthScale = trailWidthCurveFn(t);
         const opacityScale = trailOpacityCurveFn(t);
         const halfWidth = ribbonWidth * widthScale * 0.5;
 
-        // Calculate perpendicular direction for ribbon expansion
-        // Get direction from this point to the next (or previous)
-        if (s < count - 1) {
-          const nextHistIdx =
-            ((historyIndex[index] - 2 - s + trailLength * 2) % trailLength) *
-              3 +
-            index * trailLength * 3;
-          _trailDir.set(
-            hx - positionHistory[nextHistIdx],
-            hy - positionHistory[nextHistIdx + 1],
-            hz - positionHistory[nextHistIdx + 2]
-          );
-        } else if (s > 0) {
-          const prevHistIdx =
-            ((historyIndex[index] - s + trailLength * 2) % trailLength) * 3 +
-            index * trailLength * 3;
-          _trailDir.set(
-            positionHistory[prevHistIdx] - hx,
-            positionHistory[prevHistIdx + 1] - hy,
-            positionHistory[prevHistIdx + 2] - hz
-          );
-        } else {
-          _trailDir.set(0, 1, 0);
-        }
+        // Both left and right vertices get the same center position
+        trailPosArr[vIdx] = hx;
+        trailPosArr[vIdx + 1] = hy;
+        trailPosArr[vIdx + 2] = hz;
+        trailPosArr[vIdx + 3] = hx;
+        trailPosArr[vIdx + 4] = hy;
+        trailPosArr[vIdx + 5] = hz;
 
-        if (_trailDir.lengthSq() < 0.0001) {
-          _trailDir.set(0, 1, 0);
-        }
-        _trailDir.normalize();
+        // Next position for tangent computation in shader
+        trailNextArr[vIdx] = nx;
+        trailNextArr[vIdx + 1] = ny;
+        trailNextArr[vIdx + 2] = nz;
+        trailNextArr[vIdx + 3] = nx;
+        trailNextArr[vIdx + 4] = ny;
+        trailNextArr[vIdx + 5] = nz;
 
-        // Cross product with a reference vector to get perpendicular
-        // Use (0,0,1) as reference; if parallel, use (0,1,0)
-        _trailPerp.set(0, 0, 1);
-        _trailPerp.crossVectors(_trailDir, _trailPerp);
-        if (_trailPerp.lengthSq() < 0.0001) {
-          _trailPerp.set(0, 1, 0);
-          _trailPerp.crossVectors(_trailDir, _trailPerp);
-        }
-        _trailPerp.normalize();
+        // Half-width for shader offset
+        trailHalfWidthArr[aIdx] = halfWidth;
+        trailHalfWidthArr[aIdx + 1] = halfWidth;
 
-        // Left and right ribbon vertices
-        trailPosArr[vIdx] = hx + _trailPerp.x * halfWidth;
-        trailPosArr[vIdx + 1] = hy + _trailPerp.y * halfWidth;
-        trailPosArr[vIdx + 2] = hz + _trailPerp.z * halfWidth;
-        trailPosArr[vIdx + 3] = hx - _trailPerp.x * halfWidth;
-        trailPosArr[vIdx + 4] = hy - _trailPerp.y * halfWidth;
-        trailPosArr[vIdx + 5] = hz - _trailPerp.z * halfWidth;
+        // UV: left vertex u=0, right vertex u=1, v = trail percentage
+        const uvIdx = (vertBase + s * 2) * 2;
+        trailUVArr[uvIdx] = 0; // left u
+        trailUVArr[uvIdx + 1] = t; // left v
+        trailUVArr[uvIdx + 2] = 1; // right u
+        trailUVArr[uvIdx + 3] = t; // right v
 
         // Alpha
         const alpha = ca * opacityScale;
         trailAlphaArr[aIdx] = alpha;
         trailAlphaArr[aIdx + 1] = alpha;
 
-        // Color
-        trailColorArr[cIdx] = cr;
-        trailColorArr[cIdx + 1] = cg;
-        trailColorArr[cIdx + 2] = cb;
+        // Color (with optional colorOverTrail multiplier)
+        const fr = trailColorOverTrailFns
+          ? cr * trailColorOverTrailFns.r(t)
+          : cr;
+        const fg = trailColorOverTrailFns
+          ? cg * trailColorOverTrailFns.g(t)
+          : cg;
+        const fb = trailColorOverTrailFns
+          ? cb * trailColorOverTrailFns.b(t)
+          : cb;
+        trailColorArr[cIdx] = fr;
+        trailColorArr[cIdx + 1] = fg;
+        trailColorArr[cIdx + 2] = fb;
         trailColorArr[cIdx + 3] = ca;
-        trailColorArr[cIdx + 4] = cr;
-        trailColorArr[cIdx + 5] = cg;
-        trailColorArr[cIdx + 6] = cb;
+        trailColorArr[cIdx + 4] = fr;
+        trailColorArr[cIdx + 5] = fg;
+        trailColorArr[cIdx + 6] = fb;
         trailColorArr[cIdx + 7] = ca;
       }
     } else if (historyCount[index] > 0) {
@@ -2079,6 +2185,14 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
         trailPosArr[vIdx + 3] = 0;
         trailPosArr[vIdx + 4] = 0;
         trailPosArr[vIdx + 5] = 0;
+        trailNextArr[vIdx] = 0;
+        trailNextArr[vIdx + 1] = 0;
+        trailNextArr[vIdx + 2] = 0;
+        trailNextArr[vIdx + 3] = 0;
+        trailNextArr[vIdx + 4] = 0;
+        trailNextArr[vIdx + 5] = 0;
+        trailHalfWidthArr[aIdx] = 0;
+        trailHalfWidthArr[aIdx + 1] = 0;
         trailAlphaArr[aIdx] = 0;
         trailAlphaArr[aIdx + 1] = 0;
         trailColorArr[cIdx] = 0;
@@ -2097,6 +2211,18 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
     trailPositionAttr.needsUpdate = true;
     trailAlphaAttr.needsUpdate = true;
     trailColorAttr.needsUpdate = true;
+    const nextAttr = trailMesh.geometry.getAttribute(
+      'trailNext'
+    ) as THREE.BufferAttribute;
+    const hwAttr = trailMesh.geometry.getAttribute(
+      'trailHalfWidth'
+    ) as THREE.BufferAttribute;
+    nextAttr.needsUpdate = true;
+    hwAttr.needsUpdate = true;
+    const uvAttr = trailMesh.geometry.getAttribute(
+      'trailUV'
+    ) as THREE.BufferAttribute;
+    uvAttr.needsUpdate = true;
   }
 };
 

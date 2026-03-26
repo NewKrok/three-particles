@@ -494,10 +494,23 @@ export type TextureSheetAnimation = {
 export type TrailConfig = {
   /** Number of position history samples per particle. @default 20 */
   length?: number;
+  /** Base ribbon width in world units. @default 1.0 */
+  width?: number;
   /** Curve controlling ribbon width from head (0) to tail (1). */
   widthOverTrail?: LifetimeCurve;
   /** Curve controlling opacity from head (0) to tail (1). */
   opacityOverTrail?: LifetimeCurve;
+  /**
+   * Per-channel color multiplier curves along the trail (head=0, tail=1).
+   * Works as multipliers on the particle's current color, same as colorOverLifetime.
+   * To achieve full color transitions, use white startColor.
+   */
+  colorOverTrail?: {
+    isActive: boolean;
+    r: LifetimeCurve;
+    g: LifetimeCurve;
+    b: LifetimeCurve;
+  };
 };
 
 /**
@@ -1417,6 +1430,8 @@ export type GeneralData = {
   positionHistoryCount?: Uint16Array;
   /** Trail length (number of history samples per particle). */
   trailLength?: number;
+  /** Cached camera world position, updated each frame via onBeforeRender for billboard trails. */
+  trailCameraPosition?: THREE.Vector3;
 };
 
 /** Union of all buffer attribute types Three.js uses in geometry. */
@@ -1503,8 +1518,14 @@ export type ParticleSystemInstance = {
   trailWidthCurveFn?: CurveFunction;
   /** Trail opacity curve function */
   trailOpacityCurveFn?: CurveFunction;
-  /** Trail config (length, curves) */
-  trailConfig?: { length: number };
+  /** Trail color-over-trail curve functions (r, g, b multipliers) */
+  trailColorOverTrailFns?: {
+    r: CurveFunction;
+    g: CurveFunction;
+    b: CurveFunction;
+  };
+  /** Trail config (length, width) */
+  trailConfig?: { length: number; width: number };
 };
 
 /**

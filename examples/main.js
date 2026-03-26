@@ -77,6 +77,14 @@ function prepareConfig(config, textureId) {
 let activeCard = null;
 const cardRendererTypes = new Map();
 
+function getConfigRendererType(example) {
+  return example.config?.renderer?.rendererType || "POINTS";
+}
+
+function isTrailExample(example) {
+  return getConfigRendererType(example) === "TRAIL";
+}
+
 class LiveDemo {
   constructor(container, exampleData, rendererType = "POINTS") {
     this.container = container;
@@ -114,7 +122,9 @@ class LiveDemo {
 
     const config = prepareConfig(this.data.config, this.data.textureId);
     config.renderer = config.renderer || {};
-    config.renderer.rendererType = this.rendererType;
+    if (!isTrailExample(this.data)) {
+      config.renderer.rendererType = this.rendererType;
+    }
     const system = createParticleSystem(config);
     this.scene.add(system.instance);
     this.particleSystem = system;
@@ -215,14 +225,20 @@ class ExpandedDemo {
 
     const config = prepareConfig(this.data.config, this.data.textureId);
     config.renderer = config.renderer || {};
-    config.renderer.rendererType = this.rendererType;
+    if (!isTrailExample(this.data)) {
+      config.renderer.rendererType = this.rendererType;
+    }
     const system = createParticleSystem(config);
     this.scene.add(system.instance);
     this.particleSystem = system;
 
     const label = document.getElementById("expand-renderer-label");
     if (label) {
-      const actual = system.instance instanceof THREE.Mesh ? "INSTANCED" : "POINTS";
+      const actual = isTrailExample(this.data)
+        ? "TRAIL"
+        : system.instance instanceof THREE.Mesh
+          ? "INSTANCED"
+          : "POINTS";
       label.textContent = actual;
     }
 
@@ -308,9 +324,17 @@ function openExpandModal(exampleData, rendererType) {
   expandRendererType = rendererType;
 
   const toggle = document.getElementById("expand-renderer-toggle");
-  toggle.querySelectorAll("button").forEach((b) => {
-    b.classList.toggle("active", b.dataset.type === rendererType);
-  });
+  if (isTrailExample(exampleData)) {
+    toggle.innerHTML = `<span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span>`;
+  } else {
+    toggle.innerHTML = `
+      <button data-type="POINTS" title="Point sprites (THREE.Points)">POINTS</button>
+      <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INSTANCED</button>
+    `;
+    toggle.querySelectorAll("button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.type === rendererType);
+    });
+  }
 
   overlay.classList.add("open");
 
@@ -326,7 +350,7 @@ document.getElementById("expand-overlay").addEventListener("click", (e) => {
 });
 document.getElementById("expand-renderer-toggle").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-type]");
-  if (!btn) return;
+  if (!btn || (expandExampleData && isTrailExample(expandExampleData))) return;
   const type = btn.dataset.type;
   const toggle = document.getElementById("expand-renderer-toggle");
   toggle.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
@@ -362,15 +386,18 @@ examples.forEach((example) => {
     <div class="card-info">
       <h3>${example.title}</h3>
       <p>${example.description}</p>
-      <div class="card-actions">
-        <div class="card-tags">
-          ${example.tags.map((t) => `<span class="tag">${t}</span>`).join(" ")}
-        </div>
+      <div class="card-tags">
+        ${example.tags.map((t) => `<span class="tag">${t}</span>`).join(" ")}
+      </div>
+      <div class="card-controls">
         <div class="card-btns">
-          <div class="renderer-toggle">
-            <button class="active" data-type="POINTS" title="Point sprites (THREE.Points)">PTS</button>
-            <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INST</button>
-          </div>
+          ${isTrailExample(example)
+            ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span></div>`
+            : `<div class="renderer-toggle">
+              <button class="active" data-type="POINTS" title="Point sprites (THREE.Points)">PTS</button>
+              <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INST</button>
+            </div>`
+          }
           <button class="icon-btn expand-btn" title="Open fullscreen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 3 21 3 21 9"/>
@@ -398,21 +425,23 @@ examples.forEach((example) => {
   `;
   grid.appendChild(card);
 
-  cardRendererTypes.set(card, "POINTS");
+  cardRendererTypes.set(card, getConfigRendererType(example));
 
-  card.querySelector(".renderer-toggle").addEventListener("click", (e) => {
-    e.stopPropagation();
-    const btn = e.target.closest("button[data-type]");
-    if (!btn) return;
-    const type = btn.dataset.type;
-    card.querySelector(".renderer-toggle").querySelectorAll("button").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    cardRendererTypes.set(card, type);
-    if (activeCard === card) {
-      stopActiveDemo();
-      startDemo(card, example);
-    }
-  });
+  if (!isTrailExample(example)) {
+    card.querySelector(".renderer-toggle").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const btn = e.target.closest("button[data-type]");
+      if (!btn) return;
+      const type = btn.dataset.type;
+      card.querySelector(".renderer-toggle").querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      cardRendererTypes.set(card, type);
+      if (activeCard === card) {
+        stopActiveDemo();
+        startDemo(card, example);
+      }
+    });
+  }
 
   card.querySelector(".expand-btn").addEventListener("click", (e) => {
     e.stopPropagation();

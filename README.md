@@ -20,7 +20,7 @@ Particle system for ThreeJS.
 *   Sub-emitters triggered on particle birth or death events.
 *   Serialization support for saving and loading particle system configs.
 *   GPU instancing renderer (`RendererType.INSTANCED`) — removes `gl_PointSize` hardware limit, ideal for large particles or high particle counts.
-*   Trail / Ribbon renderer (`RendererType.TRAIL`) — continuous ribbon trails behind particles with configurable width and opacity tapering.
+*   Trail / Ribbon renderer (`RendererType.TRAIL`) — continuous ribbon trails behind particles with configurable width, opacity, and color tapering.
 *   TypeDoc API documentation available.
 
 # Live Demo & Examples

@@ -80,10 +80,11 @@ describe('Trail / Ribbon Renderer (RendererType.TRAIL)', () => {
       ps.dispose();
     });
 
-    it('should set the simulation Points object to invisible', () => {
+    it('should hide the simulation Points material (not the object, so trail mesh child renders)', () => {
       const { ps } = createTrailSystem();
       const points = getSimulationObject(ps);
-      expect(points.visible).toBe(false);
+      expect(points.visible).toBe(true);
+      expect((points.material as THREE.Material).visible).toBe(false);
       ps.dispose();
     });
 
@@ -105,6 +106,34 @@ describe('Trail / Ribbon Renderer (RendererType.TRAIL)', () => {
       expect(geom.getAttribute('trailColor')).toBeDefined();
       expect(geom.getIndex()).not.toBeNull();
 
+      ps.dispose();
+    });
+
+    it('should accept widthOverTrail/opacityOverTrail without type field (legacy format)', () => {
+      const { ps } = createTrailSystem({
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 8,
+            widthOverTrail: {
+              bezierPoints: [
+                { x: 0, y: 1, percentage: 0 },
+                { x: 0.5, y: 0.5 },
+                { x: 1, y: 0, percentage: 1 },
+              ],
+            },
+            opacityOverTrail: {
+              bezierPoints: [
+                { x: 0, y: 1, percentage: 0 },
+                { x: 1, y: 0, percentage: 1 },
+              ],
+            },
+          },
+        },
+      });
+      expect(ps.instance).toBeInstanceOf(THREE.Points);
+      const trailMesh = getTrailMesh(ps);
+      expect(trailMesh).toBeDefined();
       ps.dispose();
     });
 
@@ -379,6 +408,204 @@ describe('Trail / Ribbon Renderer (RendererType.TRAIL)', () => {
       if (countActiveParticles(ps) > 0) {
         // With multiple history samples, the ribbon should have some width
         expect(dist).toBeGreaterThanOrEqual(0);
+      }
+
+      ps.dispose();
+    });
+
+    it('should produce a smooth ribbon: left/right vertices stay on consistent sides', () => {
+      const trailLength = 8;
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startLifetime: 5,
+        startSpeed: 3,
+        startSize: 0.5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: trailLength, width: 0.1 },
+        },
+        // Emit along Y axis only for predictable motion
+        shape: { shape: 'CONE', cone: { angle: 0, radius: 0.001 } },
+        transform: { rotation: { x: -90 } },
+      });
+
+      // Build up full trail history
+      for (let t = 50; t <= 500; t += 50) step(t, 50);
+
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+      const alphaArr = trailMesh.geometry.getAttribute('trailAlpha')
+        .array as Float32Array;
+
+      // Collect active segment centers and check ribbon smoothness
+      const centers: { x: number; y: number; z: number }[] = [];
+      const widths: number[] = [];
+
+      for (let s = 0; s < trailLength; s++) {
+        const aIdx = s * 2;
+        if (alphaArr[aIdx] < 0.001) break; // no more active segments
+
+        const vi = s * 2 * 3;
+        const lx = posArr[vi],
+          ly = posArr[vi + 1],
+          lz = posArr[vi + 2];
+        const rx = posArr[vi + 3],
+          ry = posArr[vi + 4],
+          rz = posArr[vi + 5];
+
+        const cx = (lx + rx) / 2;
+        const cy = (ly + ry) / 2;
+        const cz = (lz + rz) / 2;
+        centers.push({ x: cx, y: cy, z: cz });
+
+        const w = Math.sqrt((lx - rx) ** 2 + (ly - ry) ** 2 + (lz - rz) ** 2);
+        widths.push(w);
+      }
+
+      // Must have at least 3 active segments to test smoothness
+      expect(centers.length).toBeGreaterThanOrEqual(3);
+
+      // Ribbon width should be reasonable (not zero, not huge)
+      for (const w of widths) {
+        // startSize=0.5, halfWidth = 0.5 * widthScale * 0.5 => max width ~0.5
+        expect(w).toBeLessThan(2.0);
+      }
+
+      // Consecutive segment centers should form a smooth path:
+      // distance between consecutive centers should be small and similar
+      const segDists: number[] = [];
+      for (let i = 1; i < centers.length; i++) {
+        const dx = centers[i].x - centers[i - 1].x;
+        const dy = centers[i].y - centers[i - 1].y;
+        const dz = centers[i].z - centers[i - 1].z;
+        segDists.push(Math.sqrt(dx * dx + dy * dy + dz * dz));
+      }
+
+      // No huge jumps between consecutive centers — each segment distance
+      // should be less than 10x the median (no teleporting vertices)
+      const sorted = [...segDists].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      for (const d of segDists) {
+        expect(d).toBeLessThan(median * 10 + 0.001);
+      }
+
+      // Width should taper (head wider, tail narrower) given default widthOverTrail curve
+      if (widths.length >= 4) {
+        expect(widths[0]).toBeGreaterThanOrEqual(
+          widths[widths.length - 1] - 0.01
+        );
+      }
+
+      ps.dispose();
+    });
+
+    it('should not have crossed/twisted quads (no bowtie shapes)', () => {
+      const trailLength = 6;
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startLifetime: 5,
+        startSpeed: 3,
+        startSize: 0.4,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: trailLength, width: 0.1 },
+        },
+        shape: { shape: 'CONE', cone: { angle: 0, radius: 0.001 } },
+        transform: { rotation: { x: -90 } },
+      });
+
+      for (let t = 50; t <= 400; t += 50) step(t, 50);
+
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+      const alphaArr = trailMesh.geometry.getAttribute('trailAlpha')
+        .array as Float32Array;
+
+      // For each consecutive pair of segments, check that the quad is not twisted:
+      // The "left" side offset direction should be consistent (dot product > 0)
+      let prevOffX = 0,
+        prevOffY = 0,
+        prevOffZ = 0;
+      let twists = 0;
+
+      for (let s = 0; s < trailLength; s++) {
+        const aIdx = s * 2;
+        if (alphaArr[aIdx] < 0.001) break;
+
+        const vi = s * 2 * 3;
+        const lx = posArr[vi],
+          ly = posArr[vi + 1],
+          lz = posArr[vi + 2];
+        const rx = posArr[vi + 3],
+          ry = posArr[vi + 4],
+          rz = posArr[vi + 5];
+
+        // Offset from center to left vertex
+        const offX = lx - (lx + rx) / 2;
+        const offY = ly - (ly + ry) / 2;
+        const offZ = lz - (lz + rz) / 2;
+
+        if (s > 0) {
+          const dot = offX * prevOffX + offY * prevOffY + offZ * prevOffZ;
+          if (dot < 0) twists++;
+        }
+        prevOffX = offX;
+        prevOffY = offY;
+        prevOffZ = offZ;
+      }
+
+      // No twists should occur
+      expect(twists).toBe(0);
+      ps.dispose();
+    });
+
+    it('ribbon segment centers should follow particle path monotonically', () => {
+      const trailLength = 8;
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startLifetime: 5,
+        startSpeed: 3,
+        startSize: 1,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: trailLength, width: 0.5 },
+        },
+        shape: { shape: 'CONE', cone: { angle: 0, radius: 0.001 } },
+        transform: { rotation: { x: -90 } },
+      });
+
+      for (let t = 50; t <= 500; t += 50) step(t, 50);
+
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+      const alphaArr = trailMesh.geometry.getAttribute('trailAlpha')
+        .array as Float32Array;
+
+      // Collect segment centers
+      const centers: [number, number, number][] = [];
+      for (let s = 0; s < trailLength; s++) {
+        const aIdx = s * 2;
+        if (alphaArr[aIdx] < 0.001) break;
+        const vi = s * 2 * 3;
+        centers.push([
+          (posArr[vi] + posArr[vi + 3]) / 2,
+          (posArr[vi + 1] + posArr[vi + 4]) / 2,
+          (posArr[vi + 2] + posArr[vi + 5]) / 2,
+        ]);
+      }
+
+      expect(centers.length).toBeGreaterThanOrEqual(3);
+
+      // Centers should move monotonically in Y (cone emits along +Y)
+      // Head (index 0) should have the highest Y, tail the lowest
+      for (let i = 1; i < centers.length; i++) {
+        expect(centers[i - 1][1]).toBeGreaterThanOrEqual(centers[i][1] - 0.01);
       }
 
       ps.dispose();
