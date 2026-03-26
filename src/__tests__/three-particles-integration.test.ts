@@ -41,8 +41,7 @@ const countActive = (ps: ParticleSystem, instanced = false): number => {
 };
 
 const readPositions = (
-  ps: ParticleSystem,
-  instanced = false
+  ps: ParticleSystem
 ): Array<{ x: number; y: number; z: number }> => {
   const instance = ps.instance;
   const obj =
@@ -50,8 +49,7 @@ const readPositions = (
       ? instance
       : (instance.children[0] as THREE.Points | THREE.Mesh | undefined);
   if (!obj) return [];
-  const attrName = instanced ? 'instanceOffset' : 'position';
-  const arr = obj.geometry?.attributes?.[attrName]?.array;
+  const arr = obj.geometry?.attributes?.position?.array;
   if (!arr) return [];
   const positions: Array<{ x: number; y: number; z: number }> = [];
   for (let i = 0; i < arr.length; i += 3) {
@@ -117,10 +115,9 @@ describe('integration — full particle lifecycle', () => {
     // Wait for particles to expire (lifetime = 0.5s)
     ps.update({ now: startTime + 800, delta: 0.3, elapsed: 0.8 });
 
-    // Some original particles should have died by now
-    // (but new ones are still emitting, so total may still be > 0)
+    // Particles are still emitting (looping=true), so count stays positive
     const active3 = countActive(ps);
-    expect(active3).toBeGreaterThanOrEqual(0);
+    expect(active3).toBeGreaterThan(0);
 
     ps.dispose();
   });
@@ -535,7 +532,7 @@ describe('integration — updateParticleSystems global update', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration: Shape emitters produce correct distributions
+// Integration: Shape emitters produce correct particle counts
 // ---------------------------------------------------------------------------
 
 describe('integration — shape emitters', () => {
@@ -652,8 +649,8 @@ describe('integration — pause, resume, dispose lifecycle', () => {
     const countAtPause = countActive(ps);
 
     ps.update({ now: startTime + 300, delta: 0.2, elapsed: 0.3 });
-    // Should not emit new particles while paused
-    expect(countActive(ps)).toBeLessThanOrEqual(countAtPause);
+    // Should not emit new particles while paused (lifetime=5s, no deaths)
+    expect(countActive(ps)).toBe(countAtPause);
 
     // Resume
     ps.resumeEmitter();
@@ -670,7 +667,7 @@ describe('integration — pause, resume, dispose lifecycle', () => {
 // ---------------------------------------------------------------------------
 
 describe('integration — simulation space', () => {
-  it('should produce different particle positions for WORLD vs LOCAL space', () => {
+  it('should use different instance types for WORLD vs LOCAL space', () => {
     const startTime = 1000;
     const baseConfig = {
       maxParticles: 10,
@@ -696,6 +693,14 @@ describe('integration — simulation space', () => {
       { ...baseConfig, simulationSpace: SimulationSpace.WORLD } as any,
       startTime
     );
+
+    // LOCAL space: instance is directly a THREE.Points
+    expect(localPs.instance).toBeInstanceOf(THREE.Points);
+
+    // WORLD space: instance is a Gyroscope wrapper containing the Points
+    expect(worldPs.instance).not.toBeInstanceOf(THREE.Points);
+    expect(worldPs.instance.children.length).toBeGreaterThan(0);
+    expect(worldPs.instance.children[0]).toBeInstanceOf(THREE.Points);
 
     localPs.update({ now: startTime, delta: 0.016, elapsed: 0 });
     worldPs.update({ now: startTime, delta: 0.016, elapsed: 0 });

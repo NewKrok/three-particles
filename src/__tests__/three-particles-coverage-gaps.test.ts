@@ -4,66 +4,12 @@ import {
   ForceFieldType,
   LifeTimeCurve,
   RendererType,
-  SimulationSpace,
   SubEmitterTrigger,
 } from '../js/effects/three-particles/three-particles-enums.js';
 import { applyForceFields } from '../js/effects/three-particles/three-particles-forces.js';
-import {
-  serializeParticleSystem,
-  deserializeParticleSystem,
-} from '../js/effects/three-particles/three-particles-serialization.js';
+import { deserializeParticleSystem } from '../js/effects/three-particles/three-particles-serialization.js';
 import { createParticleSystem } from '../js/effects/three-particles/three-particles.js';
-import type {
-  NormalizedForceFieldConfig,
-  ParticleSystem,
-} from '../js/effects/three-particles/types.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const createTestSystem = (
-  config: Record<string, unknown> = {},
-  startTime = 1000
-) => {
-  const ps = createParticleSystem(
-    {
-      maxParticles: 10,
-      duration: 5,
-      looping: true,
-      startLifetime: 0.2,
-      startSpeed: 1,
-      startSize: 1,
-      startOpacity: 1,
-      startRotation: 0,
-      emission: { rateOverTime: 50, rateOverDistance: 0 },
-      ...config,
-    } as any,
-    startTime
-  );
-
-  const step = (timeOffsetMs: number, deltaMs: number = 16) => {
-    ps.update({
-      now: startTime + timeOffsetMs,
-      delta: deltaMs / 1000,
-      elapsed: timeOffsetMs / 1000,
-    });
-  };
-
-  return { ps, step, startTime };
-};
-
-const subEmitterConfig = {
-  maxParticles: 5,
-  duration: 1,
-  looping: false,
-  startLifetime: 0.3,
-  startSpeed: 0.5,
-  startSize: 0.5,
-  startOpacity: 1,
-  startRotation: 0,
-  emission: { rateOverTime: 5, rateOverDistance: 0 },
-};
+import type { NormalizedForceFieldConfig } from '../js/effects/three-particles/types.js';
 
 // ---------------------------------------------------------------------------
 // Gap 1: three-particles.ts:1122-1124 — Sub-emitter cleanup when isActiveArr
@@ -137,13 +83,18 @@ describe('sub-emitter cleanup — missing isActiveArr branch', () => {
       subPoints.geometry.deleteAttribute('instanceIsActive');
     }
 
+    // Verify sub-emitters were created
+    const subCount = scene.children.filter((c) => c !== ps.instance).length;
+    expect(subCount).toBeGreaterThan(0);
+
     // Next update triggers cleanupCompletedInstances which should
     // hit the !isActiveArr branch and dispose the corrupted sub-emitter
-    ps.update({ now: startTime + 100, delta: 0.1, elapsed: 0.1 });
-    ps.update({ now: startTime + 200, delta: 0.1, elapsed: 0.2 });
+    // (dispose removes from internal tracking; scene graph removal is separate)
+    expect(() => {
+      ps.update({ now: startTime + 100, delta: 0.1, elapsed: 0.1 });
+      ps.update({ now: startTime + 200, delta: 0.1, elapsed: 0.2 });
+    }).not.toThrow();
 
-    // The sabotaged sub-emitter should have been removed from the scene
-    // (disposed via the !isActiveArr fallback path)
     ps.dispose();
   });
 
@@ -209,9 +160,15 @@ describe('sub-emitter cleanup — missing isActiveArr branch', () => {
       }
     }
 
+    // Verify sub-emitters were created
+    const subCount = scene.children.filter((c) => c !== ps.instance).length;
+    expect(subCount).toBeGreaterThan(0);
+
     // Should dispose the corrupted sub-emitter via the !isActiveArr branch
-    ps.update({ now: startTime + 100, delta: 0.1, elapsed: 0.1 });
-    ps.update({ now: startTime + 300, delta: 0.2, elapsed: 0.3 });
+    expect(() => {
+      ps.update({ now: startTime + 100, delta: 0.1, elapsed: 0.1 });
+      ps.update({ now: startTime + 300, delta: 0.2, elapsed: 0.3 });
+    }).not.toThrow();
 
     ps.dispose();
   });
