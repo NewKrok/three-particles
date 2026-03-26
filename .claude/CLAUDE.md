@@ -284,7 +284,7 @@ npx typedoc               # Generate documentation
 | Sub-emitters | ✅ Complete |
 | Force fields / Attractors | ✅ Complete |
 | GPU instancing (`RendererType.INSTANCED`) | ✅ Complete |
-| React Three Fiber integration | ⬜ Planned |
+| React Three Fiber integration (docs + usage guide) | ✅ Complete |
 | Trail / Ribbon renderer | ⬜ Planned |
 | WebGPU compute support | ⬜ Planned |
 | Preset system | ⬜ Planned |

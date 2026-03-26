@@ -67,6 +67,78 @@ scene.add(instance);
 updateParticleSystems({now, delta, elapsed});
 ```
 
+# Usage with React Three Fiber
+
+The library works seamlessly with [React Three Fiber](https://github.com/pmndrs/react-three-fiber). No additional wrapper package is needed — use `createParticleSystem` directly with React hooks:
+
+```tsx
+import { useRef, useEffect } from "react";
+import { useFrame } from "@react-three/fiber";
+import {
+  createParticleSystem,
+  Shape,
+  type ParticleSystem,
+} from "@newkrok/three-particles";
+import * as THREE from "three";
+
+function FireEffect({ config }: { config?: Record<string, unknown> }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const systemRef = useRef<ParticleSystem | null>(null);
+
+  useEffect(() => {
+    const system = createParticleSystem({
+      duration: 5,
+      looping: true,
+      maxParticles: 200,
+      startLifetime: { min: 0.5, max: 1.5 },
+      startSpeed: { min: 1, max: 3 },
+      startSize: { min: 0.3, max: 0.8 },
+      startColor: {
+        min: { r: 1, g: 0.2, b: 0 },
+        max: { r: 1, g: 0.8, b: 0 },
+      },
+      gravity: -1,
+      emission: { rateOverTime: 50 },
+      shape: { shape: Shape.CONE, cone: { angle: 0.2, radius: 0.3 } },
+      renderer: {
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+      },
+      ...config,
+    });
+
+    systemRef.current = system;
+    groupRef.current?.add(system.instance);
+
+    return () => {
+      system.dispose();
+    };
+  }, [config]);
+
+  useFrame((_, delta) => {
+    systemRef.current?.update({
+      now: performance.now(),
+      delta,
+      elapsed: 0,
+    });
+  });
+
+  return <group ref={groupRef} />;
+}
+
+// In your R3F Canvas:
+// <Canvas>
+//   <FireEffect />
+// </Canvas>
+```
+
+**Key points:**
+- Use `useEffect` to create and dispose the particle system
+- Use `useFrame` to drive updates each frame (call `system.update()` instead of `updateParticleSystems()` for per-system control)
+- Add the `system.instance` to a `<group>` ref so R3F manages the scene graph
+- Return a cleanup function from `useEffect` that calls `system.dispose()`
+
 # Documentation
 
 Automatically generated TypeDoc: [https://newkrok.github.io/three-particles/api/](https://newkrok.github.io/three-particles/api/)

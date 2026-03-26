@@ -118,6 +118,68 @@ Values support: constant `number`, random `{ min, max }`, or curves:
 { type: LifeTimeCurve.EASING, curveFunction: (t) => t * t, scale: 1 }
 ```
 
+## Sub-Emitters
+
+Trigger child particle systems on particle birth or death:
+
+```typescript
+subEmitters: [
+  { trigger: SubEmitterTrigger.BIRTH, config: sparkConfig },
+  { trigger: SubEmitterTrigger.DEATH, config: explosionConfig },
+]
+```
+
+## Force Fields
+
+Point attractors/repulsors and directional wind forces:
+
+```typescript
+forceFields: [
+  {
+    type: ForceFieldType.POINT,
+    position: { x: 0, y: 2, z: 0 },
+    strength: 5,
+    radius: 3,
+    falloff: ForceFieldFalloff.LINEAR,
+  },
+  {
+    type: ForceFieldType.DIRECTIONAL,
+    direction: { x: 1, y: 0, z: 0 },
+    strength: 2,
+  },
+]
+```
+
+## Usage with React Three Fiber
+
+No wrapper package needed — use hooks directly:
+
+```tsx
+import { useRef, useEffect } from "react";
+import { useFrame } from "@react-three/fiber";
+import { createParticleSystem, type ParticleSystem } from "@newkrok/three-particles";
+
+function ParticleEffect({ config }) {
+  const groupRef = useRef(null);
+  const systemRef = useRef(null);
+
+  useEffect(() => {
+    const system = createParticleSystem(config);
+    systemRef.current = system;
+    groupRef.current?.add(system.instance);
+    return () => system.dispose();
+  }, [config]);
+
+  useFrame((_, delta) => {
+    systemRef.current?.update({ now: performance.now(), delta, elapsed: 0 });
+  });
+
+  return <group ref={groupRef} />;
+}
+```
+
+Key: `useEffect` for create/dispose, `useFrame` for per-frame updates, `system.update()` for individual system control.
+
 ## Links
 
 - Repository: https://github.com/NewKrok/three-particles

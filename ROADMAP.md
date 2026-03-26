@@ -27,15 +27,11 @@
 | `CHANGELOG.md`, `CONTRIBUTING.md` | ✅ |
 | tsup build (ESM + minified + DTS) | ✅ |
 | GPU Instancing (`InstancedBufferGeometry` renderer) | ✅ |
+| React Three Fiber integration (docs + usage guide) | ✅ |
 
 ---
 
 ## High Priority — Performance & Ecosystem
-
-### React Three Fiber Integration
-- First-class R3F components (`<ParticleSystem />`, `<useParticleSystem />`)
-- Declarative API that fits the R3F ecosystem
-- Hooks for lifecycle management (`useFrame` integration)
 
 ### Trail / Ribbon Renderer
 - Continuous trail behind moving particles (projectiles, lightning, light streaks)
@@ -50,6 +46,13 @@
 ---
 
 ## Medium Priority — Features & DX
+
+### React Three Fiber Wrapper Package
+- Dedicated npm package (`@newkrok/three-particles-react`) with first-class R3F components
+- Declarative `<ParticleSystem />` component and `useParticleSystem()` hook
+- `useFrame` integration for automatic lifecycle management
+- Zero boilerplate — drop-in usage inside R3F `<Canvas>`
+- Note: basic usage guide already available in README and llms docs
 
 ### Preset System
 - Built-in particle configurations: `Presets.FIRE`, `Presets.SMOKE`, `Presets.SPARKS`, `Presets.RAIN`, etc.
