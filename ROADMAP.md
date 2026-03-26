@@ -27,15 +27,11 @@
 | `CHANGELOG.md`, `CONTRIBUTING.md` | ✅ |
 | tsup build (ESM + minified + DTS) | ✅ |
 | GPU Instancing (`InstancedBufferGeometry` renderer) | ✅ |
+| React Three Fiber integration (docs + usage guide) | ✅ |
 
 ---
 
 ## High Priority — Performance & Ecosystem
-
-### React Three Fiber Integration
-- First-class R3F components (`<ParticleSystem />`, `<useParticleSystem />`)
-- Declarative API that fits the R3F ecosystem
-- Hooks for lifecycle management (`useFrame` integration)
 
 ### Trail / Ribbon Renderer
 - Continuous trail behind moving particles (projectiles, lightning, light streaks)

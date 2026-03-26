@@ -1,6 +1,6 @@
 # @newkrok/three-particles — Full API Reference
 
-> Three.js-based high-performance particle system library (v2.10.4)
+> Three.js-based high-performance particle system library (v2.11.0)
 > License: MIT | Author: Istvan Krisztian Somoracz
 > Repository: https://github.com/NewKrok/three-particles
 
@@ -12,7 +12,7 @@
 npm install @newkrok/three-particles three
 ```
 
-Peer dependency: `three` ^0.180.0
+Peer dependency: `three` ^0.182.0
 
 ---
 
@@ -522,6 +522,171 @@ const fire = createParticleSystem({
 
 scene.add(fire.instance);
 ```
+
+---
+
+## Sub-Emitters
+
+Trigger child particle systems when particles are born or die.
+
+```typescript
+type SubEmitter = {
+  trigger: SubEmitterTrigger;  // BIRTH or DEATH
+  config: ParticleSystemConfig; // The child particle system config
+};
+
+// Usage
+createParticleSystem({
+  // ... main system config
+  subEmitters: [
+    { trigger: SubEmitterTrigger.BIRTH, config: sparkConfig },
+    { trigger: SubEmitterTrigger.DEATH, config: explosionConfig },
+  ],
+});
+```
+
+### SubEmitterTrigger
+- `BIRTH` — Spawns child system at the position of each newly created particle
+- `DEATH` — Spawns child system at the position of each dying particle
+
+---
+
+## Force Fields
+
+Apply forces to particles dynamically. Supports point attraction/repulsion and directional wind.
+
+```typescript
+type ForceField = {
+  type: ForceFieldType;         // POINT or DIRECTIONAL
+  position?: Point3D;           // For POINT type — center of force
+  direction?: Point3D;          // For DIRECTIONAL type — force direction
+  strength: number;             // Force strength (negative = repulsion for POINT)
+  radius?: number;              // For POINT type — area of effect
+  falloff?: ForceFieldFalloff;  // NONE, LINEAR, or QUADRATIC
+};
+```
+
+### ForceFieldType
+- `POINT` — Attracts (positive strength) or repels (negative strength) particles toward/from a point
+- `DIRECTIONAL` — Applies a constant force in a direction (e.g., wind)
+
+### ForceFieldFalloff
+- `NONE` — Constant force regardless of distance
+- `LINEAR` — Force decreases linearly with distance
+- `QUADRATIC` — Force decreases with the square of distance (realistic gravity-like falloff)
+
+**Example — Vortex with wind:**
+```typescript
+createParticleSystem({
+  // ... particle config
+  forceFields: [
+    {
+      type: ForceFieldType.POINT,
+      position: { x: 0, y: 2, z: 0 },
+      strength: 5,
+      radius: 3,
+      falloff: ForceFieldFalloff.LINEAR,
+    },
+    {
+      type: ForceFieldType.DIRECTIONAL,
+      direction: { x: 1, y: 0, z: 0 },
+      strength: 2,
+    },
+  ],
+});
+```
+
+---
+
+## Serialization
+
+Save and load particle system configurations as JSON.
+
+```typescript
+import {
+  serializeParticleSystemConfig,
+  deserializeParticleSystemConfig,
+} from "@newkrok/three-particles";
+
+// Serialize (config → JSON-safe object)
+const json = serializeParticleSystemConfig(config);
+const jsonString = JSON.stringify(json);
+
+// Deserialize (JSON-safe object → config)
+const restored = deserializeParticleSystemConfig(JSON.parse(jsonString));
+const system = createParticleSystem(restored);
+```
+
+---
+
+## Usage with React Three Fiber
+
+The library works with [React Three Fiber](https://github.com/pmndrs/react-three-fiber) without any additional wrapper package. Use `createParticleSystem` directly with React hooks:
+
+```tsx
+import { useRef, useEffect } from "react";
+import { useFrame } from "@react-three/fiber";
+import {
+  createParticleSystem,
+  Shape,
+  type ParticleSystem,
+} from "@newkrok/three-particles";
+import * as THREE from "three";
+
+function FireEffect({ config }: { config?: Record<string, unknown> }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const systemRef = useRef<ParticleSystem | null>(null);
+
+  useEffect(() => {
+    const system = createParticleSystem({
+      duration: 5,
+      looping: true,
+      maxParticles: 200,
+      startLifetime: { min: 0.5, max: 1.5 },
+      startSpeed: { min: 1, max: 3 },
+      startSize: { min: 0.3, max: 0.8 },
+      startColor: {
+        min: { r: 1, g: 0.2, b: 0 },
+        max: { r: 1, g: 0.8, b: 0 },
+      },
+      gravity: -1,
+      emission: { rateOverTime: 50 },
+      shape: { shape: Shape.CONE, cone: { angle: 0.2, radius: 0.3 } },
+      renderer: {
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+      },
+      ...config,
+    });
+
+    systemRef.current = system;
+    groupRef.current?.add(system.instance);
+
+    return () => {
+      system.dispose();
+    };
+  }, [config]);
+
+  useFrame((_, delta) => {
+    systemRef.current?.update({
+      now: performance.now(),
+      delta,
+      elapsed: 0,
+    });
+  });
+
+  return <group ref={groupRef} />;
+}
+```
+
+### Key Integration Points
+
+- **`useEffect`** — Create the particle system on mount, dispose on unmount
+- **`useFrame`** — Drive per-frame updates using R3F's render loop (use `system.update()` for individual system control instead of the global `updateParticleSystems()`)
+- **`<group ref>`** — Attach `system.instance` to a group so R3F manages the scene graph
+- **Config changes** — Pass `config` as a dependency to `useEffect` to recreate on changes
+- **No wrapper package needed** — The imperative API integrates naturally with React hooks
 
 ---
 
