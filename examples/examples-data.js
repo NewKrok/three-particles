@@ -1,6 +1,30 @@
 
 export const examples = [
   {
+    id: "comet-trail",
+    title: "Comet Trail",
+    description: "Glowing comet with a long tapering ribbon trail that fades from white-hot to deep blue.",
+    tags: ["trail", "ribbon", "advanced"],
+    textureId: "STARBURST",
+    config: {"duration":5,"looping":true,"startLifetime":{"min":1.5,"max":3.0},"startSpeed":{"min":2.0,"max":4.0},"startSize":{"min":2,"max":5},"startOpacity":1.0,"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":1.0,"g":0.8,"b":0.4},"max":{"r":1.0,"g":0.95,"b":0.7}},"maxParticles":30,"emission":{"rateOverTime":15},"shape":{"shape":"CONE","cone":{"angle":8,"radius":0.1,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"discardBackgroundColor":true,"backgroundColorTolerance":0.2,"backgroundColor":{"r":0,"g":0,"b":0},"trail":{"length":30,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.7},{"x":0.7,"y":0.2},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.4,"y":0.6},{"x":0.8,"y":0.15},{"x":1,"y":0,"percentage":1}]}}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.8},{"x":1,"y":0.4,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.95,"percentage":0},{"x":0.5,"y":0.5},{"x":1,"y":0.2,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.7,"percentage":0},{"x":0.5,"y":0.8},{"x":1,"y":1.0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.8},{"x":0.85,"y":0.3},{"x":1,"y":0,"percentage":1}]}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.5,"percentage":0},{"x":0.1,"y":1},{"x":0.6,"y":0.8,"percentage":0.6},{"x":1,"y":0.3,"percentage":1}]}}},
+  },
+  {
+    id: "magic-missile-trail",
+    title: "Magic Missile Trail",
+    description: "Spiraling arcane missile with a vibrant purple-blue ribbon trail and noise-driven wobble.",
+    tags: ["trail", "ribbon", "noise", "advanced"],
+    textureId: "STARBURST",
+    config: {"duration":3,"looping":true,"startLifetime":{"min":0.8,"max":1.5},"startSpeed":{"min":3.0,"max":5.0},"startSize":{"min":3,"max":6},"startOpacity":1.0,"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":0.5,"g":0.2,"b":1.0},"max":{"r":0.7,"g":0.4,"b":1.0}},"maxParticles":40,"emission":{"rateOverTime":30},"shape":{"shape":"CONE","cone":{"angle":5,"radius":0.05,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"discardBackgroundColor":true,"backgroundColorTolerance":0.2,"backgroundColor":{"r":0,"g":0,"b":0},"trail":{"length":20,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.5},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.6,"y":0.5},{"x":1,"y":0,"percentage":1}]}}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.5,"percentage":0},{"x":0.3,"y":0.7},{"x":0.7,"y":0.9},{"x":1,"y":1.0,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.2,"percentage":0},{"x":0.3,"y":0.4},{"x":0.7,"y":0.6},{"x":1,"y":0.8,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":1.0,"percentage":0},{"x":0.5,"y":0.9},{"x":1,"y":0.7,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.4,"y":0.9},{"x":0.8,"y":0.4},{"x":1,"y":0,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.3,"frequency":0.8,"octaves":2,"positionAmount":0.4,"rotationAmount":1.5,"sizeAmount":0.1}},
+  },
+  {
+    id: "fire-whip-trail",
+    title: "Fire Whip Trail",
+    description: "Fiery trail ribbons transitioning from white-hot core through orange to smoky red tail.",
+    tags: ["trail", "ribbon", "color", "advanced"],
+    textureId: "SOFT_SMOKE",
+    config: {"duration":4,"looping":true,"startLifetime":{"min":1.0,"max":2.0},"startSpeed":{"min":1.5,"max":3.0},"startSize":{"min":4,"max":8},"startOpacity":1.0,"startRotation":{"min":-180,"max":180},"startColor":{"min":{"r":1.0,"g":0.9,"b":0.7},"max":{"r":1.0,"g":1.0,"b":0.9}},"maxParticles":25,"emission":{"rateOverTime":15},"shape":{"shape":"SPHERE","sphere":{"radius":0.3,"radiusThickness":0.1,"arc":360}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"discardBackgroundColor":true,"backgroundColorTolerance":0.3,"backgroundColor":{"r":0,"g":0,"b":0},"trail":{"length":25,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.2,"y":0.9},{"x":0.6,"y":0.4},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.7},{"x":0.7,"y":0.2},{"x":1,"y":0,"percentage":1}]}}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":1},{"x":0.6,"y":0.9,"percentage":0.6},{"x":1,"y":0.4,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.9,"percentage":0},{"x":0.2,"y":0.6},{"x":0.5,"y":0.3,"percentage":0.5},{"x":1,"y":0.05,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.7,"percentage":0},{"x":0.15,"y":0.2},{"x":0.4,"y":0.05,"percentage":0.4},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.9},{"x":0.7,"y":0.5},{"x":1,"y":0,"percentage":1}]}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.05,"y":1},{"x":0.5,"y":0.8,"percentage":0.5},{"x":1,"y":0.4,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.2,"frequency":0.5,"octaves":1,"positionAmount":0.3,"rotationAmount":2.0}},
+  },
+  {
     id: "shield",
     title: "Shield",
     description: "Energy shield using a repulsive force field to confine particles on a spherical shell.",

@@ -28,15 +28,11 @@
 | tsup build (ESM + minified + DTS) | ✅ |
 | GPU Instancing (`InstancedBufferGeometry` renderer) | ✅ |
 | React Three Fiber integration (docs + usage guide) | ✅ |
+| Trail / Ribbon Renderer (`RendererType.TRAIL`) | ✅ |
 
 ---
 
 ## High Priority — Performance & Ecosystem
-
-### Trail / Ribbon Renderer
-- Continuous trail behind moving particles (projectiles, lightning, light streaks)
-- Configurable width, fade, and color over trail length
-- Billboard or camera-facing trail geometry
 
 ### WebGPU Compute Support
 - Leverage Three.js WebGPU renderer (production-ready since r171)
