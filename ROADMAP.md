@@ -47,6 +47,13 @@
 
 ## Medium Priority — Features & DX
 
+### React Three Fiber Wrapper Package
+- Dedicated npm package (`@newkrok/three-particles-react`) with first-class R3F components
+- Declarative `<ParticleSystem />` component and `useParticleSystem()` hook
+- `useFrame` integration for automatic lifecycle management
+- Zero boilerplate — drop-in usage inside R3F `<Canvas>`
+- Note: basic usage guide already available in README and llms docs
+
 ### Preset System
 - Built-in particle configurations: `Presets.FIRE`, `Presets.SMOKE`, `Presets.SPARKS`, `Presets.RAIN`, etc.
 - Easy starting point for new users
