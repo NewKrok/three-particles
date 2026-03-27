@@ -5,6 +5,7 @@ import {
   calculateValue,
   isLifeTimeCurve,
   getCurveFunctionFromConfig,
+  createDefaultMeshTexture,
   createDefaultParticleTexture,
   calculateRandomPositionAndVelocityOnSphere,
   calculateRandomPositionAndVelocityOnCone,
@@ -106,6 +107,68 @@ describe('createDefaultParticleTexture', () => {
     expect(mockContext.fill).toHaveBeenCalled();
     expect(mockCanvas.width).toBe(64);
     expect(mockCanvas.height).toBe(64);
+  });
+});
+
+// ─── createDefaultMeshTexture ────────────────────────────────────────────────
+
+describe('createDefaultMeshTexture', () => {
+  let originalDocument: typeof globalThis.document;
+
+  beforeEach(() => {
+    originalDocument = globalThis.document;
+  });
+
+  afterEach(() => {
+    globalThis.document = originalDocument;
+  });
+
+  it('should create a 1x1 white texture when canvas context is available', () => {
+    const mockContext = {
+      fillStyle: '',
+      fillRect: jest.fn(),
+    };
+    const mockCanvas = {
+      width: 0,
+      height: 0,
+      getContext: jest.fn().mockReturnValue(mockContext),
+    };
+    globalThis.document = {
+      createElement: jest.fn().mockReturnValue(mockCanvas),
+    } as any;
+
+    const result = createDefaultMeshTexture();
+
+    expect(result).not.toBeNull();
+    expect(mockCanvas.width).toBe(1);
+    expect(mockCanvas.height).toBe(1);
+    expect(mockContext.fillStyle).toBe('white');
+    expect(mockContext.fillRect).toHaveBeenCalledWith(0, 0, 1, 1);
+  });
+
+  it('should return null when getContext returns null', () => {
+    const mockCanvas = {
+      width: 0,
+      height: 0,
+      getContext: jest.fn().mockReturnValue(null),
+    };
+    globalThis.document = {
+      createElement: jest.fn().mockReturnValue(mockCanvas),
+    } as any;
+
+    const result = createDefaultMeshTexture();
+    expect(result).toBeNull();
+  });
+
+  it('should return null when document.createElement throws', () => {
+    globalThis.document = {
+      createElement: jest.fn().mockImplementation(() => {
+        throw new Error('No DOM');
+      }),
+    } as any;
+
+    const result = createDefaultMeshTexture();
+    expect(result).toBeNull();
   });
 });
 

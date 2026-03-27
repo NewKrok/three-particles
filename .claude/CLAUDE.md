@@ -280,7 +280,7 @@ npx typedoc               # Generate documentation
 | PR checks (lint + test + build + bundle size + CodeQL) | ✅ Complete |
 | Bundle size monitoring (150 KB limit) | ✅ Complete |
 | Performance benchmark suite | ✅ Complete |
-| Test coverage (100% stmt, 99.5% branch, 580 tests) | ✅ Target ≥90% stmt, ≥80% branch |
+| Test coverage (99.5% stmt, 97.8% branch, 638 tests) | ✅ Target ≥90% stmt, ≥80% branch |
 | Sub-emitters | ✅ Complete |
 | Force fields / Attractors | ✅ Complete |
 | GPU instancing (`RendererType.INSTANCED`) | ✅ Complete |
@@ -289,7 +289,7 @@ npx typedoc               # Generate documentation
 | Trail improvements (tangent smoothing, adaptive sampling, max time) | ⬜ Planned |
 | WebGPU compute support | ⬜ Planned |
 | Preset system | ⬜ Planned |
-| Mesh particle renderer | ⬜ Planned |
+| Mesh particle renderer (`RendererType.MESH`) | ✅ Complete |
 
 ---
 

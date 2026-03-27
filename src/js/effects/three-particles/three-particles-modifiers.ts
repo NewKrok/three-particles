@@ -257,4 +257,17 @@ export const applyModifiers = ({
 
     attributes.position.needsUpdate = true;
   }
+
+  // Sync packed quaternion vec4 from scalar rotation for mesh particles.
+  // This runs after noise so the quaternion reflects the final rotation value.
+  if (attributes.quat) {
+    const rotZ = attributes.rotation.array[particleIndex];
+    const halfZ = rotZ * 0.5;
+    const qi = particleIndex * 4;
+    attributes.quat.array[qi] = 0;
+    attributes.quat.array[qi + 1] = 0;
+    attributes.quat.array[qi + 2] = Math.sin(halfZ);
+    attributes.quat.array[qi + 3] = Math.cos(halfZ);
+    attributes.quat.needsUpdate = true;
+  }
 };

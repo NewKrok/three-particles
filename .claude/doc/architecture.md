@@ -107,15 +107,16 @@ createParticleSystem(config, externalNow)
   │     ├─ startLifetime (Float32, size 1)
   │     ├─ rotation (Float32, size 1)
   │     ├─ startFrame (Float32, size 1)
-  │     └─ isActive (Float32, size 1)
+  │     ├─ isActive (Float32, size 1)
+  │     └─ quat (Float32, size 4) — MESH only, packed quaternion vec4
   │
   ├─ 4. Create ShaderMaterial
   │     ├─ Vertex shader + Fragment shader
   │     ├─ Uniforms: elapsed, map, tiles, fps, backgroundColor...
   │     ├─ Blending mode, depth settings, transparency
-  │     └─ Texture (user-provided or default white circle)
+  │     └─ Texture (user-provided, default white circle for POINTS/INSTANCED, or solid white 1×1 for MESH)
   │
-  ├─ 5. Create THREE.Points (or Gyroscope wrapper for WORLD space)
+  ├─ 5. Create THREE.Points / THREE.Mesh (INSTANCED/MESH) (+ Gyroscope wrapper for WORLD space)
   │
   └─ 6. Push to createdParticleSystems[], return ParticleSystem handle
 ```
@@ -353,6 +354,7 @@ LifetimeCurve       → evaluate curve at time, multiply by scale
 | rotation | Float32 | 1 | Yes (rotation over lifetime + noise) |
 | startFrame | Float32 | 1 | No (set at emission) |
 | isActive | Float32 | 1 | Yes (activate/deactivate) |
+| quat | Float32 | 4 | Yes — MESH only (synced from rotation) |
 
 ---
 

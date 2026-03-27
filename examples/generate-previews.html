@@ -65,6 +65,19 @@
       return THREE.NormalBlending;
     }
 
+    const MESH_GEOMETRIES = {
+      BOX: () => new THREE.BoxGeometry(1, 1, 1),
+      SPHERE: () => new THREE.SphereGeometry(0.5, 12, 8),
+      ICOSAHEDRON: () => new THREE.IcosahedronGeometry(0.5, 0),
+      TORUS: () => new THREE.TorusGeometry(0.4, 0.15, 8, 24),
+      CONE: () => new THREE.ConeGeometry(0.4, 1, 8),
+      OCTAHEDRON: () => new THREE.OctahedronGeometry(0.5, 0),
+      DODECAHEDRON: () => new THREE.DodecahedronGeometry(0.5, 0),
+      TETRAHEDRON: () => new THREE.TetrahedronGeometry(0.6, 0),
+      TORUS_KNOT: () => new THREE.TorusKnotGeometry(0.3, 0.1, 32, 8),
+      CYLINDER: () => new THREE.CylinderGeometry(0.3, 0.3, 1, 8),
+    };
+
     const { examples } = await import("./examples-data.js");
 
     const status = document.getElementById("status");
@@ -72,11 +85,26 @@
     const downloadBtn = document.getElementById("download-all");
     const results = [];
 
-    status.textContent = `Processing ${examples.length} examples one by one...`;
+    // Check which previews already exist
+    const missing = [];
+    for (const example of examples) {
+      try {
+        const resp = await fetch(`previews/${example.id}.webp`, { method: "HEAD" });
+        if (!resp.ok) missing.push(example);
+      } catch {
+        missing.push(example);
+      }
+    }
 
-    for (let i = 0; i < examples.length; i++) {
-      const example = examples[i];
-      status.textContent = `[${i + 1}/${examples.length}] Rendering: ${example.title}...`;
+    if (missing.length === 0) {
+      status.textContent = "All previews already exist! Nothing to generate.";
+    } else {
+
+    status.textContent = `${missing.length} missing preview(s) out of ${examples.length}. Generating...`;
+
+    for (let i = 0; i < missing.length; i++) {
+      const example = missing[i];
+      status.textContent = `[${i + 1}/${missing.length}] Rendering: ${example.title}...`;
 
       // Create a canvas for this demo
       const slot = document.createElement("div");
@@ -111,6 +139,11 @@
         config.renderer.blending = resolveBlending(config.renderer.blending);
       }
       if (tex) config.map = tex;
+      // Attach mesh geometry for MESH renderer examples
+      if (example.meshType && MESH_GEOMETRIES[example.meshType]) {
+        if (!config.renderer) config.renderer = {};
+        config.renderer.mesh = { geometry: MESH_GEOMETRIES[example.meshType]() };
+      }
       if (config.subEmitters) {
         for (const sub of config.subEmitters) {
           if (sub.config?.renderer?.blending) {
@@ -185,6 +218,7 @@
 
     status.textContent = `Done! ${results.length} previews generated. Click button to download.`;
     downloadBtn.style.display = "inline-block";
+    } // end else (missing.length > 0)
 
     downloadBtn.addEventListener("click", async () => {
       status.textContent = "Building ZIP...";

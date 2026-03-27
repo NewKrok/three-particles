@@ -4,6 +4,8 @@ import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 import InstancedParticleFragmentShader from './shaders/instanced-particle-fragment-shader.glsl.js';
 import InstancedParticleVertexShader from './shaders/instanced-particle-vertex-shader.glsl.js';
+import MeshParticleFragmentShader from './shaders/mesh-particle-fragment-shader.glsl.js';
+import MeshParticleVertexShader from './shaders/mesh-particle-vertex-shader.glsl.js';
 import ParticleSystemFragmentShader from './shaders/particle-system-fragment-shader.glsl.js';
 import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.glsl.js';
 import TrailFragmentShader from './shaders/trail-fragment-shader.glsl.js';
@@ -31,6 +33,7 @@ import {
   calculateValue,
   getCurveFunctionFromConfig,
   isLifeTimeCurve,
+  createDefaultMeshTexture,
   createDefaultParticleTexture,
 } from './three-particles-utils.js';
 
@@ -51,6 +54,7 @@ import {
   RandomBetweenTwoConstants,
   ShapeConfig,
   SubEmitterConfig,
+  MeshConfig,
   TrailConfig,
 } from './types.js';
 
@@ -513,7 +517,10 @@ export const createParticleSystem = (
     { applyToFirstObject: false, skippedProperties: [] }
   ) as NormalizedParticleSystemConfig;
   let particleMap: THREE.Texture | null =
-    normalizedConfig.map || createDefaultParticleTexture();
+    normalizedConfig.map ||
+    (normalizedConfig.renderer.rendererType === RendererType.MESH
+      ? createDefaultMeshTexture()
+      : createDefaultParticleTexture());
 
   const {
     transform,
@@ -752,8 +759,10 @@ export const createParticleSystem = (
   }
 
   const useTrail = renderer.rendererType === RendererType.TRAIL;
+  const useMesh = renderer.rendererType === RendererType.MESH;
   const useInstancing =
-    !useTrail && renderer.rendererType === RendererType.INSTANCED;
+    !useTrail && !useMesh && renderer.rendererType === RendererType.INSTANCED;
+  const useInstancedAttributes = useInstancing || useMesh;
 
   // Trail config defaults
   const defaultTrailCurve: LifetimeCurve = {
@@ -791,15 +800,15 @@ export const createParticleSystem = (
     generalData.positionHistoryCount = new Uint16Array(maxParticles);
   }
 
-  // Attribute name prefix: instanced renderer uses 'instance'-prefixed names
-  // to avoid collision with the base quad geometry's own 'position' attribute.
+  // Attribute name prefix: instanced/mesh renderers use 'instance'-prefixed names
+  // to avoid collision with the base geometry's own 'position' attribute.
   const attr = (name: string) =>
-    useInstancing
+    useInstancedAttributes
       ? `instance${name.charAt(0).toUpperCase()}${name.slice(1)}`
       : name;
 
-  // Position attribute is special: Points uses 'position', instanced uses 'instanceOffset'
-  const posAttr = useInstancing ? 'instanceOffset' : 'position';
+  // Position attribute is special: Points uses 'position', instanced/mesh uses 'instanceOffset'
+  const posAttr = useInstancedAttributes ? 'instanceOffset' : 'position';
 
   const sharedUniforms: Record<string, { value: unknown }> = {
     elapsed: { value: 0.0 },
@@ -815,14 +824,22 @@ export const createParticleSystem = (
     ...(useInstancing ? { viewportHeight: { value: 1.0 } } : {}),
   };
 
+  const getVertexShader = () => {
+    if (useMesh) return MeshParticleVertexShader;
+    if (useInstancing) return InstancedParticleVertexShader;
+    return ParticleSystemVertexShader;
+  };
+
+  const getFragmentShader = () => {
+    if (useMesh) return MeshParticleFragmentShader;
+    if (useInstancing) return InstancedParticleFragmentShader;
+    return ParticleSystemFragmentShader;
+  };
+
   const material = new THREE.ShaderMaterial({
     uniforms: sharedUniforms,
-    vertexShader: useInstancing
-      ? InstancedParticleVertexShader
-      : ParticleSystemVertexShader,
-    fragmentShader: useInstancing
-      ? InstancedParticleFragmentShader
-      : ParticleSystemFragmentShader,
+    vertexShader: getVertexShader(),
+    fragmentShader: getFragmentShader(),
     transparent: renderer.transparent,
     blending: renderer.blending,
     depthTest: renderer.depthTest,
@@ -831,7 +848,28 @@ export const createParticleSystem = (
 
   let geometry: THREE.BufferGeometry | THREE.InstancedBufferGeometry;
 
-  if (useInstancing) {
+  if (useMesh) {
+    const meshConfig = renderer.mesh;
+    if (!meshConfig?.geometry) {
+      throw new Error(
+        'RendererType.MESH requires a mesh configuration with a geometry. ' +
+          'Set renderer.mesh.geometry to a THREE.BufferGeometry instance.'
+      );
+    }
+    const instancedGeometry = new THREE.InstancedBufferGeometry();
+    // Copy base mesh geometry attributes (position, normal, uv, index)
+    const sourceGeom = meshConfig.geometry;
+    const srcPos = sourceGeom.getAttribute('position');
+    if (srcPos) instancedGeometry.setAttribute('position', srcPos);
+    const srcNormal = sourceGeom.getAttribute('normal');
+    if (srcNormal) instancedGeometry.setAttribute('normal', srcNormal);
+    const srcUv = sourceGeom.getAttribute('uv');
+    if (srcUv) instancedGeometry.setAttribute('uv', srcUv);
+    const srcIndex = sourceGeom.getIndex();
+    if (srcIndex) instancedGeometry.setIndex(srcIndex);
+    instancedGeometry.instanceCount = maxParticles;
+    geometry = instancedGeometry;
+  } else if (useInstancing) {
     const instancedGeometry = new THREE.InstancedBufferGeometry();
     // Base quad: 1x1 plane centred at origin (vertices from -0.5 to 0.5)
     const quadPositions = new Float32Array([
@@ -865,7 +903,7 @@ export const createParticleSystem = (
     positionArray[i * 3 + 1] = startPositions[i].y;
     positionArray[i * 3 + 2] = startPositions[i].z;
   }
-  const positionAttribute = useInstancing
+  const positionAttribute = useInstancedAttributes
     ? new THREE.InstancedBufferAttribute(positionArray, 3)
     : new THREE.BufferAttribute(positionArray, 3);
   geometry.setAttribute(posAttr, positionAttribute);
@@ -875,7 +913,7 @@ export const createParticleSystem = (
     propertyName: attr('isActive'),
     maxParticles,
     factory: 0,
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
 
   createFloat32Attributes({
@@ -883,7 +921,7 @@ export const createParticleSystem = (
     propertyName: attr('lifetime'),
     maxParticles,
     factory: 0,
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
 
   createFloat32Attributes({
@@ -892,7 +930,7 @@ export const createParticleSystem = (
     maxParticles,
     factory: () =>
       calculateValue(generalData.particleSystemId, startLifetime, 0) * 1000,
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
 
   createFloat32Attributes({
@@ -907,7 +945,7 @@ export const createParticleSystem = (
             0
           )
         : 0,
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
 
   createFloat32Attributes({
@@ -915,7 +953,7 @@ export const createParticleSystem = (
     propertyName: attr('size'),
     maxParticles,
     factory: (_, index) => generalData.startValues.startSize[index],
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
 
   createFloat32Attributes({
@@ -923,7 +961,7 @@ export const createParticleSystem = (
     propertyName: attr('rotation'),
     maxParticles,
     factory: 0,
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
 
   const colorRandomRatio = Math.random();
@@ -934,7 +972,7 @@ export const createParticleSystem = (
     factory: () =>
       startColor.min!.r! +
       colorRandomRatio * (startColor.max!.r! - startColor.min!.r!),
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
   createFloat32Attributes({
     geometry,
@@ -943,7 +981,7 @@ export const createParticleSystem = (
     factory: () =>
       startColor.min!.g! +
       colorRandomRatio * (startColor.max!.g! - startColor.min!.g!),
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
   createFloat32Attributes({
     geometry,
@@ -952,17 +990,30 @@ export const createParticleSystem = (
     factory: () =>
       startColor.min!.b! +
       colorRandomRatio * (startColor.max!.b! - startColor.min!.b!),
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
   createFloat32Attributes({
     geometry,
     propertyName: attr('colorA'),
     maxParticles,
     factory: 0,
-    instanced: useInstancing,
+    instanced: useInstancedAttributes,
   });
 
-  // Resolve per-particle attribute accessors (instanced uses prefixed names)
+  // Packed quaternion vec4 attribute for 3D mesh rotation (only for MESH renderer)
+  if (useMesh) {
+    const quatArray = new Float32Array(maxParticles * 4);
+    // Initialize to identity quaternion (0, 0, 0, 1)
+    for (let i = 0; i < maxParticles; i++) {
+      quatArray[i * 4 + 3] = 1; // w = 1
+    }
+    geometry.setAttribute(
+      attr('quat'),
+      new THREE.InstancedBufferAttribute(quatArray, 4)
+    );
+  }
+
+  // Resolve per-particle attribute accessors (instanced/mesh uses prefixed names)
   const a = geometry.attributes;
   const aIsActive = a[attr('isActive')];
   const aColorR = a[attr('colorR')];
@@ -975,6 +1026,7 @@ export const createParticleSystem = (
   const aRotation = a[attr('rotation')];
   const aLifetime = a[attr('lifetime')];
   const aPosition = a[posAttr];
+  const aQuat = useMesh ? a[attr('quat')] : undefined;
 
   const deactivateParticle = (particleIndex: number) => {
     aIsActive.array[particleIndex] = 0;
@@ -1069,6 +1121,18 @@ export const createParticleSystem = (
       generalData.normalizedLifetimePercentage
     );
     aRotation.needsUpdate = true;
+
+    // Initialize mesh particle quaternion from the Z-rotation startRotation
+    if (aQuat) {
+      const rotZ = aRotation.array[particleIndex];
+      const halfZ = rotZ * 0.5;
+      const qi = particleIndex * 4;
+      aQuat.array[qi] = 0;
+      aQuat.array[qi + 1] = 0;
+      aQuat.array[qi + 2] = Math.sin(halfZ);
+      aQuat.array[qi + 3] = Math.cos(halfZ);
+      aQuat.needsUpdate = true;
+    }
 
     if (normalizedConfig.rotationOverLifetime.isActive)
       generalData.lifetimeValues.rotationOverLifetime[particleIndex] =
@@ -1237,7 +1301,12 @@ export const createParticleSystem = (
           },
           renderer: {
             ...(subConfig.config.renderer ?? {}),
-            rendererType: renderer.rendererType,
+            ...(subConfig.config.renderer?.rendererType
+              ? {}
+              : renderer.rendererType === RendererType.MESH ||
+                  renderer.rendererType === RendererType.TRAIL
+                ? {}
+                : { rendererType: renderer.rendererType }),
           } as typeof subConfig.config.renderer,
           ...(inheritVelocity > 0
             ? {
@@ -1404,9 +1473,10 @@ export const createParticleSystem = (
     }
   }
 
-  let particleSystem: THREE.Points | THREE.Mesh = useInstancing
-    ? new THREE.Mesh(geometry, material)
-    : new THREE.Points(geometry, material);
+  let particleSystem: THREE.Points | THREE.Mesh =
+    useInstancing || useMesh
+      ? new THREE.Mesh(geometry, material)
+      : new THREE.Points(geometry, material);
 
   if (useInstancing) {
     particleSystem.onBeforeRender = (glRenderer: THREE.WebGLRenderer) => {
@@ -1442,6 +1512,7 @@ export const createParticleSystem = (
     colorG: aColorG,
     colorB: aColorB,
     colorA: aColorA,
+    ...(useMesh ? { quat: aQuat } : {}),
   };
 
   const calculatedCreationTime =
