@@ -50,7 +50,21 @@ function resolveBlending(blending) {
   return THREE.NormalBlending;
 }
 
-function prepareConfig(config, textureId) {
+// Mesh geometry factories for RendererType.MESH examples
+const MESH_GEOMETRIES = {
+  BOX: () => new THREE.BoxGeometry(1, 1, 1),
+  SPHERE: () => new THREE.SphereGeometry(0.5, 12, 8),
+  ICOSAHEDRON: () => new THREE.IcosahedronGeometry(0.5, 0),
+  TORUS: () => new THREE.TorusGeometry(0.4, 0.15, 8, 24),
+  CONE: () => new THREE.ConeGeometry(0.4, 1, 8),
+  OCTAHEDRON: () => new THREE.OctahedronGeometry(0.5, 0),
+  DODECAHEDRON: () => new THREE.DodecahedronGeometry(0.5, 0),
+  TETRAHEDRON: () => new THREE.TetrahedronGeometry(0.6, 0),
+  TORUS_KNOT: () => new THREE.TorusKnotGeometry(0.3, 0.1, 32, 8),
+  CYLINDER: () => new THREE.CylinderGeometry(0.3, 0.3, 1, 8),
+};
+
+function prepareConfig(config, textureId, meshType) {
   const prepared = JSON.parse(JSON.stringify(config));
   delete prepared._editorData;
   if (prepared.renderer?.blending) {
@@ -70,6 +84,11 @@ function prepareConfig(config, textureId) {
       }
     }
   }
+  // Attach mesh geometry for MESH renderer examples
+  if (meshType && MESH_GEOMETRIES[meshType]) {
+    prepared.renderer = prepared.renderer || {};
+    prepared.renderer.mesh = { geometry: MESH_GEOMETRIES[meshType]() };
+  }
   return prepared;
 }
 
@@ -83,6 +102,10 @@ function getConfigRendererType(example) {
 
 function isTrailExample(example) {
   return getConfigRendererType(example) === "TRAIL";
+}
+
+function isMeshExample(example) {
+  return getConfigRendererType(example) === "MESH";
 }
 
 class LiveDemo {
@@ -120,9 +143,9 @@ class LiveDemo {
     this.camera.position.set(0, 0, 15);
     this.camera.lookAt(0, 0, 0);
 
-    const config = prepareConfig(this.data.config, this.data.textureId);
+    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType);
     config.renderer = config.renderer || {};
-    if (!isTrailExample(this.data)) {
+    if (!isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
     const system = createParticleSystem(config);
@@ -223,9 +246,9 @@ class ExpandedDemo {
     this.camera.position.set(0, 0, 15);
     this.camera.lookAt(0, 0, 0);
 
-    const config = prepareConfig(this.data.config, this.data.textureId);
+    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType);
     config.renderer = config.renderer || {};
-    if (!isTrailExample(this.data)) {
+    if (!isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
     const system = createParticleSystem(config);
@@ -236,9 +259,11 @@ class ExpandedDemo {
     if (label) {
       const actual = isTrailExample(this.data)
         ? "TRAIL"
-        : system.instance instanceof THREE.Mesh
-          ? "INSTANCED"
-          : "POINTS";
+        : isMeshExample(this.data)
+          ? "MESH"
+          : system.instance instanceof THREE.Mesh
+            ? "INSTANCED"
+            : "POINTS";
       label.textContent = actual;
     }
 
@@ -326,6 +351,8 @@ function openExpandModal(exampleData, rendererType) {
   const toggle = document.getElementById("expand-renderer-toggle");
   if (isTrailExample(exampleData)) {
     toggle.innerHTML = `<span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span>`;
+  } else if (isMeshExample(exampleData)) {
+    toggle.innerHTML = `<span class="trail-badge" title="3D Mesh renderer">MESH</span>`;
   } else {
     toggle.innerHTML = `
       <button data-type="POINTS" title="Point sprites (THREE.Points)">POINTS</button>
@@ -350,7 +377,7 @@ document.getElementById("expand-overlay").addEventListener("click", (e) => {
 });
 document.getElementById("expand-renderer-toggle").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-type]");
-  if (!btn || (expandExampleData && isTrailExample(expandExampleData))) return;
+  if (!btn || (expandExampleData && (isTrailExample(expandExampleData) || isMeshExample(expandExampleData)))) return;
   const type = btn.dataset.type;
   const toggle = document.getElementById("expand-renderer-toggle");
   toggle.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
@@ -393,7 +420,9 @@ examples.forEach((example) => {
         <div class="card-btns">
           ${isTrailExample(example)
             ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span></div>`
-            : `<div class="renderer-toggle">
+            : isMeshExample(example)
+              ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge" title="3D Mesh renderer">MESH</span></div>`
+              : `<div class="renderer-toggle">
               <button class="active" data-type="POINTS" title="Point sprites (THREE.Points)">PTS</button>
               <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INST</button>
             </div>`
@@ -427,7 +456,7 @@ examples.forEach((example) => {
 
   cardRendererTypes.set(card, getConfigRendererType(example));
 
-  if (!isTrailExample(example)) {
+  if (!isTrailExample(example) && !isMeshExample(example)) {
     card.querySelector(".renderer-toggle").addEventListener("click", (e) => {
       e.stopPropagation();
       const btn = e.target.closest("button[data-type]");

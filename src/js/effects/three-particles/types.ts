@@ -514,6 +514,32 @@ export type TrailConfig = {
 };
 
 /**
+ * Configuration for the mesh particle renderer.
+ * Controls which 3D geometry is used when `rendererType` is `RendererType.MESH`.
+ *
+ * @property geometry - A `THREE.BufferGeometry` to render for each particle.
+ *   Built-in Three.js primitives like `BoxGeometry`, `SphereGeometry`, `TorusGeometry`
+ *   all work. The geometry's own normals and UVs are preserved.
+ *
+ * @example
+ * ```typescript
+ * // Cube mesh particles
+ * mesh: {
+ *   geometry: new THREE.BoxGeometry(1, 1, 1),
+ * }
+ *
+ * // Icosahedron mesh particles
+ * mesh: {
+ *   geometry: new THREE.IcosahedronGeometry(0.5, 0),
+ * }
+ * ```
+ */
+export type MeshConfig = {
+  /** The geometry to render for each particle. */
+  geometry: THREE.BufferGeometry;
+};
+
+/**
  * Configuration for the particle system renderer, controlling blending, transparency, depth, and background color behavior.
  *
  * @property blending - Defines the blending mode for the particle system (e.g., additive blending).
@@ -574,6 +600,14 @@ export type Renderer = {
    * @see TrailConfig
    */
   trail?: TrailConfig;
+
+  /**
+   * Mesh particle renderer configuration.
+   * Only used when `rendererType` is `RendererType.MESH`.
+   *
+   * @see MeshConfig
+   */
+  mesh?: MeshConfig;
 };
 
 /**
@@ -1457,6 +1491,11 @@ export type MappedAttributes = {
   colorG: AnyBufferAttribute;
   colorB: AnyBufferAttribute;
   colorA: AnyBufferAttribute;
+  /** Quaternion components for 3D mesh rotation (only present for RendererType.MESH). */
+  quatX?: AnyBufferAttribute;
+  quatY?: AnyBufferAttribute;
+  quatZ?: AnyBufferAttribute;
+  quatW?: AnyBufferAttribute;
 };
 
 export type ParticleSystemInstance = {

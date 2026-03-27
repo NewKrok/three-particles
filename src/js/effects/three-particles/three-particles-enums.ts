@@ -197,6 +197,23 @@ export const enum RendererType {
    * Configure trail-specific properties via {@link TrailConfig} on the renderer.
    */
   TRAIL = 'TRAIL',
+
+  /**
+   * Render each particle as a 3D mesh using GPU instancing (`InstancedBufferGeometry`).
+   * Instead of flat billboard sprites, particles are rendered as real 3D geometry
+   * (e.g., cubes, spheres, tori, or any custom `THREE.BufferGeometry`).
+   *
+   * Key differences from billboard renderers:
+   * - **3D rotation**: Particles rotate in all three axes (quaternion-based).
+   * - **Normals**: Mesh geometry retains normals, enabling basic lighting.
+   * - **Arbitrary geometry**: Any `THREE.BufferGeometry` can be used per particle.
+   *
+   * All existing modifiers (sizeOverLifetime, colorOverLifetime, noise, force fields,
+   * sub-emitters) work with mesh particles.
+   *
+   * Configure mesh-specific properties via {@link MeshConfig} on the renderer.
+   */
+  MESH = 'MESH',
 }
 
 /**

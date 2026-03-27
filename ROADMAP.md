@@ -29,6 +29,7 @@
 | GPU Instancing (`InstancedBufferGeometry` renderer) | ✅ |
 | React Three Fiber integration (docs + usage guide) | ✅ |
 | Trail / Ribbon Renderer (`RendererType.TRAIL`) | ✅ |
+| Mesh Particle Renderer (`RendererType.MESH`) | ✅ |
 
 ---
 
@@ -80,11 +81,6 @@
 - Built-in particle configurations: `Presets.FIRE`, `Presets.SMOKE`, `Presets.SPARKS`, `Presets.RAIN`, etc.
 - Easy starting point for new users
 - Fully customizable — presets are just `ParticleSystemConfig` objects
-
-### Mesh Particle Renderer
-- Use 3D meshes as individual particles (shards, leaves, debris)
-- Support for custom geometry with per-particle transforms
-- Combine with GPU instancing for performance
 
 ### Additional Emitter Shapes
 - Point emitter (single origin)

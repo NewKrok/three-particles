@@ -76,6 +76,26 @@ function animate() {
 - `RendererType.POINTS` (default) — Classic point sprites via `THREE.Points`
 - `RendererType.INSTANCED` — Camera-facing quads via `InstancedBufferGeometry`, removes `gl_PointSize` hardware limit
 - `RendererType.TRAIL` — Ribbon trails behind particles with configurable width, opacity, and color tapering
+- `RendererType.MESH` — Render each particle as a 3D mesh (cubes, spheres, custom geometry) via GPU instancing with quaternion-based 3D rotation and directional lighting
+
+## Mesh Particle Renderer
+
+Configure via `renderer.mesh`:
+
+```typescript
+renderer: {
+  rendererType: RendererType.MESH,
+  blending: THREE.NormalBlending,
+  transparent: true,
+  depthTest: true,
+  depthWrite: true,
+  mesh: {
+    geometry: new THREE.BoxGeometry(1, 1, 1), // Any THREE.BufferGeometry
+  },
+}
+```
+
+Mesh particles use GPU instancing (`InstancedBufferGeometry`). Each particle is a full 3D mesh with quaternion rotation, normals, and UVs preserved. All modifiers (sizeOverLifetime, colorOverLifetime, noise, force fields, sub-emitters) work with mesh particles.
 
 ## Trail / Ribbon Renderer
 

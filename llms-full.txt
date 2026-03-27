@@ -338,6 +338,8 @@ type Renderer = {
   depthTest: boolean;                   // Default: true
   depthWrite: boolean;                  // Default: false
   rendererType?: RendererType;          // Default: RendererType.POINTS
+  trail?: TrailConfig;                  // Only for RendererType.TRAIL
+  mesh?: MeshConfig;                    // Only for RendererType.MESH
 };
 
 enum RendererType {
@@ -348,10 +350,42 @@ enum RendererType {
   TRAIL = 'TRAIL',         // Ribbon trails behind particles. Each particle records a position
                             // history and the renderer builds a camera-facing triangle-strip
                             // ribbon through those samples.
+  MESH = 'MESH',           // 3D mesh particles via GPU instancing. Each particle is rendered
+                            // as a full 3D mesh with quaternion-based rotation, normals, and
+                            // directional lighting. Any THREE.BufferGeometry can be used.
 }
+
+type MeshConfig = {
+  geometry: THREE.BufferGeometry;  // The geometry to render for each particle
+};
 ```
 
 Common blending modes: `THREE.NormalBlending`, `THREE.AdditiveBlending`, `THREE.SubtractiveBlending`
+
+### Mesh Particle Configuration
+
+When using `RendererType.MESH`, configure mesh-specific properties via `renderer.mesh`:
+
+```typescript
+renderer: {
+  rendererType: RendererType.MESH,
+  blending: THREE.NormalBlending,
+  transparent: true,
+  depthTest: true,
+  depthWrite: true,
+  mesh: {
+    geometry: new THREE.BoxGeometry(1, 1, 1),
+  },
+}
+```
+
+Mesh particle features:
+- GPU instancing (`InstancedBufferGeometry`) — one draw call for all particles
+- Quaternion-based 3D rotation (particles rotate in all 3 axes)
+- Normals preserved from the source geometry, simple directional lighting from camera
+- Any `THREE.BufferGeometry` works: `BoxGeometry`, `SphereGeometry`, `IcosahedronGeometry`, custom meshes, etc.
+- All modifiers work: sizeOverLifetime, colorOverLifetime, opacityOverLifetime, rotationOverLifetime, noise, force fields, sub-emitters
+- Note: `mesh.geometry` is a runtime object (not serializable to JSON); provide it programmatically
 
 ### Trail / Ribbon Configuration
 

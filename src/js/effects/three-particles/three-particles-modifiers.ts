@@ -257,4 +257,19 @@ export const applyModifiers = ({
 
     attributes.position.needsUpdate = true;
   }
+
+  // Sync quaternion attributes from scalar rotation for mesh particles.
+  // This runs after noise so the quaternion reflects the final rotation value.
+  if (attributes.quatX && attributes.quatZ && attributes.quatW) {
+    const rotZ = attributes.rotation.array[particleIndex];
+    const halfZ = rotZ * 0.5;
+    attributes.quatX.array[particleIndex] = 0;
+    attributes.quatY!.array[particleIndex] = 0;
+    attributes.quatZ.array[particleIndex] = Math.sin(halfZ);
+    attributes.quatW.array[particleIndex] = Math.cos(halfZ);
+    attributes.quatX.needsUpdate = true;
+    attributes.quatY!.needsUpdate = true;
+    attributes.quatZ.needsUpdate = true;
+    attributes.quatW.needsUpdate = true;
+  }
 };
