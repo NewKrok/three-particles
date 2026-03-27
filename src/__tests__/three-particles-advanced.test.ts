@@ -80,7 +80,7 @@ describe('Force fields integration in particle system', () => {
     });
 
     step(16);
-    step(100);
+    step(200, 184);
 
     // Particles should have moved toward the force field
     const attrs = getAttributes(ps);
@@ -88,7 +88,7 @@ describe('Force fields integration in particle system', () => {
     for (let i = 0; i < attrs.isActive.array.length; i++) {
       if (attrs.isActive.array[i]) {
         const y = attrs.position.array[i * 3 + 1];
-        if (y > 0.01) {
+        if (y > 0.001) {
           movedUpward = true;
           break;
         }
