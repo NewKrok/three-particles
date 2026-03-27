@@ -76,7 +76,7 @@ function animate() {
 - `RendererType.POINTS` (default) — Classic point sprites via `THREE.Points`
 - `RendererType.INSTANCED` — Camera-facing quads via `InstancedBufferGeometry`, removes `gl_PointSize` hardware limit
 - `RendererType.TRAIL` — Ribbon trails behind particles with configurable width, opacity, and color tapering
-- `RendererType.MESH` — Render each particle as a 3D mesh (cubes, spheres, custom geometry) via GPU instancing with quaternion-based 3D rotation and directional lighting
+- `RendererType.MESH` — Render each particle as a 3D mesh (cubes, spheres, custom geometry) via GPU instancing with quaternion-based 3D rotation and directional lighting. Uses solid white default texture (not circle) to preserve mesh shape. Sub-emitters do not inherit MESH or TRAIL rendererType from parent
 
 ## Mesh Particle Renderer
 

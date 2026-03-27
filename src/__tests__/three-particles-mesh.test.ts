@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { RendererType } from '../js/effects/three-particles/three-particles-enums.js';
+import {
+  RendererType,
+  SubEmitterTrigger,
+} from '../js/effects/three-particles/three-particles-enums.js';
 import { createParticleSystem } from '../js/effects/three-particles/three-particles.js';
 import type { ParticleSystem } from '../js/effects/three-particles/types.js';
 
@@ -134,28 +137,22 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       ps.dispose();
     });
 
-    it('should have quaternion attributes for 3D rotation', () => {
+    it('should have packed quaternion vec4 attribute for 3D rotation', () => {
       const { ps } = createMeshSystem();
       const geom = getGeometry(ps);
 
-      const quatAttrs = [
-        'instanceQuatX',
-        'instanceQuatY',
-        'instanceQuatZ',
-        'instanceQuatW',
-      ];
+      const quat = geom.getAttribute('instanceQuat');
+      expect(quat).toBeDefined();
+      expect(quat).toBeInstanceOf(THREE.InstancedBufferAttribute);
+      expect(quat.itemSize).toBe(4);
+      expect(quat.count).toBe(50);
 
-      for (const name of quatAttrs) {
-        const attr = geom.getAttribute(name);
-        expect(attr).toBeDefined();
-        expect(attr).toBeInstanceOf(THREE.InstancedBufferAttribute);
-        expect(attr.count).toBe(50);
-      }
-
-      // instanceQuatW should be initialized to 1 (identity quaternion)
-      const quatW = geom.getAttribute('instanceQuatW');
+      // Identity quaternion: (0, 0, 0, 1)
       for (let i = 0; i < 50; i++) {
-        expect(quatW.array[i]).toBe(1);
+        expect(quat.array[i * 4]).toBe(0); // x
+        expect(quat.array[i * 4 + 1]).toBe(0); // y
+        expect(quat.array[i * 4 + 2]).toBe(0); // z
+        expect(quat.array[i * 4 + 3]).toBe(1); // w
       }
 
       ps.dispose();
@@ -316,16 +313,15 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       step(100);
 
       const geom = getGeometry(ps);
-      const quatZ = geom.getAttribute('instanceQuatZ').array;
-      const quatW = geom.getAttribute('instanceQuatW').array;
+      const quat = geom.getAttribute('instanceQuat').array;
       const isActive = geom.getAttribute('instanceIsActive').array;
 
       let found = false;
       for (let i = 0; i < 5; i++) {
         if (isActive[i]) {
           const halfZ = startRot * 0.5;
-          expect(quatZ[i]).toBeCloseTo(Math.sin(halfZ), 3);
-          expect(quatW[i]).toBeCloseTo(Math.cos(halfZ), 3);
+          expect(quat[i * 4 + 2]).toBeCloseTo(Math.sin(halfZ), 3);
+          expect(quat[i * 4 + 3]).toBeCloseTo(Math.cos(halfZ), 3);
           found = true;
           break;
         }
@@ -347,10 +343,10 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       step(100);
 
       const geom = getGeometry(ps);
-      const quatZ = geom.getAttribute('instanceQuatZ').array;
+      const quat = geom.getAttribute('instanceQuat').array;
       const isActive = geom.getAttribute('instanceIsActive').array;
 
-      // Find an active particle's initial quatZ
+      // Find an active particle's initial quat Z component
       let idx = -1;
       for (let i = 0; i < 5; i++) {
         if (isActive[i]) {
@@ -360,13 +356,13 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       }
       expect(idx).toBeGreaterThanOrEqual(0);
 
-      const initialQuatZ = quatZ[idx];
+      const initialQuatZ = quat[idx * 4 + 2];
 
       // Step forward to rotate
       step(500, 400);
 
-      // Quaternion Z should have changed
-      expect(quatZ[idx]).not.toBeCloseTo(initialQuatZ, 2);
+      // Quaternion Z component should have changed
+      expect(quat[idx * 4 + 2]).not.toBeCloseTo(initialQuatZ, 2);
 
       ps.dispose();
     });
@@ -573,6 +569,73 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       ps.resumeEmitter();
       step(500, 300);
       expect(countActiveParticles(ps)).toBeGreaterThan(0);
+
+      ps.dispose();
+    });
+  });
+
+  describe('sub-emitters', () => {
+    it('should not force MESH rendererType on sub-emitters without geometry', () => {
+      const scene = new THREE.Group();
+      const startTime = 1000;
+
+      const ps = createParticleSystem(
+        {
+          maxParticles: 3,
+          duration: 5,
+          looping: true,
+          startLifetime: 0.1,
+          startSpeed: 1,
+          startSize: 1,
+          startOpacity: 1,
+          startRotation: 0,
+          emission: {
+            rateOverTime: 0,
+            rateOverDistance: 0,
+            bursts: [{ time: 0, count: 2 }],
+          },
+          renderer: {
+            rendererType: RendererType.MESH,
+            mesh: { geometry: new THREE.BoxGeometry(1, 1, 1) },
+          },
+          subEmitters: [
+            {
+              trigger: SubEmitterTrigger.DEATH,
+              config: {
+                maxParticles: 3,
+                duration: 0.5,
+                looping: false,
+                startLifetime: 0.1,
+                startSpeed: 0,
+                startSize: 0.5,
+                startOpacity: 1,
+                startRotation: 0,
+                emission: {
+                  rateOverTime: 0,
+                  rateOverDistance: 0,
+                  bursts: [{ time: 0, count: 1 }],
+                },
+              },
+              maxInstances: 4,
+            },
+          ],
+        } as any,
+        startTime
+      );
+
+      scene.add(ps.instance);
+
+      // Emit burst
+      ps.update({ now: startTime, delta: 0.016, elapsed: 0 });
+
+      // Kill parent particles (lifetime = 0.1s) — triggers sub-emitters
+      expect(() => {
+        ps.update({ now: startTime + 200, delta: 0.2, elapsed: 0.2 });
+      }).not.toThrow();
+
+      // Sub-emitters should have been created as POINTS (default), not MESH
+      const subInstances = scene.children.filter((c) => c !== ps.instance);
+      expect(subInstances.length).toBeGreaterThan(0);
 
       ps.dispose();
     });

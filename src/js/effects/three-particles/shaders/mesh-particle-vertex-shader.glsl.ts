@@ -9,10 +9,7 @@ const MeshParticleVertexShader = `
   attribute float instanceRotation;
   attribute float instanceStartFrame;
   attribute vec3 instanceOffset;
-  attribute float instanceQuatX;
-  attribute float instanceQuatY;
-  attribute float instanceQuatZ;
-  attribute float instanceQuatW;
+  attribute vec4 instanceQuat;
 
   varying vec4 vColor;
   varying float vLifetime;
@@ -39,8 +36,7 @@ const MeshParticleVertexShader = `
     vRotation = instanceRotation;
 
     // Apply quaternion rotation to the mesh vertex position
-    vec4 quat = vec4(instanceQuatX, instanceQuatY, instanceQuatZ, instanceQuatW);
-    vec3 rotatedPosition = applyQuaternion(position, quat);
+    vec3 rotatedPosition = applyQuaternion(position, instanceQuat);
 
     // Scale mesh by particle size
     vec3 scaledPosition = rotatedPosition * instanceSize;
@@ -52,7 +48,7 @@ const MeshParticleVertexShader = `
     gl_Position = projectionMatrix * mvPosition;
 
     // Transform normal by quaternion for lighting
-    vNormal = normalize((modelViewMatrix * vec4(applyQuaternion(normal, quat), 0.0)).xyz);
+    vNormal = normalize((modelViewMatrix * vec4(applyQuaternion(normal, instanceQuat), 0.0)).xyz);
 
     // Pass through UVs from the mesh geometry
     vUv = uv;

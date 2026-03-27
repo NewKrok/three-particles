@@ -33,6 +33,7 @@ import {
   calculateValue,
   getCurveFunctionFromConfig,
   isLifeTimeCurve,
+  createDefaultMeshTexture,
   createDefaultParticleTexture,
 } from './three-particles-utils.js';
 
@@ -516,7 +517,10 @@ export const createParticleSystem = (
     { applyToFirstObject: false, skippedProperties: [] }
   ) as NormalizedParticleSystemConfig;
   let particleMap: THREE.Texture | null =
-    normalizedConfig.map || createDefaultParticleTexture();
+    normalizedConfig.map ||
+    (normalizedConfig.renderer.rendererType === RendererType.MESH
+      ? createDefaultMeshTexture()
+      : createDefaultParticleTexture());
 
   const {
     transform,
@@ -996,36 +1000,17 @@ export const createParticleSystem = (
     instanced: useInstancedAttributes,
   });
 
-  // Quaternion attributes for 3D mesh rotation (only for MESH renderer)
+  // Packed quaternion vec4 attribute for 3D mesh rotation (only for MESH renderer)
   if (useMesh) {
-    createFloat32Attributes({
-      geometry,
-      propertyName: attr('quatX'),
-      maxParticles,
-      factory: 0,
-      instanced: true,
-    });
-    createFloat32Attributes({
-      geometry,
-      propertyName: attr('quatY'),
-      maxParticles,
-      factory: 0,
-      instanced: true,
-    });
-    createFloat32Attributes({
-      geometry,
-      propertyName: attr('quatZ'),
-      maxParticles,
-      factory: 0,
-      instanced: true,
-    });
-    createFloat32Attributes({
-      geometry,
-      propertyName: attr('quatW'),
-      maxParticles,
-      factory: 1, // Identity quaternion w=1
-      instanced: true,
-    });
+    const quatArray = new Float32Array(maxParticles * 4);
+    // Initialize to identity quaternion (0, 0, 0, 1)
+    for (let i = 0; i < maxParticles; i++) {
+      quatArray[i * 4 + 3] = 1; // w = 1
+    }
+    geometry.setAttribute(
+      attr('quat'),
+      new THREE.InstancedBufferAttribute(quatArray, 4)
+    );
   }
 
   // Resolve per-particle attribute accessors (instanced/mesh uses prefixed names)
@@ -1041,10 +1026,7 @@ export const createParticleSystem = (
   const aRotation = a[attr('rotation')];
   const aLifetime = a[attr('lifetime')];
   const aPosition = a[posAttr];
-  const aQuatX = useMesh ? a[attr('quatX')] : undefined;
-  const aQuatY = useMesh ? a[attr('quatY')] : undefined;
-  const aQuatZ = useMesh ? a[attr('quatZ')] : undefined;
-  const aQuatW = useMesh ? a[attr('quatW')] : undefined;
+  const aQuat = useMesh ? a[attr('quat')] : undefined;
 
   const deactivateParticle = (particleIndex: number) => {
     aIsActive.array[particleIndex] = 0;
@@ -1141,17 +1123,15 @@ export const createParticleSystem = (
     aRotation.needsUpdate = true;
 
     // Initialize mesh particle quaternion from the Z-rotation startRotation
-    if (aQuatX && aQuatY && aQuatZ && aQuatW) {
+    if (aQuat) {
       const rotZ = aRotation.array[particleIndex];
       const halfZ = rotZ * 0.5;
-      aQuatX.array[particleIndex] = 0;
-      aQuatY.array[particleIndex] = 0;
-      aQuatZ.array[particleIndex] = Math.sin(halfZ);
-      aQuatW.array[particleIndex] = Math.cos(halfZ);
-      aQuatX.needsUpdate = true;
-      aQuatY.needsUpdate = true;
-      aQuatZ.needsUpdate = true;
-      aQuatW.needsUpdate = true;
+      const qi = particleIndex * 4;
+      aQuat.array[qi] = 0;
+      aQuat.array[qi + 1] = 0;
+      aQuat.array[qi + 2] = Math.sin(halfZ);
+      aQuat.array[qi + 3] = Math.cos(halfZ);
+      aQuat.needsUpdate = true;
     }
 
     if (normalizedConfig.rotationOverLifetime.isActive)
@@ -1321,7 +1301,12 @@ export const createParticleSystem = (
           },
           renderer: {
             ...(subConfig.config.renderer ?? {}),
-            rendererType: renderer.rendererType,
+            ...(subConfig.config.renderer?.rendererType
+              ? {}
+              : renderer.rendererType === RendererType.MESH ||
+                  renderer.rendererType === RendererType.TRAIL
+                ? {}
+                : { rendererType: renderer.rendererType }),
           } as typeof subConfig.config.renderer,
           ...(inheritVelocity > 0
             ? {
@@ -1527,14 +1512,7 @@ export const createParticleSystem = (
     colorG: aColorG,
     colorB: aColorB,
     colorA: aColorA,
-    ...(useMesh
-      ? {
-          quatX: aQuatX,
-          quatY: aQuatY,
-          quatZ: aQuatZ,
-          quatW: aQuatW,
-        }
-      : {}),
+    ...(useMesh ? { quat: aQuat } : {}),
   };
 
   const calculatedCreationTime =

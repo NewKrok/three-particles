@@ -1491,11 +1491,8 @@ export type MappedAttributes = {
   colorG: AnyBufferAttribute;
   colorB: AnyBufferAttribute;
   colorA: AnyBufferAttribute;
-  /** Quaternion components for 3D mesh rotation (only present for RendererType.MESH). */
-  quatX?: AnyBufferAttribute;
-  quatY?: AnyBufferAttribute;
-  quatZ?: AnyBufferAttribute;
-  quatW?: AnyBufferAttribute;
+  /** Packed quaternion vec4 for 3D mesh rotation (only present for RendererType.MESH). */
+  quat?: AnyBufferAttribute;
 };
 
 export type ParticleSystemInstance = {

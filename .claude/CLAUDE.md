@@ -280,7 +280,7 @@ npx typedoc               # Generate documentation
 | PR checks (lint + test + build + bundle size + CodeQL) | ✅ Complete |
 | Bundle size monitoring (150 KB limit) | ✅ Complete |
 | Performance benchmark suite | ✅ Complete |
-| Test coverage (99.5% stmt, 97.8% branch, 634 tests) | ✅ Target ≥90% stmt, ≥80% branch |
+| Test coverage (99.5% stmt, 97.8% branch, 638 tests) | ✅ Target ≥90% stmt, ≥80% branch |
 | Sub-emitters | ✅ Complete |
 | Force fields / Attractors | ✅ Complete |
 | GPU instancing (`RendererType.INSTANCED`) | ✅ Complete |

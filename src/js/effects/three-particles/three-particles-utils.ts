@@ -337,6 +337,31 @@ export const calculateRandomPositionAndVelocityOnRectangle = (
 };
 
 /**
+ * Creates a solid white 1x1 texture for mesh particles.
+ * Unlike the circle texture used by point/billboard renderers, mesh particles
+ * need a neutral texture so the geometry shape is visible.
+ * @returns {THREE.CanvasTexture | null} The generated texture or null if context fails.
+ */
+export const createDefaultMeshTexture = (): THREE.CanvasTexture | null => {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.fillStyle = 'white';
+      context.fillRect(0, 0, 1, 1);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      return texture;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Creates a default white circle texture using CanvasTexture.
  * @returns {THREE.CanvasTexture | null} The generated texture or null if context fails.
  */
