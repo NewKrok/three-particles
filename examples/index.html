@@ -112,6 +112,8 @@
     .icon-btn:hover { background: #1a1a2e; border-color: #4fc3f7; }
     .icon-btn svg { width: 16px; height: 16px; }
     .icon-btn.copied { color: #66bb6a; border-color: #66bb6a; }
+    .icon-btn.playing { color: #66bb6a; border-color: #66bb6a; }
+    .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
     .version-switcher {
       display: inline-flex; align-items: center; gap: 8px;
       margin-top: 12px; font-size: 0.85rem; color: #888;
@@ -337,6 +339,26 @@
         <h2 id="expand-title"></h2>
         <div class="expand-controls">
           <div class="renderer-toggle" id="expand-renderer-toggle"></div>
+          <button class="icon-btn" id="expand-playpause-btn" title="Pause">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="expand-restart-btn" title="Restart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="expand-copy-btn" title="Copy config to clipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="expand-download-btn" title="Download config JSON">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
         </div>
       </div>
       <div class="expand-canvas-wrapper">

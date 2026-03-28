@@ -114,6 +114,9 @@ class LiveDemo {
     this.data = exampleData;
     this.rendererType = rendererType;
     this.clock = new THREE.Clock();
+    this.paused = false;
+    this.pausedDuration = 0;
+    this.pauseStartTime = 0;
     this.init();
   }
 
@@ -159,7 +162,7 @@ class LiveDemo {
     const delta = this.clock.getDelta();
     const elapsed = this.clock.getElapsedTime();
 
-    const cycleData = { now: Date.now(), delta, elapsed };
+    const cycleData = { now: Date.now() - this.pausedDuration, delta, elapsed };
     if (this.particleSystem.update) {
       this.particleSystem.update(cycleData);
     } else {
@@ -168,6 +171,23 @@ class LiveDemo {
 
     this.renderer.render(this.scene, this.camera);
     this.animationId = requestAnimationFrame(() => this.animate());
+  }
+
+  pause() {
+    if (this.paused || !this.animationId) return;
+    cancelAnimationFrame(this.animationId);
+    this.animationId = null;
+    this.paused = true;
+    this.pauseStartTime = Date.now();
+    this.clock.stop();
+  }
+
+  resume() {
+    if (!this.paused) return;
+    this.pausedDuration += Date.now() - this.pauseStartTime;
+    this.paused = false;
+    this.clock.start();
+    this.animate();
   }
 
   dispose() {
@@ -188,11 +208,37 @@ class LiveDemo {
   }
 }
 
+function updateCardPlayPauseBtn(card, playing) {
+  const btn = card.querySelector(".playpause-btn");
+  if (!btn) return;
+  const playIcon = btn.querySelector(".play-icon");
+  const pauseIcon = btn.querySelector(".pause-icon");
+  btn.disabled = !activeCard || activeCard !== card;
+  const restartBtn = card.querySelector(".restart-btn");
+  if (restartBtn) restartBtn.disabled = btn.disabled;
+  if (playing) {
+    playIcon.style.display = "none";
+    pauseIcon.style.display = "block";
+    btn.title = "Pause";
+    btn.classList.add("playing");
+  } else {
+    playIcon.style.display = "block";
+    pauseIcon.style.display = "none";
+    btn.title = "Play";
+    btn.classList.remove("playing");
+  }
+}
+
 function stopActiveDemo() {
   if (activeCard) {
     activeCard._liveDemo.dispose();
     activeCard._liveDemo = null;
     activeCard.classList.remove("active");
+    updateCardPlayPauseBtn(activeCard, false);
+    const btn = activeCard.querySelector(".playpause-btn");
+    if (btn) btn.disabled = true;
+    const restartBtn = activeCard.querySelector(".restart-btn");
+    if (restartBtn) restartBtn.disabled = true;
     activeCard = null;
   }
 }
@@ -209,6 +255,7 @@ function startDemo(card, exampleData) {
   card._liveDemo = new LiveDemo(card, exampleData, rendererType);
   card.classList.add("active");
   activeCard = card;
+  updateCardPlayPauseBtn(card, true);
 }
 
 // ─── Expanded demo for fullscreen modal ─────────────────────────────
@@ -226,6 +273,9 @@ class ExpandedDemo {
     this.fpsAccum = 0;
     this.tickAccum = 0;
     this.lastFpsUpdate = 0;
+    this.paused = false;
+    this.pausedDuration = 0;
+    this.pauseStartTime = 0;
     this.init();
   }
 
@@ -279,7 +329,7 @@ class ExpandedDemo {
 
     const tickStart = performance.now();
 
-    const cycleData = { now: Date.now(), delta, elapsed };
+    const cycleData = { now: Date.now() - this.pausedDuration, delta, elapsed };
     if (this.particleSystem.update) {
       this.particleSystem.update(cycleData);
     } else {
@@ -311,6 +361,23 @@ class ExpandedDemo {
     this.animationId = requestAnimationFrame(() => this.animate());
   }
 
+  pause() {
+    if (this.paused || !this.animationId) return;
+    cancelAnimationFrame(this.animationId);
+    this.animationId = null;
+    this.paused = true;
+    this.pauseStartTime = Date.now();
+    this.clock.stop();
+  }
+
+  resume() {
+    if (!this.paused) return;
+    this.pausedDuration += Date.now() - this.pauseStartTime;
+    this.paused = false;
+    this.clock.start();
+    this.animate();
+  }
+
   resize() {
     if (!this.renderer) return;
     const width = this.canvas.clientWidth;
@@ -335,6 +402,21 @@ function closeExpandModal() {
     expandDemo = null;
   }
   expandExampleData = null;
+}
+
+function updateExpandPlayPauseBtn(playing) {
+  const btn = document.getElementById("expand-playpause-btn");
+  if (!btn) return;
+  const svg = btn.querySelector("svg");
+  if (playing) {
+    svg.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+    btn.title = "Pause";
+    btn.classList.add("playing");
+  } else {
+    svg.innerHTML = '<polygon points="5,3 19,12 5,21"/>';
+    btn.title = "Play";
+    btn.classList.remove("playing");
+  }
 }
 
 function openExpandModal(exampleData, rendererType) {
@@ -364,6 +446,7 @@ function openExpandModal(exampleData, rendererType) {
   }
 
   overlay.classList.add("open");
+  updateExpandPlayPauseBtn(true);
 
   requestAnimationFrame(() => {
     expandDemo = new ExpandedDemo(canvas, exampleData, rendererType);
@@ -387,7 +470,51 @@ document.getElementById("expand-renderer-toggle").addEventListener("click", (e) 
     expandDemo.dispose();
     const canvas = document.getElementById("expand-canvas");
     expandDemo = new ExpandedDemo(canvas, expandExampleData, type);
+    updateExpandPlayPauseBtn(true);
   }
+});
+
+document.getElementById("expand-playpause-btn").addEventListener("click", () => {
+  if (!expandDemo) return;
+  if (expandDemo.paused) {
+    expandDemo.resume();
+    updateExpandPlayPauseBtn(true);
+  } else {
+    expandDemo.pause();
+    updateExpandPlayPauseBtn(false);
+  }
+});
+
+document.getElementById("expand-restart-btn").addEventListener("click", () => {
+  if (!expandExampleData) return;
+  if (expandDemo) expandDemo.dispose();
+  const canvas = document.getElementById("expand-canvas");
+  expandDemo = new ExpandedDemo(canvas, expandExampleData, expandRendererType);
+  updateExpandPlayPauseBtn(true);
+});
+
+document.getElementById("expand-copy-btn").addEventListener("click", () => {
+  if (!expandExampleData) return;
+  gtag("event", "click", { event_category: "config_action", event_label: "copy", demo: expandExampleData.id });
+  const btn = document.getElementById("expand-copy-btn");
+  const json = JSON.stringify(expandExampleData.config, null, 2);
+  navigator.clipboard.writeText(json).then(() => {
+    btn.classList.add("copied");
+    setTimeout(() => btn.classList.remove("copied"), 1500);
+  });
+});
+
+document.getElementById("expand-download-btn").addEventListener("click", () => {
+  if (!expandExampleData) return;
+  gtag("event", "click", { event_category: "config_action", event_label: "download", demo: expandExampleData.id });
+  const json = JSON.stringify(expandExampleData.config, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${expandExampleData.id}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 // ─── Build the page ──────────────────────────────────────────────────
@@ -427,6 +554,19 @@ examples.forEach((example) => {
               <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INST</button>
             </div>`
           }
+          <button class="icon-btn playpause-btn" title="Play" disabled>
+            <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5,3 19,12 5,21"/>
+            </svg>
+            <svg class="pause-icon" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+            </svg>
+          </button>
+          <button class="icon-btn restart-btn" title="Restart" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+            </svg>
+          </button>
           <button class="icon-btn expand-btn" title="Open fullscreen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 3 21 3 21 9"/>
@@ -471,6 +611,30 @@ examples.forEach((example) => {
       }
     });
   }
+
+  card.querySelector(".playpause-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (activeCard !== card || !card._liveDemo) return;
+    if (card._liveDemo.paused) {
+      card._liveDemo.resume();
+      updateCardPlayPauseBtn(card, true);
+    } else {
+      card._liveDemo.pause();
+      updateCardPlayPauseBtn(card, false);
+    }
+  });
+
+  card.querySelector(".restart-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (activeCard !== card) return;
+    const rendererType = cardRendererTypes.get(card) || "POINTS";
+    if (card._liveDemo) {
+      card._liveDemo.dispose();
+      card._liveDemo = null;
+    }
+    card._liveDemo = new LiveDemo(card, example, rendererType);
+    updateCardPlayPauseBtn(card, true);
+  });
 
   card.querySelector(".expand-btn").addEventListener("click", (e) => {
     e.stopPropagation();
