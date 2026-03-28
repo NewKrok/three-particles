@@ -2770,25 +2770,85 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
     }
   }
 
-  // --- Connected Ribbons: chain particles into a single ribbon ---
+  // --- Connected Ribbons: chain particle positions with Catmull-Rom interpolation ---
   if (useRibbon && _ribbonCount >= 2 && _ribbonIndices) {
     hasUpdates = true;
-    // Use the leader (oldest) particle's vertex slots to build the connected ribbon.
     const leader = _ribbonIndices[0];
     const leaderVertBase = leader * verticesPerParticle;
 
-    // Gather all positions in chain order (flat array: x,y,z,x,y,z,...)
-    const chainCount = Math.min(_ribbonCount, trailLength);
-    const chainSize = chainCount * 3;
+    // The ribbon uses each particle's current position as a control point,
+    // then fills `trailLength` vertices by Catmull-Rom interpolation between them.
+    // This produces a smooth, continuous ribbon through all particle positions.
+    const controlCount = _ribbonCount;
+    const filledCount = Math.min(
+      trailLength,
+      Math.max(controlCount * 4, controlCount)
+    );
+    const chainSize = filledCount * 3;
     if (!_rawPoints || _rawPointsSize < chainSize) {
       _rawPoints = new Float32Array(chainSize);
       _rawPointsSize = chainSize;
     }
-    for (let ci = 0; ci < chainCount; ci++) {
-      const posIdx = _ribbonIndices[ci] * 3;
-      _rawPoints[ci * 3] = positionArr[posIdx];
-      _rawPoints[ci * 3 + 1] = positionArr[posIdx + 1];
-      _rawPoints[ci * 3 + 2] = positionArr[posIdx + 2];
+
+    if (controlCount === 2) {
+      // Only 2 particles: linearly interpolate between them
+      const p0Idx = _ribbonIndices[0] * 3;
+      const p1Idx = _ribbonIndices[1] * 3;
+      for (let i = 0; i < filledCount; i++) {
+        const t = i / (filledCount - 1);
+        _rawPoints[i * 3] =
+          positionArr[p0Idx] + t * (positionArr[p1Idx] - positionArr[p0Idx]);
+        _rawPoints[i * 3 + 1] =
+          positionArr[p0Idx + 1] +
+          t * (positionArr[p1Idx + 1] - positionArr[p0Idx + 1]);
+        _rawPoints[i * 3 + 2] =
+          positionArr[p0Idx + 2] +
+          t * (positionArr[p1Idx + 2] - positionArr[p0Idx + 2]);
+      }
+    } else {
+      // 3+ particles: Catmull-Rom interpolation through all control points
+      const segments = controlCount - 1;
+      const ptsPerSeg = Math.max(1, Math.floor((filledCount - 1) / segments));
+      let wi = 0;
+      for (let seg = 0; seg < segments && wi < filledCount; seg++) {
+        const i0 = Math.max(0, seg - 1);
+        const i1 = seg;
+        const i2 = Math.min(controlCount - 1, seg + 1);
+        const i3 = Math.min(controlCount - 1, seg + 2);
+        const p0i = _ribbonIndices[i0] * 3;
+        const p1i = _ribbonIndices[i1] * 3;
+        const p2i = _ribbonIndices[i2] * 3;
+        const p3i = _ribbonIndices[i3] * 3;
+        const subCount = seg === segments - 1 ? filledCount - wi : ptsPerSeg;
+        for (let sub = 0; sub < subCount && wi < filledCount; sub++) {
+          const t = sub / subCount;
+          catmullRom(
+            _rawPoints,
+            wi * 3,
+            positionArr[p0i],
+            positionArr[p0i + 1],
+            positionArr[p0i + 2],
+            positionArr[p1i],
+            positionArr[p1i + 1],
+            positionArr[p1i + 2],
+            positionArr[p2i],
+            positionArr[p2i + 1],
+            positionArr[p2i + 2],
+            positionArr[p3i],
+            positionArr[p3i + 1],
+            positionArr[p3i + 2],
+            t
+          );
+          wi++;
+        }
+      }
+      // Ensure last point is the last particle's position
+      if (wi > 0) {
+        const lastPIdx = _ribbonIndices[controlCount - 1] * 3;
+        _rawPoints[(wi - 1) * 3] = positionArr[lastPIdx];
+        _rawPoints[(wi - 1) * 3 + 1] = positionArr[lastPIdx + 1];
+        _rawPoints[(wi - 1) * 3 + 2] = positionArr[lastPIdx + 2];
+      }
     }
 
     const leaderCr = colorRArr[leader];
@@ -2802,7 +2862,7 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
       const aIdx = leaderVertBase + s * 2;
       const uvIdxBase = (leaderVertBase + s * 2) * 2;
 
-      if (s >= chainCount) {
+      if (s >= filledCount) {
         clearTrailVertex(
           vIdx,
           cIdx,
@@ -2825,19 +2885,40 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
       const ptx = _rawPoints[ptIdx];
       const pty = _rawPoints[ptIdx + 1];
       const ptz = _rawPoints[ptIdx + 2];
+
+      // Averaged tangent for interior points
       let nx: number, ny: number, nz: number;
-      if (s < chainCount - 1) {
-        const ni = (s + 1) * 3;
-        nx = _rawPoints[ni];
-        ny = _rawPoints[ni + 1];
-        nz = _rawPoints[ni + 2];
+      if (s > 0 && s < filledCount - 1) {
+        const px2 = _rawPoints[(s - 1) * 3];
+        const py2 = _rawPoints[(s - 1) * 3 + 1];
+        const pz2 = _rawPoints[(s - 1) * 3 + 2];
+        const nx2 = _rawPoints[(s + 1) * 3];
+        const ny2 = _rawPoints[(s + 1) * 3 + 1];
+        const nz2 = _rawPoints[(s + 1) * 3 + 2];
+        const atx = nx2 - px2;
+        const aty = ny2 - py2;
+        const atz = nz2 - pz2;
+        const atLen = Math.sqrt(atx * atx + aty * aty + atz * atz);
+        if (atLen > 0.0001) {
+          nx = ptx + atx / atLen;
+          ny = pty + aty / atLen;
+          nz = ptz + atz / atLen;
+        } else {
+          nx = _rawPoints[(s + 1) * 3];
+          ny = _rawPoints[(s + 1) * 3 + 1];
+          nz = _rawPoints[(s + 1) * 3 + 2];
+        }
+      } else if (s < filledCount - 1) {
+        nx = _rawPoints[(s + 1) * 3];
+        ny = _rawPoints[(s + 1) * 3 + 1];
+        nz = _rawPoints[(s + 1) * 3 + 2];
       } else {
         nx = ptx;
         ny = pty + 0.001;
         nz = ptz;
       }
 
-      const t = chainCount > 1 ? s / (chainCount - 1) : 0;
+      const t = filledCount > 1 ? s / (filledCount - 1) : 0;
       const widthScale = trailWidthCurveFn(t);
       const opacityScale = trailOpacityCurveFn(t);
       const halfWidth = trailConfig.width * widthScale * 0.5;
