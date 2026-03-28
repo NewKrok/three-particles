@@ -511,6 +511,65 @@ export type TrailConfig = {
     g: LifetimeCurve;
     b: LifetimeCurve;
   };
+
+  /**
+   * Minimum distance (in world units) a particle must travel before a new
+   * trail sample is recorded. When set, the trail becomes frame-rate
+   * independent — at high FPS the samples are spread further apart in time,
+   * at low FPS they cluster around sharp turns.
+   *
+   * When `0` or `undefined`, a sample is recorded every frame (legacy behavior).
+   * @default 0
+   */
+  minVertexDistance?: number;
+
+  /**
+   * Maximum trail duration in seconds. Trail segments older than this value
+   * are faded out and expired, regardless of the ring-buffer `length`.
+   * This enables time-based trail length (e.g. "2-second trails") in addition
+   * to the segment-count cap.
+   *
+   * When `0` or `undefined`, trail length is governed only by `length`.
+   * @default 0
+   */
+  maxTime?: number;
+
+  /**
+   * Enable Catmull-Rom spline interpolation between history samples.
+   * Inserts additional subdivided points between raw samples, eliminating
+   * sharp kinks at trail bends. The `smoothingSubdivisions` property controls
+   * how many extra points are inserted per segment.
+   *
+   * @default false
+   */
+  smoothing?: boolean;
+
+  /**
+   * Number of Catmull-Rom subdivisions inserted between each pair of raw
+   * history samples when `smoothing` is enabled. Higher values produce
+   * smoother curves at the cost of more vertices.
+   *
+   * @default 3
+   */
+  smoothingSubdivisions?: number;
+
+  /**
+   * Enable twist prevention for the ribbon. Uses frame tracking to maintain
+   * consistent ribbon orientation during rapid direction changes, preventing
+   * self-intersecting or flipped ribbon quads.
+   *
+   * @default false
+   */
+  twistPrevention?: boolean;
+
+  /**
+   * Connect multiple particles into a single continuous ribbon.
+   * All particles that share the same `ribbonId` are sorted by age and
+   * their positions are chained into one continuous strip.
+   *
+   * When `undefined`, each particle has its own independent trail (default behavior).
+   */
+  ribbonId?: number;
 };
 
 /**
@@ -608,6 +667,55 @@ export type Renderer = {
    * @see MeshConfig
    */
   mesh?: MeshConfig;
+
+  /**
+   * Soft particles configuration.
+   * When enabled, particles fade smoothly near opaque geometry instead of
+   * producing a hard intersection line. Requires a depth texture from a
+   * `WebGLRenderTarget`.
+   *
+   * @see SoftParticlesConfig
+   */
+  softParticles?: SoftParticlesConfig;
+};
+
+/**
+ * Configuration for soft (depth-faded) particles.
+ * When enabled, particles fade out smoothly near opaque geometry instead
+ * of producing a hard intersection line.
+ *
+ * Requires a depth texture from a `WebGLRenderTarget` with `DepthTexture`.
+ * If `depthTexture` is not provided, soft particles are automatically disabled
+ * regardless of the `enabled` flag.
+ *
+ * @property enabled - Whether soft particle fading is active. @default false
+ * @property intensity - Controls the fade distance in world units. Higher values
+ *   produce a wider fade zone. Typical range: 0.1 to 5.0. @default 1.0
+ * @property depthTexture - A `THREE.DepthTexture` attached to the render target
+ *   that contains the scene's depth pass. Must be updated every frame before
+ *   the particle system renders.
+ *
+ * @example
+ * // Create a render target with a depth texture
+ * const rt = new THREE.WebGLRenderTarget(width, height, {
+ *   depthTexture: new THREE.DepthTexture(width, height),
+ * });
+ *
+ * // Pass it to the particle system config
+ * const config = {
+ *   renderer: {
+ *     softParticles: {
+ *       enabled: true,
+ *       intensity: 1.5,
+ *       depthTexture: rt.depthTexture,
+ *     },
+ *   },
+ * };
+ */
+export type SoftParticlesConfig = {
+  enabled?: boolean;
+  intensity?: number;
+  depthTexture?: THREE.DepthTexture;
 };
 
 /**
@@ -1466,6 +1574,25 @@ export type GeneralData = {
   trailLength?: number;
   /** Cached camera world position, updated each frame via onBeforeRender for billboard trails. */
   trailCameraPosition?: THREE.Vector3;
+
+  /**
+   * Timestamp (in ms) when each trail history sample was recorded.
+   * Used by `maxTime` to expire old segments.
+   * Layout: `maxParticles * trailLength` entries.
+   */
+  trailSampleTimes?: Float64Array;
+
+  /**
+   * Last recorded position per particle for adaptive sampling (`minVertexDistance`).
+   * Layout: `maxParticles * 3` (x, y, z).
+   */
+  trailLastSampledPosition?: Float32Array;
+
+  /**
+   * Per-particle previous ribbon normal vector for twist prevention.
+   * Layout: `maxParticles * 3` (nx, ny, nz).
+   */
+  trailPrevNormal?: Float32Array;
 };
 
 /** Union of all buffer attribute types Three.js uses in geometry. */
@@ -1560,8 +1687,17 @@ export type ParticleSystemInstance = {
     g: CurveFunction;
     b: CurveFunction;
   };
-  /** Trail config (length, width) */
-  trailConfig?: { length: number; width: number };
+  /** Trail config (length, width, and advanced features) */
+  trailConfig?: {
+    length: number;
+    width: number;
+    minVertexDistance: number;
+    maxTime: number;
+    smoothing: boolean;
+    smoothingSubdivisions: number;
+    twistPrevention: boolean;
+    ribbonId?: number;
+  };
 };
 
 /**

@@ -29,7 +29,9 @@
 | GPU Instancing (`InstancedBufferGeometry` renderer) | ✅ |
 | React Three Fiber integration (docs + usage guide) | ✅ |
 | Trail / Ribbon Renderer (`RendererType.TRAIL`) | ✅ |
+| Trail improvements (smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons) | ✅ |
 | Mesh Particle Renderer (`RendererType.MESH`) | ✅ |
+| Soft Particles (depth-based fade near geometry) | ✅ |
 
 ---
 
@@ -42,29 +44,22 @@
 
 ---
 
-## High Priority — Trail Renderer Improvements
+## High Priority — Trail Renderer Improvements (Phase 2)
 
-### Trail Tangent Smoothing
-- Catmull-Rom spline interpolation between history samples
-- Eliminates sharp kinks at trail bends
-- Smoother visual quality, especially at low frame rates
+### UV Texture Modes
+- Support Stretch (current), Tile, Per-Segment, and Distribute modes
+- Tile mode enables repeating chain/lightning textures along the ribbon
+- Per-Segment mode maps one texture copy per ribbon segment
 
-### Adaptive Trail Sampling
-- Distance-based history recording (only push samples when particle moves enough)
-- Frame-rate independent trail appearance
-- Configurable minimum sample distance
+### UV Scrolling / Animated UV
+- Scrolling UV offset along the trail over time (energy, lava, electricity effects)
+- Configurable scroll speed and direction (U, V, or both axes)
+- Integrates with texture sheet animation for flipbook-style trail textures
 
-### Trail Max Time
-- Time-based trail length (e.g., 2 seconds) in addition to segment count
-- Trail segments fade/expire based on age, not just ring buffer overflow
-
-### Connected Ribbons
-- Multiple particles contributing to a single continuous ribbon
-- Useful for sword slashes, laser beams, rope physics
-
-### Trail Twist Prevention
-- Frame-tracking to detect and prevent self-intersecting ribbons
-- Consistent ribbon orientation during rapid direction changes
+### Trail Width by Speed
+- Dynamic trail width modulated by particle velocity
+- Fast particles produce thinner, stretched trails; slow particles produce wider ribbons
+- Curve-based speed-to-width mapping
 
 ---
 

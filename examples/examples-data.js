@@ -1,6 +1,52 @@
 
 export const examples = [
   {
+    id: "soft-ground-fog",
+    title: "Soft Ground Fog",
+    description: "Low-lying fog particles that fade smoothly near the ground plane using depth-based soft particles — no hard clipping.",
+    tags: ["softParticles", "advanced"],
+    textureId: "SOFT_SMOKE",
+    softParticles: true,
+    softParticlesIntensity: 2.0,
+    config: {"duration":5,"looping":true,"startLifetime":{"min":3.0,"max":5.0},"startSpeed":{"min":0.05,"max":0.25},"startSize":{"min":4.0,"max":8.0},"startOpacity":0.8,"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":0.7,"g":0.75,"b":0.8},"max":{"r":0.85,"g":0.88,"b":0.92}},"maxParticles":50,"gravity":0.15,"emission":{"rateOverTime":10},"shape":{"shape":"BOX","box":{"scale":{"x":10,"y":2,"z":10},"emitFrom":"VOLUME"}},"transform":{"position":{"y":-1.5}},"renderer":{"blending":"THREE.AdditiveBlending","transparent":true,"depthTest":true,"depthWrite":false,"discardBackgroundColor":true,"backgroundColorTolerance":0.2,"backgroundColor":{"r":0,"g":0,"b":0}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.5,"percentage":0},{"x":0.3,"y":1.0},{"x":0.7,"y":1.0,"percentage":0.7},{"x":1,"y":0.8,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.15,"y":0.8},{"x":0.7,"y":0.7,"percentage":0.7},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-15,"max":15},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.15,"frequency":0.2,"octaves":2,"positionAmount":0.3}},
+  },
+  {
+    id: "laser-ribbon",
+    title: "Laser Ribbon",
+    description: "Connected ribbon linking multiple particles into a continuous laser beam with color gradient.",
+    tags: ["trail", "connectedRibbon", "advanced"],
+    config: {"duration":5,"looping":true,"startLifetime":5,"startSpeed":{"min":1.5,"max":2.5},"startSize":1,"startOpacity":1.0,"startRotation":0,"startColor":{"min":{"r":1.0,"g":1.0,"b":1.0},"max":{"r":1.0,"g":1.0,"b":1.0}},"maxParticles":8,"emission":{"rateOverTime":0,"bursts":[{"time":0,"count":8}]},"shape":{"shape":"SPHERE","sphere":{"radius":1.5,"radiusThickness":0.1,"arc":360}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"trail":{"length":40,"width":0.5,"ribbonId":1,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.9},{"x":0.7,"y":0.6},{"x":1,"y":0.1,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.8},{"x":0.85,"y":0.3},{"x":1,"y":0,"percentage":1}]},"colorOverTrail":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.3,"percentage":0},{"x":0.3,"y":0.5},{"x":0.7,"y":1.0},{"x":1,"y":1.0,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":1.0,"percentage":0},{"x":0.3,"y":0.8},{"x":0.7,"y":0.3},{"x":1,"y":0.1,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.8,"percentage":0},{"x":0.3,"y":1.0},{"x":0.7,"y":0.5},{"x":1,"y":0.2,"percentage":1}]}}}},"velocityOverLifetime":{"isActive":true,"orbital":{"y":{"min":0.5,"max":1.0}}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.2,"frequency":0.3,"octaves":2,"positionAmount":0.3},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.05,"y":1},{"x":0.85,"y":1,"percentage":0.85},{"x":1,"y":0,"percentage":1}]}}},
+  },
+  {
+    id: "smooth-serpent",
+    title: "Smooth Serpent",
+    description: "Catmull-Rom smoothed trail creating organic serpentine motion with noise-driven curves.",
+    tags: ["trail", "smoothing", "noise", "advanced"],
+    config: {"duration":5,"looping":true,"startLifetime":{"min":2.0,"max":3.5},"startSpeed":{"min":2.0,"max":3.0},"startSize":1,"startOpacity":1.0,"startRotation":0,"startColor":{"min":{"r":0.2,"g":1.0,"b":0.4},"max":{"r":0.4,"g":1.0,"b":0.6}},"maxParticles":15,"emission":{"rateOverTime":6},"shape":{"shape":"CONE","cone":{"angle":10,"radius":0.15,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"trail":{"length":50,"width":0.5,"smoothing":true,"smoothingSubdivisions":4,"twistPrevention":true,"widthOverTrail":{"bezierPoints":[{"x":0,"y":0.8,"percentage":0},{"x":0.2,"y":1},{"x":0.6,"y":0.7},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.4,"y":0.8},{"x":0.8,"y":0.3},{"x":1,"y":0,"percentage":1}]},"colorOverTrail":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.2,"percentage":0},{"x":0.5,"y":0.5},{"x":1,"y":1.0,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":1.0,"percentage":0},{"x":0.5,"y":0.8},{"x":1,"y":0.3,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.4,"percentage":0},{"x":0.5,"y":0.9},{"x":1,"y":0.6,"percentage":1}]}}}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.3,"frequency":0.4,"octaves":2,"positionAmount":0.5},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.1,"y":1},{"x":0.8,"y":0.9,"percentage":0.8},{"x":1,"y":0,"percentage":1}]}}},
+  },
+  {
+    id: "fading-sparkler",
+    title: "Fading Sparkler",
+    description: "Sparkler trails with time-based fade: each ribbon segment expires after a fixed duration.",
+    tags: ["trail", "maxTime", "advanced"],
+    textureId: "STARBURST",
+    config: {"duration":5,"looping":true,"startLifetime":{"min":1.5,"max":2.5},"startSpeed":{"min":3.0,"max":5.0},"startSize":1,"startOpacity":1.0,"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":1.0,"g":0.8,"b":0.3},"max":{"r":1.0,"g":0.95,"b":0.6}},"maxParticles":30,"emission":{"rateOverTime":18},"shape":{"shape":"CONE","cone":{"angle":25,"radius":0.1,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"trail":{"length":40,"width":0.35,"maxTime":0.4,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.8},{"x":0.7,"y":0.3},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.4,"y":0.7},{"x":0.8,"y":0.15},{"x":1,"y":0,"percentage":1}]}}},"colorOverLifetime":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":1.0,"percentage":0},{"x":0.4,"y":1.0},{"x":0.7,"y":0.9},{"x":1,"y":0.6,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.95,"percentage":0},{"x":0.3,"y":0.7},{"x":0.6,"y":0.3},{"x":1,"y":0.1,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":0.6,"percentage":0},{"x":0.3,"y":0.2},{"x":0.6,"y":0.05},{"x":1,"y":0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.5,"y":0.9},{"x":0.85,"y":0.5},{"x":1,"y":0,"percentage":1}]}},"gravity":2.5},
+  },
+  {
+    id: "adaptive-ink-strokes",
+    title: "Adaptive Ink Strokes",
+    description: "Frame-rate independent calligraphy-style trails using adaptive distance-based sampling.",
+    tags: ["trail", "adaptiveSampling", "advanced"],
+    config: {"duration":5,"looping":true,"startLifetime":{"min":2.0,"max":3.5},"startSpeed":{"min":1.5,"max":3.0},"startSize":1,"startOpacity":1.0,"startRotation":0,"startColor":{"min":{"r":0.85,"g":0.85,"b":0.9},"max":{"r":1.0,"g":1.0,"b":1.0}},"maxParticles":12,"emission":{"rateOverTime":4},"shape":{"shape":"CONE","cone":{"angle":15,"radius":0.15,"radiusThickness":1.0,"arc":360}},"transform":{"rotation":{"x":-90}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"trail":{"length":50,"width":0.5,"minVertexDistance":0.04,"widthOverTrail":{"bezierPoints":[{"x":0,"y":1.0,"percentage":0},{"x":0.15,"y":0.7},{"x":0.6,"y":0.4},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":0.8,"percentage":0},{"x":0.4,"y":0.6},{"x":0.8,"y":0.2},{"x":1,"y":0,"percentage":1}]}}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.03,"y":1},{"x":0.7,"y":0.8,"percentage":0.7},{"x":1,"y":0,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.2,"frequency":0.4,"octaves":2,"positionAmount":0.35}},
+  },
+  {
+    id: "ethereal-wisps",
+    title: "Ethereal Wisps",
+    description: "Ghost-like wisps combining all trail improvements: smoothing, adaptive sampling, twist prevention, and time-based fade.",
+    tags: ["trail", "smoothing", "adaptiveSampling", "maxTime", "twistPrevention", "advanced"],
+    config: {"duration":5,"looping":true,"startLifetime":{"min":2.5,"max":4.0},"startSpeed":{"min":0.5,"max":1.2},"startSize":1,"startOpacity":1.0,"startRotation":0,"startColor":{"min":{"r":0.6,"g":0.8,"b":1.0},"max":{"r":0.8,"g":0.9,"b":1.0}},"maxParticles":20,"emission":{"rateOverTime":8},"shape":{"shape":"SPHERE","sphere":{"radius":0.5,"radiusThickness":1.0,"arc":360}},"renderer":{"rendererType":"TRAIL","blending":"THREE.AdditiveBlending","transparent":true,"depthWrite":false,"trail":{"length":40,"width":0.5,"maxTime":1.5,"smoothing":true,"smoothingSubdivisions":3,"twistPrevention":true,"widthOverTrail":{"bezierPoints":[{"x":0,"y":0.6,"percentage":0},{"x":0.15,"y":1},{"x":0.5,"y":0.8},{"x":1,"y":0,"percentage":1}]},"opacityOverTrail":{"bezierPoints":[{"x":0,"y":1,"percentage":0},{"x":0.3,"y":0.8},{"x":0.7,"y":0.3},{"x":1,"y":0,"percentage":1}]},"colorOverTrail":{"isActive":true,"r":{"bezierPoints":[{"x":0,"y":0.6,"percentage":0},{"x":0.5,"y":0.8},{"x":1,"y":1.0,"percentage":1}]},"g":{"bezierPoints":[{"x":0,"y":0.9,"percentage":0},{"x":0.5,"y":0.7},{"x":1,"y":0.4,"percentage":1}]},"b":{"bezierPoints":[{"x":0,"y":1.0,"percentage":0},{"x":0.5,"y":0.9},{"x":1,"y":0.7,"percentage":1}]}}}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.5,"frequency":0.5,"octaves":3,"positionAmount":0.7},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.1,"y":0.8},{"x":0.7,"y":0.9,"percentage":0.7},{"x":1,"y":0,"percentage":1}]}}},
+  },
+  {
     id: "rock-debris-explosion",
     title: "Rock Debris Explosion",
     description: "Scattered rock-like fragments burst outward with gravity, using 3D mesh particles for solid debris.",

@@ -9,6 +9,7 @@ const TrailVertexShader = `
   varying float vAlpha;
   varying vec4 vColor;
   varying vec2 vUv;
+  varying float vViewZ;
 
   #include <common>
   #include <logdepthbuf_pars_vertex>
@@ -35,28 +36,27 @@ const TrailVertexShader = `
     float perpLen = length(perp);
 
     // When tangent is nearly parallel to view direction, the cross product
-    // collapses and the ribbon becomes edge-on (invisible). Use a secondary
-    // perpendicular from cross(tangent, up) and blend it in to guarantee
-    // a minimum visible width.
-    vec3 upPerp = cross(tangent, vec3(0.0, 1.0, 0.0));
-    float upPerpLen = length(upPerp);
-    if (upPerpLen < 0.0001) {
-      upPerp = cross(tangent, vec3(1.0, 0.0, 0.0));
-      upPerpLen = length(upPerp);
-    }
-    upPerp = upPerp / max(upPerpLen, 0.0001);
+    // collapses and the ribbon becomes edge-on (invisible). Build a stable
+    // fallback perpendicular from the camera's right axis — this keeps the
+    // ribbon in screen-space and prevents it from flipping into an arbitrary
+    // plane when viewed edge-on.
+    vec3 camRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+    vec3 fallbackPerp = normalize(camRight - tangent * dot(camRight, tangent));
 
     if (perpLen < 0.0001) {
-      perp = upPerp;
+      perp = fallbackPerp;
     } else {
       perp = perp / perpLen;
-      // Blend in the secondary perp when billboard perp gets weak
-      float blendFactor = smoothstep(0.0, 0.5, perpLen);
-      perp = normalize(mix(upPerp, perp, blendFactor));
+      // Smoothly blend toward the fallback when the billboard perp weakens.
+      // The wide range (0..0.7) ensures a gradual transition so the ribbon
+      // does not snap abruptly when rotating toward edge-on.
+      float blendFactor = smoothstep(0.0, 0.7, perpLen);
+      perp = normalize(mix(fallbackPerp, perp, blendFactor));
     }
 
     vec3 offsetPos = position + perp * trailOffset * trailHalfWidth;
     vec4 mvPosition = modelViewMatrix * vec4(offsetPos, 1.0);
+    vViewZ = -mvPosition.z;
     gl_Position = projectionMatrix * mvPosition;
 
     #include <logdepthbuf_vertex>

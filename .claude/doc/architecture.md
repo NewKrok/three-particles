@@ -15,7 +15,8 @@
          │             │             │
          └──────┬──────┴─────────────┘
                 ▼
-          THREE.Points
+     THREE.Points / THREE.Mesh
+      (POINTS, INSTANCED, TRAIL, MESH)
                 │
                 ▼  (every frame)
        updateParticleSystems(cycleData)
@@ -47,8 +48,14 @@ src/js/effects/three-particles/
 ├── three-particles-enums.ts    ← SimulationSpace, Shape, EmitFrom, etc.
 ├── types.ts                    ← Complete TypeScript type definitions
 └── shaders/
-    ├── particle-system-vertex-shader.glsl.ts    ← Position, size, color → GPU
-    └── particle-system-fragment-shader.glsl.ts  ← Texture, rotation, animation
+    ├── particle-system-vertex-shader.glsl.ts       ← POINTS: position, size, color → GPU
+    ├── particle-system-fragment-shader.glsl.ts     ← POINTS: texture, rotation, animation
+    ├── instanced-particle-vertex-shader.glsl.ts    ← INSTANCED: quad-based particles
+    ├── instanced-particle-fragment-shader.glsl.ts  ← INSTANCED: fragment processing
+    ├── trail-vertex-shader.glsl.ts                 ← TRAIL: ribbon vertex positions + UVs
+    ├── trail-fragment-shader.glsl.ts               ← TRAIL: ribbon fragment with tapering
+    ├── mesh-particle-vertex-shader.glsl.ts         ← MESH: 3D geometry + quaternion rotation
+    └── mesh-particle-fragment-shader.glsl.ts       ← MESH: directional lighting + texture
 ```
 
 ### Module Dependencies
@@ -383,8 +390,9 @@ LifetimeCurve       → evaluate curve at time, multiply by scale
 | **Lazy modifier evaluation** | Skip inactive modifiers entirely (no computation) |
 | **Bezier cache** | Avoid recalculating identical curves across systems |
 | **Buffer attributes** | Single GPU upload per frame, GPU handles per-particle rendering |
-| **THREE.Points** | Single draw call for all particles (not individual meshes) |
-| **Perspective point size** | `100.0 / distance` — computed in vertex shader on GPU |
+| **THREE.Points / InstancedMesh** | Single draw call for all particles per renderer type |
+| **4 renderer types** | POINTS (default), INSTANCED (no gl_PointSize limit), TRAIL (ribbon geometry), MESH (3D geometry with lighting) |
+| **Perspective point size** | `100.0 / distance` — computed in vertex shader on GPU (POINTS renderer) |
 
 ### Hot Paths (Performance Critical)
 
@@ -442,7 +450,7 @@ All fields optional — merged with defaults at creation:
 
 ```typescript
 {
-  instance: THREE.Points | Gyroscope  // Add to scene
+  instance: THREE.Points | THREE.Mesh | Gyroscope  // Add to scene (type depends on renderer + simulation space)
   update(cycleData)                   // Call every frame
   dispose()                           // Cleanup
   pauseEmitter()                      // Stop emitting

@@ -202,6 +202,10 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
     transparent: true,
     depthTest: true,
     depthWrite: false,
+    softParticles: {
+      enabled: false,
+      intensity: 1.0,
+    },
   },
   velocityOverLifetime: {
     isActive: false,
@@ -786,6 +790,12 @@ export const createParticleSystem = (
           defaultTrailCurve
         ),
         colorOverTrail: renderer.trail?.colorOverTrail,
+        minVertexDistance: renderer.trail?.minVertexDistance ?? 0,
+        maxTime: renderer.trail?.maxTime ?? 0,
+        smoothing: renderer.trail?.smoothing ?? false,
+        smoothingSubdivisions: renderer.trail?.smoothingSubdivisions ?? 3,
+        twistPrevention: renderer.trail?.twistPrevention ?? false,
+        ribbonId: renderer.trail?.ribbonId,
       }
     : undefined;
 
@@ -798,6 +808,23 @@ export const createParticleSystem = (
     );
     generalData.positionHistoryIndex = new Uint16Array(maxParticles);
     generalData.positionHistoryCount = new Uint16Array(maxParticles);
+
+    // Adaptive sampling: track last sampled position per particle
+    if (trailConfig.minVertexDistance > 0) {
+      generalData.trailLastSampledPosition = new Float32Array(maxParticles * 3);
+    }
+
+    // Max time: track timestamp of each history sample
+    if (trailConfig.maxTime > 0) {
+      generalData.trailSampleTimes = new Float64Array(
+        maxParticles * trailLength
+      );
+    }
+
+    // Twist prevention: store previous ribbon normal per particle
+    if (trailConfig.twistPrevention) {
+      generalData.trailPrevNormal = new Float32Array(maxParticles * 3);
+    }
   }
 
   // Attribute name prefix: instanced/mesh renderers use 'instance'-prefixed names
@@ -809,6 +836,10 @@ export const createParticleSystem = (
 
   // Position attribute is special: Points uses 'position', instanced/mesh uses 'instanceOffset'
   const posAttr = useInstancedAttributes ? 'instanceOffset' : 'position';
+
+  const softParticlesEnabled = !!(
+    renderer.softParticles?.enabled && renderer.softParticles?.depthTexture
+  );
 
   const sharedUniforms: Record<string, { value: unknown }> = {
     elapsed: { value: 0.0 },
@@ -822,6 +853,14 @@ export const createParticleSystem = (
     discardBackgroundColor: { value: renderer.discardBackgroundColor },
     backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
     ...(useInstancing ? { viewportHeight: { value: 1.0 } } : {}),
+    softParticlesEnabled: { value: softParticlesEnabled },
+    softParticlesIntensity: {
+      value: Math.max(renderer.softParticles?.intensity ?? 1.0, 0.001),
+    },
+    sceneDepthTexture: {
+      value: renderer.softParticles?.depthTexture ?? null,
+    },
+    cameraNearFar: { value: new THREE.Vector2(0.1, 1000.0) },
   };
 
   const getVertexShader = () => {
@@ -1051,6 +1090,22 @@ export const createParticleSystem = (
     if (generalData.positionHistoryCount) {
       generalData.positionHistoryCount[particleIndex] = 0;
       generalData.positionHistoryIndex![particleIndex] = 0;
+
+      // Reset adaptive sampling last position
+      if (generalData.trailLastSampledPosition) {
+        const lsIdx = particleIndex * 3;
+        generalData.trailLastSampledPosition[lsIdx] = 0;
+        generalData.trailLastSampledPosition[lsIdx + 1] = 0;
+        generalData.trailLastSampledPosition[lsIdx + 2] = 0;
+      }
+
+      // Reset twist prevention normal
+      if (generalData.trailPrevNormal) {
+        const nIdx = particleIndex * 3;
+        generalData.trailPrevNormal[nIdx] = 0;
+        generalData.trailPrevNormal[nIdx + 1] = 0;
+        generalData.trailPrevNormal[nIdx + 2] = 0;
+      }
     }
 
     if (generalData.noise.offsets)
@@ -1421,6 +1476,14 @@ export const createParticleSystem = (
         discardBackgroundColor: { value: renderer.discardBackgroundColor },
         backgroundColor: { value: renderer.backgroundColor },
         backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
+        softParticlesEnabled: { value: softParticlesEnabled },
+        softParticlesIntensity: {
+          value: Math.max(renderer.softParticles?.intensity ?? 1.0, 0.001),
+        },
+        sceneDepthTexture: {
+          value: renderer.softParticles?.depthTexture ?? null,
+        },
+        cameraNearFar: { value: new THREE.Vector2(0.1, 1000.0) },
       },
       vertexShader: TrailVertexShader,
       fragmentShader: TrailFragmentShader,
@@ -1442,6 +1505,17 @@ export const createParticleSystem = (
       camera: THREE.Camera
     ) => {
       camera.getWorldPosition(trailCameraPos);
+      if (
+        softParticlesEnabled &&
+        (camera as THREE.PerspectiveCamera).isPerspectiveCamera
+      ) {
+        const perspCam = camera as THREE.PerspectiveCamera;
+        const trailUniforms = (trailMaterial as THREE.ShaderMaterial).uniforms;
+        (trailUniforms.cameraNearFar.value as THREE.Vector2).set(
+          perspCam.near,
+          perspCam.far
+        );
+      }
     };
     generalData.trailCameraPosition = trailCameraPos;
 
@@ -1478,10 +1552,27 @@ export const createParticleSystem = (
       ? new THREE.Mesh(geometry, material)
       : new THREE.Points(geometry, material);
 
-  if (useInstancing) {
-    particleSystem.onBeforeRender = (glRenderer: THREE.WebGLRenderer) => {
-      const size = glRenderer.getSize(new THREE.Vector2());
-      sharedUniforms.viewportHeight.value = size.y * glRenderer.getPixelRatio();
+  if (useInstancing || softParticlesEnabled) {
+    particleSystem.onBeforeRender = (
+      glRenderer: THREE.WebGLRenderer,
+      _scene: THREE.Scene,
+      camera: THREE.Camera
+    ) => {
+      if (useInstancing) {
+        const size = glRenderer.getSize(new THREE.Vector2());
+        sharedUniforms.viewportHeight.value =
+          size.y * glRenderer.getPixelRatio();
+      }
+      if (
+        softParticlesEnabled &&
+        (camera as THREE.PerspectiveCamera).isPerspectiveCamera
+      ) {
+        const perspCam = camera as THREE.PerspectiveCamera;
+        (sharedUniforms.cameraNearFar.value as THREE.Vector2).set(
+          perspCam.near,
+          perspCam.far
+        );
+      }
     };
   }
 
@@ -1607,6 +1698,12 @@ export const createParticleSystem = (
           trailConfig: {
             length: trailConfig!.length,
             width: trailConfig!.width,
+            minVertexDistance: trailConfig!.minVertexDistance,
+            maxTime: trailConfig!.maxTime,
+            smoothing: trailConfig!.smoothing,
+            smoothingSubdivisions: trailConfig!.smoothingSubdivisions,
+            twistPrevention: trailConfig!.twistPrevention,
+            ribbonId: trailConfig!.ribbonId,
           },
         }
       : {}),
@@ -2026,15 +2123,179 @@ const updateParticleSystemInstance = (
 
   // Trail geometry update: record position history and rebuild ribbon
   if (props.trailMesh) {
-    updateTrailGeometry(props);
+    updateTrailGeometry(props, now);
   }
 };
 
 /**
+ * Evaluates a Catmull-Rom spline at parameter `t` (0..1) between points p1 and p2,
+ * using p0 and p3 as control points. Writes result into `out`.
+ */
+const catmullRom = (
+  out: Float32Array,
+  outIdx: number,
+  p0x: number,
+  p0y: number,
+  p0z: number,
+  p1x: number,
+  p1y: number,
+  p1z: number,
+  p2x: number,
+  p2y: number,
+  p2z: number,
+  p3x: number,
+  p3y: number,
+  p3z: number,
+  t: number
+) => {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  out[outIdx] =
+    0.5 *
+    (2 * p1x +
+      (-p0x + p2x) * t +
+      (2 * p0x - 5 * p1x + 4 * p2x - p3x) * t2 +
+      (-p0x + 3 * p1x - 3 * p2x + p3x) * t3);
+  out[outIdx + 1] =
+    0.5 *
+    (2 * p1y +
+      (-p0y + p2y) * t +
+      (2 * p0y - 5 * p1y + 4 * p2y - p3y) * t2 +
+      (-p0y + 3 * p1y - 3 * p2y + p3y) * t3);
+  out[outIdx + 2] =
+    0.5 *
+    (2 * p1z +
+      (-p0z + p2z) * t +
+      (2 * p0z - 5 * p1z + 4 * p2z - p3z) * t2 +
+      (-p0z + 3 * p1z - 3 * p2z + p3z) * t3);
+};
+
+/** Zeroes out a single trail vertex (both left+right sides). */
+const clearTrailVertex = (
+  vIdx: number,
+  cIdx: number,
+  aIdx: number,
+  uvIdx: number,
+  trailPosArr: Float32Array,
+  trailNextArr: Float32Array,
+  trailHalfWidthArr: Float32Array,
+  trailUVArr: Float32Array,
+  trailAlphaArr: Float32Array,
+  trailColorArr: Float32Array,
+  fallbackX: number,
+  fallbackY: number,
+  fallbackZ: number
+) => {
+  trailPosArr[vIdx] = fallbackX;
+  trailPosArr[vIdx + 1] = fallbackY;
+  trailPosArr[vIdx + 2] = fallbackZ;
+  trailPosArr[vIdx + 3] = fallbackX;
+  trailPosArr[vIdx + 4] = fallbackY;
+  trailPosArr[vIdx + 5] = fallbackZ;
+  trailNextArr[vIdx] = fallbackX;
+  trailNextArr[vIdx + 1] = fallbackY;
+  trailNextArr[vIdx + 2] = fallbackZ;
+  trailNextArr[vIdx + 3] = fallbackX;
+  trailNextArr[vIdx + 4] = fallbackY;
+  trailNextArr[vIdx + 5] = fallbackZ;
+  trailHalfWidthArr[aIdx] = 0;
+  trailHalfWidthArr[aIdx + 1] = 0;
+  trailUVArr[uvIdx] = 0;
+  trailUVArr[uvIdx + 1] = 0;
+  trailUVArr[uvIdx + 2] = 0;
+  trailUVArr[uvIdx + 3] = 0;
+  trailAlphaArr[aIdx] = 0;
+  trailAlphaArr[aIdx + 1] = 0;
+  trailColorArr[cIdx] = 0;
+  trailColorArr[cIdx + 1] = 0;
+  trailColorArr[cIdx + 2] = 0;
+  trailColorArr[cIdx + 3] = 0;
+  trailColorArr[cIdx + 4] = 0;
+  trailColorArr[cIdx + 5] = 0;
+  trailColorArr[cIdx + 6] = 0;
+  trailColorArr[cIdx + 7] = 0;
+};
+
+/**
+ * Writes a single trail ribbon vertex pair (left+right) into the typed arrays.
+ */
+const writeTrailVertex = (
+  vIdx: number,
+  cIdx: number,
+  aIdx: number,
+  uvIdx: number,
+  hx: number,
+  hy: number,
+  hz: number,
+  nx: number,
+  ny: number,
+  nz: number,
+  halfWidth: number,
+  t: number,
+  alpha: number,
+  fr: number,
+  fg: number,
+  fb: number,
+  ca: number,
+  trailPosArr: Float32Array,
+  trailNextArr: Float32Array,
+  trailHalfWidthArr: Float32Array,
+  trailUVArr: Float32Array,
+  trailAlphaArr: Float32Array,
+  trailColorArr: Float32Array
+) => {
+  trailPosArr[vIdx] = hx;
+  trailPosArr[vIdx + 1] = hy;
+  trailPosArr[vIdx + 2] = hz;
+  trailPosArr[vIdx + 3] = hx;
+  trailPosArr[vIdx + 4] = hy;
+  trailPosArr[vIdx + 5] = hz;
+  trailNextArr[vIdx] = nx;
+  trailNextArr[vIdx + 1] = ny;
+  trailNextArr[vIdx + 2] = nz;
+  trailNextArr[vIdx + 3] = nx;
+  trailNextArr[vIdx + 4] = ny;
+  trailNextArr[vIdx + 5] = nz;
+  trailHalfWidthArr[aIdx] = halfWidth;
+  trailHalfWidthArr[aIdx + 1] = halfWidth;
+  trailUVArr[uvIdx] = 0;
+  trailUVArr[uvIdx + 1] = t;
+  trailUVArr[uvIdx + 2] = 1;
+  trailUVArr[uvIdx + 3] = t;
+  trailAlphaArr[aIdx] = alpha;
+  trailAlphaArr[aIdx + 1] = alpha;
+  trailColorArr[cIdx] = fr;
+  trailColorArr[cIdx + 1] = fg;
+  trailColorArr[cIdx + 2] = fb;
+  trailColorArr[cIdx + 3] = ca;
+  trailColorArr[cIdx + 4] = fr;
+  trailColorArr[cIdx + 5] = fg;
+  trailColorArr[cIdx + 6] = fb;
+  trailColorArr[cIdx + 7] = ca;
+};
+
+// Scratch buffers reused each frame to avoid per-particle allocations
+let _rawPoints: Float32Array | null = null;
+let _rawPointsSize = 0;
+let _smoothedPoints: Float32Array | null = null;
+let _smoothedPointsSize = 0;
+// Scratch buffer for connected ribbon particle indices (reused each frame)
+let _ribbonIndices: Uint16Array | null = null;
+let _ribbonIndicesSize = 0;
+let _ribbonCount = 0;
+
+/**
  * Records current particle positions into the history ring buffer,
  * then rebuilds the triangle-strip ribbon geometry for all active particles.
+ *
+ * Supports:
+ * - Adaptive sampling (minVertexDistance): frame-rate independent trail density
+ * - Max time (maxTime): time-based trail expiry
+ * - Catmull-Rom smoothing: eliminates sharp kinks between samples
+ * - Twist prevention: consistent ribbon orientation during rapid direction changes
+ * - Connected ribbons (ribbonId): multiple particles forming a single ribbon
  */
-const updateTrailGeometry = (props: ParticleSystemInstance) => {
+const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
   const {
     generalData,
     trailPositionAttr,
@@ -2064,6 +2325,17 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
   const positionHistory = generalData.positionHistory;
   const historyIndex = generalData.positionHistoryIndex;
   const historyCount = generalData.positionHistoryCount;
+  const sampleTimes = generalData.trailSampleTimes;
+  const lastSampledPos = generalData.trailLastSampledPosition;
+  const prevNormal = generalData.trailPrevNormal;
+  const minVertexDist = trailConfig.minVertexDistance;
+  const minVertexDistSq = minVertexDist * minVertexDist;
+  const maxTime = trailConfig.maxTime;
+  const maxTimeMs = maxTime * 1000;
+  const useSmoothing = trailConfig.smoothing;
+  const subdivisions = trailConfig.smoothingSubdivisions;
+  const useTwistPrevention = trailConfig.twistPrevention;
+  const ribbonId = trailConfig.ribbonId;
 
   const isActiveArr = ma.isActive.array;
   const positionArr = ma.position.array;
@@ -2071,7 +2343,6 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
   const colorGArr = ma.colorG.array;
   const colorBArr = ma.colorB.array;
   const colorAArr = ma.colorA.array;
-  const sizeArr = ma.size.array;
 
   const trailPosArr = trailPositionAttr.array as Float32Array;
   const trailAlphaArr = trailAlphaAttr.array as Float32Array;
@@ -2090,25 +2361,117 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
   const creationTimesLength = generalData.creationTimes.length;
   let hasUpdates = false;
 
+  // --- Connected Ribbons: collect particles sharing the same ribbonId ---
+  const useRibbon = ribbonId !== undefined;
+  let ribbonLeader = -1;
+  if (useRibbon) {
+    // Pre-allocate scratch buffer for ribbon indices
+    if (!_ribbonIndices || _ribbonIndicesSize < creationTimesLength) {
+      _ribbonIndices = new Uint16Array(creationTimesLength);
+      _ribbonIndicesSize = creationTimesLength;
+    }
+    _ribbonCount = 0;
+    for (let i = 0; i < creationTimesLength; i++) {
+      if (isActiveArr[i]) _ribbonIndices[_ribbonCount++] = i;
+    }
+    // Insertion sort by creation time (typically nearly-sorted, O(n) best case)
+    for (let i = 1; i < _ribbonCount; i++) {
+      const key = _ribbonIndices[i];
+      const keyTime = generalData.creationTimes[key];
+      let j = i - 1;
+      while (j >= 0 && generalData.creationTimes[_ribbonIndices[j]] > keyTime) {
+        _ribbonIndices[j + 1] = _ribbonIndices[j];
+        j--;
+      }
+      _ribbonIndices[j + 1] = key;
+    }
+    if (_ribbonCount > 0) ribbonLeader = _ribbonIndices[0];
+  }
+
   for (let index = 0; index < creationTimesLength; index++) {
     const vertBase = index * verticesPerParticle;
 
     if (isActiveArr[index]) {
+      // Skip individual trail build for non-leader ribbon particles
+      // (the leader's trail will be built by the connected ribbon section)
+      if (useRibbon && _ribbonCount >= 2 && index !== ribbonLeader) {
+        // Still record position history for this particle (needed for sampling)
+        const posIdx = index * 3;
+        const px = positionArr[posIdx];
+        const py = positionArr[posIdx + 1];
+        const pz = positionArr[posIdx + 2];
+        const histBase = (index * trailLength + historyIndex[index]) * 3;
+        positionHistory[histBase] = px;
+        positionHistory[histBase + 1] = py;
+        positionHistory[histBase + 2] = pz;
+        if (sampleTimes) {
+          sampleTimes[index * trailLength + historyIndex[index]] = now;
+        }
+        historyIndex[index] = (historyIndex[index] + 1) % trailLength;
+        if (historyCount[index] < trailLength) historyCount[index]++;
+        continue;
+      }
       hasUpdates = true;
       const posIdx = index * 3;
       const px = positionArr[posIdx];
       const py = positionArr[posIdx + 1];
       const pz = positionArr[posIdx + 2];
 
-      // Push current position into circular buffer every frame
-      const histBase = (index * trailLength + historyIndex[index]) * 3;
-      positionHistory[histBase] = px;
-      positionHistory[histBase + 1] = py;
-      positionHistory[histBase + 2] = pz;
-      historyIndex[index] = (historyIndex[index] + 1) % trailLength;
-      if (historyCount[index] < trailLength) historyCount[index]++;
+      // --- Adaptive Sampling: only push a new sample if distance threshold met ---
+      let shouldSample = true;
+      if (minVertexDist > 0 && lastSampledPos && historyCount[index] > 0) {
+        const lsIdx = index * 3;
+        const dx = px - lastSampledPos[lsIdx];
+        const dy = py - lastSampledPos[lsIdx + 1];
+        const dz = pz - lastSampledPos[lsIdx + 2];
+        if (dx * dx + dy * dy + dz * dz < minVertexDistSq) {
+          shouldSample = false;
+        }
+      }
 
-      const count = historyCount[index];
+      if (shouldSample) {
+        // Record the sample
+        const histBase = (index * trailLength + historyIndex[index]) * 3;
+        positionHistory[histBase] = px;
+        positionHistory[histBase + 1] = py;
+        positionHistory[histBase + 2] = pz;
+
+        // Record timestamp for maxTime
+        if (sampleTimes) {
+          sampleTimes[index * trailLength + historyIndex[index]] = now;
+        }
+
+        historyIndex[index] = (historyIndex[index] + 1) % trailLength;
+        if (historyCount[index] < trailLength) historyCount[index]++;
+
+        // Update last sampled position
+        if (lastSampledPos) {
+          const lsIdx = index * 3;
+          lastSampledPos[lsIdx] = px;
+          lastSampledPos[lsIdx + 1] = py;
+          lastSampledPos[lsIdx + 2] = pz;
+        }
+      }
+
+      // --- MaxTime: determine effective count (expire old segments) ---
+      let rawCount = historyCount[index];
+      let effectiveCount = rawCount;
+      if (maxTime > 0 && sampleTimes && rawCount > 0) {
+        const sampleBase = index * trailLength;
+        effectiveCount = 0;
+        for (let s = 0; s < rawCount; s++) {
+          const sampleSlot =
+            (historyIndex[index] - 1 - s + trailLength * 2) % trailLength;
+          const age = now - sampleTimes[sampleBase + sampleSlot];
+          if (age <= maxTimeMs) {
+            effectiveCount++;
+          } else {
+            break; // older samples are even older, stop
+          }
+        }
+      }
+
+      const count = effectiveCount;
       const ribbonWidth = trailConfig.width;
 
       // Get particle color
@@ -2119,110 +2482,216 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
 
       const ringOff = index * trailLength * 3;
 
-      // Build ribbon: both left/right vertices share the center position.
-      // The shader offsets them using trailNext to compute the tangent.
+      // --- Collect raw history points for this particle ---
+      // We need them for both smoothing and the ribbon build.
+      // rawPts: flat array of [x, y, z, x, y, z, ...] for count entries
+      // rawPts[0..2] = head (most recent), rawPts[(count-1)*3..(count-1)*3+2] = tail
+      const rawPtsSize = count * 3;
+      // Reuse a scratch float array for raw points
+      if (!_rawPoints || _rawPointsSize < rawPtsSize) {
+        _rawPoints = new Float32Array(rawPtsSize);
+        _rawPointsSize = rawPtsSize;
+      }
+      const rawPts = _rawPoints;
+      for (let s = 0; s < count; s++) {
+        const histSlot =
+          ((historyIndex[index] - 1 - s + trailLength * 2) % trailLength) * 3 +
+          ringOff;
+        rawPts[s * 3] = positionHistory[histSlot];
+        rawPts[s * 3 + 1] = positionHistory[histSlot + 1];
+        rawPts[s * 3 + 2] = positionHistory[histSlot + 2];
+      }
+
+      // --- Catmull-Rom Smoothing ---
+      let finalPts: Float32Array;
+      let finalCount: number;
+
+      if (useSmoothing && count >= 3) {
+        // Interpolate between each pair of raw points with subdivisions
+        const segmentCount = count - 1;
+        finalCount = segmentCount * subdivisions + 1;
+        const neededSize = finalCount * 3;
+
+        // Resize global scratch buffer if needed
+        if (!_smoothedPoints || _smoothedPointsSize < neededSize) {
+          _smoothedPoints = new Float32Array(neededSize);
+          _smoothedPointsSize = neededSize;
+        }
+        finalPts = _smoothedPoints;
+
+        for (let seg = 0; seg < segmentCount; seg++) {
+          // Control points: p0, p1, p2, p3
+          const i0 = Math.max(0, seg - 1);
+          const i1 = seg;
+          const i2 = Math.min(count - 1, seg + 1);
+          const i3 = Math.min(count - 1, seg + 2);
+
+          const p0x = rawPts[i0 * 3],
+            p0y = rawPts[i0 * 3 + 1],
+            p0z = rawPts[i0 * 3 + 2];
+          const p1x = rawPts[i1 * 3],
+            p1y = rawPts[i1 * 3 + 1],
+            p1z = rawPts[i1 * 3 + 2];
+          const p2x = rawPts[i2 * 3],
+            p2y = rawPts[i2 * 3 + 1],
+            p2z = rawPts[i2 * 3 + 2];
+          const p3x = rawPts[i3 * 3],
+            p3y = rawPts[i3 * 3 + 1],
+            p3z = rawPts[i3 * 3 + 2];
+
+          for (let sub = 0; sub < subdivisions; sub++) {
+            const t = sub / subdivisions;
+            const outIdx = (seg * subdivisions + sub) * 3;
+            catmullRom(
+              finalPts,
+              outIdx,
+              p0x,
+              p0y,
+              p0z,
+              p1x,
+              p1y,
+              p1z,
+              p2x,
+              p2y,
+              p2z,
+              p3x,
+              p3y,
+              p3z,
+              t
+            );
+          }
+        }
+        // Last point = last raw point
+        const lastOutIdx = (finalCount - 1) * 3;
+        finalPts[lastOutIdx] = rawPts[(count - 1) * 3];
+        finalPts[lastOutIdx + 1] = rawPts[(count - 1) * 3 + 1];
+        finalPts[lastOutIdx + 2] = rawPts[(count - 1) * 3 + 2];
+      } else {
+        finalPts = rawPts;
+        finalCount = count;
+      }
+
+      // Limit final count to the number of slots we can fill
+      if (finalCount > trailLength) finalCount = trailLength;
+
+      // Collapse degenerate segments: when two consecutive smoothed points are
+      // nearly identical the shader tangent becomes zero, producing distorted
+      // "squished" ribbon quads. Shift such points to the next distinct neighbor.
+      if (useSmoothing && finalCount >= 2) {
+        const MIN_SEG_DIST_SQ = 0.0001 * 0.0001;
+        for (let d = 1; d < finalCount; d++) {
+          const pi = (d - 1) * 3;
+          const ci = d * 3;
+          const dx = finalPts[ci] - finalPts[pi];
+          const dy = finalPts[ci + 1] - finalPts[pi + 1];
+          const dz = finalPts[ci + 2] - finalPts[pi + 2];
+          if (dx * dx + dy * dy + dz * dz < MIN_SEG_DIST_SQ) {
+            // Snap to previous point — the shader will get a near-zero tangent
+            // but the vertex pair collapses to the same position, hiding it
+            finalPts[ci] = finalPts[pi];
+            finalPts[ci + 1] = finalPts[pi + 1];
+            finalPts[ci + 2] = finalPts[pi + 2];
+          }
+        }
+      }
+
+      // --- Build ribbon vertices ---
       for (let s = 0; s < trailLength; s++) {
         const vIdx = (vertBase + s * 2) * 3;
         const cIdx = (vertBase + s * 2) * 4;
         const aIdx = vertBase + s * 2;
+        const uvIdxBase = (vertBase + s * 2) * 2;
 
-        if (s >= count) {
-          trailPosArr[vIdx] = px;
-          trailPosArr[vIdx + 1] = py;
-          trailPosArr[vIdx + 2] = pz;
-          trailPosArr[vIdx + 3] = px;
-          trailPosArr[vIdx + 4] = py;
-          trailPosArr[vIdx + 5] = pz;
-          trailNextArr[vIdx] = px;
-          trailNextArr[vIdx + 1] = py;
-          trailNextArr[vIdx + 2] = pz;
-          trailNextArr[vIdx + 3] = px;
-          trailNextArr[vIdx + 4] = py;
-          trailNextArr[vIdx + 5] = pz;
-          trailHalfWidthArr[aIdx] = 0;
-          trailHalfWidthArr[aIdx + 1] = 0;
-          const uvIdx2 = (vertBase + s * 2) * 2;
-          trailUVArr[uvIdx2] = 0;
-          trailUVArr[uvIdx2 + 1] = 0;
-          trailUVArr[uvIdx2 + 2] = 0;
-          trailUVArr[uvIdx2 + 3] = 0;
-          trailAlphaArr[aIdx] = 0;
-          trailAlphaArr[aIdx + 1] = 0;
-          trailColorArr[cIdx] = 0;
-          trailColorArr[cIdx + 1] = 0;
-          trailColorArr[cIdx + 2] = 0;
-          trailColorArr[cIdx + 3] = 0;
-          trailColorArr[cIdx + 4] = 0;
-          trailColorArr[cIdx + 5] = 0;
-          trailColorArr[cIdx + 6] = 0;
-          trailColorArr[cIdx + 7] = 0;
+        if (s >= finalCount) {
+          clearTrailVertex(
+            vIdx,
+            cIdx,
+            aIdx,
+            uvIdxBase,
+            trailPosArr,
+            trailNextArr,
+            trailHalfWidthArr,
+            trailUVArr,
+            trailAlphaArr,
+            trailColorArr,
+            px,
+            py,
+            pz
+          );
           continue;
         }
 
-        // History position: s=0 is head, s=count-1 is tail
-        const histIdx =
-          ((historyIndex[index] - 1 - s + trailLength * 2) % trailLength) * 3 +
-          ringOff;
-        const hx = positionHistory[histIdx];
-        const hy = positionHistory[histIdx + 1];
-        const hz = positionHistory[histIdx + 2];
+        const hx = finalPts[s * 3];
+        const hy = finalPts[s * 3 + 1];
+        const hz = finalPts[s * 3 + 2];
 
-        // Next position (for tangent in shader): use s-1 (newer) if available
+        // Compute an averaged tangent direction for the shader.
+        // At interior points we average the forward and backward segment
+        // directions so the billboard plane transitions smoothly through
+        // bends instead of snapping per-segment.
         let nx: number, ny: number, nz: number;
-        if (s < count - 1) {
-          const ni =
-            ((historyIndex[index] - 2 - s + trailLength * 2) % trailLength) *
-              3 +
-            ringOff;
-          nx = positionHistory[ni];
-          ny = positionHistory[ni + 1];
-          nz = positionHistory[ni + 2];
+        if (s > 0 && s < finalCount - 1) {
+          // Interior: average of (prev→current) and (current→next)
+          const px2 = finalPts[(s - 1) * 3];
+          const py2 = finalPts[(s - 1) * 3 + 1];
+          const pz2 = finalPts[(s - 1) * 3 + 2];
+          const nx2 = finalPts[(s + 1) * 3];
+          const ny2 = finalPts[(s + 1) * 3 + 1];
+          const nz2 = finalPts[(s + 1) * 3 + 2];
+          // Averaged tangent = (current - prev) + (next - current) = next - prev
+          const atx = nx2 - px2;
+          const aty = ny2 - py2;
+          const atz = nz2 - pz2;
+          const atLen = Math.sqrt(atx * atx + aty * aty + atz * atz);
+          if (atLen > 0.0001) {
+            // trailNext = current + normalized averaged tangent (shader computes tangent as trailNext - position)
+            nx = hx + atx / atLen;
+            ny = hy + aty / atLen;
+            nz = hz + atz / atLen;
+          } else {
+            nx = finalPts[(s + 1) * 3];
+            ny = finalPts[(s + 1) * 3 + 1];
+            nz = finalPts[(s + 1) * 3 + 2];
+          }
+        } else if (s < finalCount - 1) {
+          // Head: use forward direction
+          nx = finalPts[(s + 1) * 3];
+          ny = finalPts[(s + 1) * 3 + 1];
+          nz = finalPts[(s + 1) * 3 + 2];
         } else {
-          // Tail: use same direction as previous segment
+          // Tail: nudge to avoid zero tangent
           nx = hx;
           ny = hy + 0.001;
           nz = hz;
         }
 
         // Trail percentage (0=head, 1=tail)
-        const t = count > 1 ? s / (count - 1) : 0;
+        const t = finalCount > 1 ? s / (finalCount - 1) : 0;
+
+        // --- MaxTime: apply additional age-based fade ---
+        let timeFade = 1.0;
+        if (maxTime > 0 && sampleTimes && effectiveCount > 0) {
+          // Map the current vertex index back to the nearest raw sample
+          // for time lookup. When smoothing is active, multiple smoothed
+          // vertices may correspond to one raw segment.
+          const rawS = useSmoothing
+            ? Math.min(
+                Math.floor((s / Math.max(finalCount - 1, 1)) * (rawCount - 1)),
+                rawCount - 1
+              )
+            : Math.min(s, rawCount - 1);
+          const sampleSlot =
+            (historyIndex[index] - 1 - rawS + trailLength * 2) % trailLength;
+          const sampleBase = index * trailLength;
+          const age = now - sampleTimes[sampleBase + sampleSlot];
+          timeFade = 1.0 - Math.min(age / maxTimeMs, 1.0);
+        }
+
         const widthScale = trailWidthCurveFn(t);
         const opacityScale = trailOpacityCurveFn(t);
         const halfWidth = ribbonWidth * widthScale * 0.5;
+        const alpha = ca * opacityScale * timeFade;
 
-        // Both left and right vertices get the same center position
-        trailPosArr[vIdx] = hx;
-        trailPosArr[vIdx + 1] = hy;
-        trailPosArr[vIdx + 2] = hz;
-        trailPosArr[vIdx + 3] = hx;
-        trailPosArr[vIdx + 4] = hy;
-        trailPosArr[vIdx + 5] = hz;
-
-        // Next position for tangent computation in shader
-        trailNextArr[vIdx] = nx;
-        trailNextArr[vIdx + 1] = ny;
-        trailNextArr[vIdx + 2] = nz;
-        trailNextArr[vIdx + 3] = nx;
-        trailNextArr[vIdx + 4] = ny;
-        trailNextArr[vIdx + 5] = nz;
-
-        // Half-width for shader offset
-        trailHalfWidthArr[aIdx] = halfWidth;
-        trailHalfWidthArr[aIdx + 1] = halfWidth;
-
-        // UV: left vertex u=0, right vertex u=1, v = trail percentage
-        const uvIdx = (vertBase + s * 2) * 2;
-        trailUVArr[uvIdx] = 0; // left u
-        trailUVArr[uvIdx + 1] = t; // left v
-        trailUVArr[uvIdx + 2] = 1; // right u
-        trailUVArr[uvIdx + 3] = t; // right v
-
-        // Alpha
-        const alpha = ca * opacityScale;
-        trailAlphaArr[aIdx] = alpha;
-        trailAlphaArr[aIdx + 1] = alpha;
-
-        // Color (with optional colorOverTrail multiplier)
         const fr = trailColorOverTrailFns
           ? cr * trailColorOverTrailFns.r(t)
           : cr;
@@ -2232,14 +2701,97 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
         const fb = trailColorOverTrailFns
           ? cb * trailColorOverTrailFns.b(t)
           : cb;
-        trailColorArr[cIdx] = fr;
-        trailColorArr[cIdx + 1] = fg;
-        trailColorArr[cIdx + 2] = fb;
-        trailColorArr[cIdx + 3] = ca;
-        trailColorArr[cIdx + 4] = fr;
-        trailColorArr[cIdx + 5] = fg;
-        trailColorArr[cIdx + 6] = fb;
-        trailColorArr[cIdx + 7] = ca;
+
+        writeTrailVertex(
+          vIdx,
+          cIdx,
+          aIdx,
+          uvIdxBase,
+          hx,
+          hy,
+          hz,
+          nx,
+          ny,
+          nz,
+          halfWidth,
+          t,
+          alpha,
+          fr,
+          fg,
+          fb,
+          ca,
+          trailPosArr,
+          trailNextArr,
+          trailHalfWidthArr,
+          trailUVArr,
+          trailAlphaArr,
+          trailColorArr
+        );
+      }
+
+      // --- Twist Prevention ---
+      // After building the ribbon, ensure ribbon normals are consistent.
+      // We compare the implied normal direction of consecutive segments and
+      // flip if the dot product with the previous frame's normal is negative.
+      if (useTwistPrevention && prevNormal && finalCount >= 2) {
+        const nIdx = index * 3;
+        // Compute current head tangent
+        const tx = finalPts[3] - finalPts[0];
+        const ty = finalPts[4] - finalPts[1];
+        const tz = finalPts[5] - finalPts[2];
+        const tLen = Math.sqrt(tx * tx + ty * ty + tz * tz);
+        if (tLen > 0.0001) {
+          const ntx = tx / tLen;
+          const nty = ty / tLen;
+          const ntz = tz / tLen;
+          // Use a consistent up vector to compute a reference normal
+          let upx = 0,
+            upy = 1,
+            upz = 0;
+          const dot = ntx * upx + nty * upy + ntz * upz;
+          if (Math.abs(dot) > 0.999) {
+            upx = 1;
+            upy = 0;
+            upz = 0;
+          }
+          // cross(tangent, up) = normal
+          let cnx = nty * upz - ntz * upy;
+          let cny = ntz * upx - ntx * upz;
+          let cnz = ntx * upy - nty * upx;
+          const cnLen = Math.sqrt(cnx * cnx + cny * cny + cnz * cnz);
+          if (cnLen > 0.0001) {
+            cnx /= cnLen;
+            cny /= cnLen;
+            cnz /= cnLen;
+          }
+
+          // Check dot product with previous normal — if negative, flip
+          const prevNx = prevNormal[nIdx];
+          const prevNy = prevNormal[nIdx + 1];
+          const prevNz = prevNormal[nIdx + 2];
+          const hasPrev = prevNx !== 0 || prevNy !== 0 || prevNz !== 0;
+          if (hasPrev) {
+            const normalDot = cnx * prevNx + cny * prevNy + cnz * prevNz;
+            if (normalDot < 0) {
+              // Flip all ribbon offsets for this particle by swapping left/right half-widths
+              for (let s = 0; s < Math.min(finalCount, trailLength); s++) {
+                const aIdx = vertBase + s * 2;
+                const hw = trailHalfWidthArr[aIdx];
+                trailHalfWidthArr[aIdx] = -hw;
+                trailHalfWidthArr[aIdx + 1] = -hw;
+              }
+              // Also flip the stored normal for next frame
+              cnx = -cnx;
+              cny = -cny;
+              cnz = -cnz;
+            }
+          }
+
+          // Store current normal for next frame
+          prevNormal[nIdx] = cnx;
+          prevNormal[nIdx + 1] = cny;
+          prevNormal[nIdx + 2] = cnz;
+        }
       }
     } else if (historyCount[index] > 0) {
       // Particle just became inactive — collapse ribbon and clear history once
@@ -2250,30 +2802,240 @@ const updateTrailGeometry = (props: ParticleSystemInstance) => {
         const vIdx = (vertBase + s * 2) * 3;
         const cIdx = (vertBase + s * 2) * 4;
         const aIdx = vertBase + s * 2;
-        trailPosArr[vIdx] = 0;
-        trailPosArr[vIdx + 1] = 0;
-        trailPosArr[vIdx + 2] = 0;
-        trailPosArr[vIdx + 3] = 0;
-        trailPosArr[vIdx + 4] = 0;
-        trailPosArr[vIdx + 5] = 0;
-        trailNextArr[vIdx] = 0;
-        trailNextArr[vIdx + 1] = 0;
-        trailNextArr[vIdx + 2] = 0;
-        trailNextArr[vIdx + 3] = 0;
-        trailNextArr[vIdx + 4] = 0;
-        trailNextArr[vIdx + 5] = 0;
-        trailHalfWidthArr[aIdx] = 0;
-        trailHalfWidthArr[aIdx + 1] = 0;
-        trailAlphaArr[aIdx] = 0;
-        trailAlphaArr[aIdx + 1] = 0;
-        trailColorArr[cIdx] = 0;
-        trailColorArr[cIdx + 1] = 0;
-        trailColorArr[cIdx + 2] = 0;
-        trailColorArr[cIdx + 3] = 0;
-        trailColorArr[cIdx + 4] = 0;
-        trailColorArr[cIdx + 5] = 0;
-        trailColorArr[cIdx + 6] = 0;
-        trailColorArr[cIdx + 7] = 0;
+        const uvIdxBase = (vertBase + s * 2) * 2;
+        clearTrailVertex(
+          vIdx,
+          cIdx,
+          aIdx,
+          uvIdxBase,
+          trailPosArr,
+          trailNextArr,
+          trailHalfWidthArr,
+          trailUVArr,
+          trailAlphaArr,
+          trailColorArr,
+          0,
+          0,
+          0
+        );
+      }
+    }
+  }
+
+  // --- Connected Ribbons: chain particle positions with Catmull-Rom interpolation ---
+  if (useRibbon && _ribbonCount >= 2 && _ribbonIndices) {
+    hasUpdates = true;
+    const leader = _ribbonIndices[0];
+    const leaderVertBase = leader * verticesPerParticle;
+
+    // The ribbon uses each particle's current position as a control point,
+    // then fills `trailLength` vertices by Catmull-Rom interpolation between them.
+    // This produces a smooth, continuous ribbon through all particle positions.
+    const controlCount = _ribbonCount;
+    const filledCount = Math.min(
+      trailLength,
+      Math.max(controlCount * 4, controlCount)
+    );
+    const chainSize = filledCount * 3;
+    if (!_rawPoints || _rawPointsSize < chainSize) {
+      _rawPoints = new Float32Array(chainSize);
+      _rawPointsSize = chainSize;
+    }
+
+    if (controlCount === 2) {
+      // Only 2 particles: linearly interpolate between them
+      const p0Idx = _ribbonIndices[0] * 3;
+      const p1Idx = _ribbonIndices[1] * 3;
+      for (let i = 0; i < filledCount; i++) {
+        const t = i / (filledCount - 1);
+        _rawPoints[i * 3] =
+          positionArr[p0Idx] + t * (positionArr[p1Idx] - positionArr[p0Idx]);
+        _rawPoints[i * 3 + 1] =
+          positionArr[p0Idx + 1] +
+          t * (positionArr[p1Idx + 1] - positionArr[p0Idx + 1]);
+        _rawPoints[i * 3 + 2] =
+          positionArr[p0Idx + 2] +
+          t * (positionArr[p1Idx + 2] - positionArr[p0Idx + 2]);
+      }
+    } else {
+      // 3+ particles: Catmull-Rom interpolation through all control points
+      const segments = controlCount - 1;
+      const ptsPerSeg = Math.max(1, Math.floor((filledCount - 1) / segments));
+      let wi = 0;
+      for (let seg = 0; seg < segments && wi < filledCount; seg++) {
+        const i0 = Math.max(0, seg - 1);
+        const i1 = seg;
+        const i2 = Math.min(controlCount - 1, seg + 1);
+        const i3 = Math.min(controlCount - 1, seg + 2);
+        const p0i = _ribbonIndices[i0] * 3;
+        const p1i = _ribbonIndices[i1] * 3;
+        const p2i = _ribbonIndices[i2] * 3;
+        const p3i = _ribbonIndices[i3] * 3;
+        const subCount = seg === segments - 1 ? filledCount - wi : ptsPerSeg;
+        for (let sub = 0; sub < subCount && wi < filledCount; sub++) {
+          const t = sub / subCount;
+          catmullRom(
+            _rawPoints,
+            wi * 3,
+            positionArr[p0i],
+            positionArr[p0i + 1],
+            positionArr[p0i + 2],
+            positionArr[p1i],
+            positionArr[p1i + 1],
+            positionArr[p1i + 2],
+            positionArr[p2i],
+            positionArr[p2i + 1],
+            positionArr[p2i + 2],
+            positionArr[p3i],
+            positionArr[p3i + 1],
+            positionArr[p3i + 2],
+            t
+          );
+          wi++;
+        }
+      }
+      // Ensure last point is the last particle's position
+      if (wi > 0) {
+        const lastPIdx = _ribbonIndices[controlCount - 1] * 3;
+        _rawPoints[(wi - 1) * 3] = positionArr[lastPIdx];
+        _rawPoints[(wi - 1) * 3 + 1] = positionArr[lastPIdx + 1];
+        _rawPoints[(wi - 1) * 3 + 2] = positionArr[lastPIdx + 2];
+      }
+    }
+
+    const leaderCr = colorRArr[leader];
+    const leaderCg = colorGArr[leader];
+    const leaderCb = colorBArr[leader];
+    const leaderCa = colorAArr[leader];
+
+    for (let s = 0; s < trailLength; s++) {
+      const vIdx = (leaderVertBase + s * 2) * 3;
+      const cIdx = (leaderVertBase + s * 2) * 4;
+      const aIdx = leaderVertBase + s * 2;
+      const uvIdxBase = (leaderVertBase + s * 2) * 2;
+
+      if (s >= filledCount) {
+        clearTrailVertex(
+          vIdx,
+          cIdx,
+          aIdx,
+          uvIdxBase,
+          trailPosArr,
+          trailNextArr,
+          trailHalfWidthArr,
+          trailUVArr,
+          trailAlphaArr,
+          trailColorArr,
+          0,
+          0,
+          0
+        );
+        continue;
+      }
+
+      const ptIdx = s * 3;
+      const ptx = _rawPoints[ptIdx];
+      const pty = _rawPoints[ptIdx + 1];
+      const ptz = _rawPoints[ptIdx + 2];
+
+      // Averaged tangent for interior points
+      let nx: number, ny: number, nz: number;
+      if (s > 0 && s < filledCount - 1) {
+        const px2 = _rawPoints[(s - 1) * 3];
+        const py2 = _rawPoints[(s - 1) * 3 + 1];
+        const pz2 = _rawPoints[(s - 1) * 3 + 2];
+        const nx2 = _rawPoints[(s + 1) * 3];
+        const ny2 = _rawPoints[(s + 1) * 3 + 1];
+        const nz2 = _rawPoints[(s + 1) * 3 + 2];
+        const atx = nx2 - px2;
+        const aty = ny2 - py2;
+        const atz = nz2 - pz2;
+        const atLen = Math.sqrt(atx * atx + aty * aty + atz * atz);
+        if (atLen > 0.0001) {
+          nx = ptx + atx / atLen;
+          ny = pty + aty / atLen;
+          nz = ptz + atz / atLen;
+        } else {
+          nx = _rawPoints[(s + 1) * 3];
+          ny = _rawPoints[(s + 1) * 3 + 1];
+          nz = _rawPoints[(s + 1) * 3 + 2];
+        }
+      } else if (s < filledCount - 1) {
+        nx = _rawPoints[(s + 1) * 3];
+        ny = _rawPoints[(s + 1) * 3 + 1];
+        nz = _rawPoints[(s + 1) * 3 + 2];
+      } else {
+        nx = ptx;
+        ny = pty + 0.001;
+        nz = ptz;
+      }
+
+      const t = filledCount > 1 ? s / (filledCount - 1) : 0;
+      const widthScale = trailWidthCurveFn(t);
+      const opacityScale = trailOpacityCurveFn(t);
+      const halfWidth = trailConfig.width * widthScale * 0.5;
+      const alpha = leaderCa * opacityScale;
+      const fr = trailColorOverTrailFns
+        ? leaderCr * trailColorOverTrailFns.r(t)
+        : leaderCr;
+      const fg = trailColorOverTrailFns
+        ? leaderCg * trailColorOverTrailFns.g(t)
+        : leaderCg;
+      const fb = trailColorOverTrailFns
+        ? leaderCb * trailColorOverTrailFns.b(t)
+        : leaderCb;
+
+      writeTrailVertex(
+        vIdx,
+        cIdx,
+        aIdx,
+        uvIdxBase,
+        ptx,
+        pty,
+        ptz,
+        nx,
+        ny,
+        nz,
+        halfWidth,
+        t,
+        alpha,
+        fr,
+        fg,
+        fb,
+        leaderCa,
+        trailPosArr,
+        trailNextArr,
+        trailHalfWidthArr,
+        trailUVArr,
+        trailAlphaArr,
+        trailColorArr
+      );
+    }
+
+    // Clear non-leader ribbon particles' trail vertices
+    for (let ri = 1; ri < _ribbonCount; ri++) {
+      const pIdx = _ribbonIndices[ri];
+      const pVertBase = pIdx * verticesPerParticle;
+      for (let s = 0; s < trailLength; s++) {
+        const vIdx = (pVertBase + s * 2) * 3;
+        const cIdx = (pVertBase + s * 2) * 4;
+        const aIdx = pVertBase + s * 2;
+        const uvIdxBase = (pVertBase + s * 2) * 2;
+        clearTrailVertex(
+          vIdx,
+          cIdx,
+          aIdx,
+          uvIdxBase,
+          trailPosArr,
+          trailNextArr,
+          trailHalfWidthArr,
+          trailUVArr,
+          trailAlphaArr,
+          trailColorArr,
+          0,
+          0,
+          0
+        );
       }
     }
   }
