@@ -286,7 +286,8 @@ npx typedoc               # Generate documentation
 | GPU instancing (`RendererType.INSTANCED`) | ✅ Complete |
 | React Three Fiber integration (docs + usage guide) | ✅ Complete |
 | Trail / Ribbon renderer (`RendererType.TRAIL`) with `colorOverTrail` | ✅ Complete |
-| Trail improvements (tangent smoothing, adaptive sampling, max time) | ⬜ Planned |
+| Trail improvements (smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons) | ✅ Complete |
+| Trail Phase 2 (UV texture modes, UV scrolling, width by speed) | ⬜ Planned |
 | WebGPU compute support | ⬜ Planned |
 | Preset system | ⬜ Planned |
 | Mesh particle renderer (`RendererType.MESH`) | ✅ Complete |
@@ -341,3 +342,39 @@ When working on specific features, refer to these files:
 | Tests | `src/__tests__/*.test.ts` |
 | Build config | `tsup.config.ts`, `tsconfig.json` |
 | Package info | `package.json` |
+
+---
+
+## Trail Renderer — Current & Planned Features
+
+### Implemented (TrailConfig properties)
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `length` | `number` | `20` | Position history samples per particle |
+| `width` | `number` | `1.0` | Base ribbon width in world units |
+| `widthOverTrail` | `LifetimeCurve` | Linear 1→0 | Width taper from head (0) to tail (1) |
+| `opacityOverTrail` | `LifetimeCurve` | Linear 1→0 | Opacity fade from head to tail |
+| `colorOverTrail` | `{r,g,b: LifetimeCurve}` | — | Per-channel color multipliers along trail |
+| `minVertexDistance` | `number` | `0` | Distance threshold for frame-rate independent sampling |
+| `maxTime` | `number` | `0` | Time-based trail expiry in seconds |
+| `smoothing` | `boolean` | `false` | Catmull-Rom spline interpolation |
+| `smoothingSubdivisions` | `number` | `3` | Subdivision count per raw segment when smoothing |
+| `twistPrevention` | `boolean` | `false` | Prevent self-intersecting ribbons |
+| `ribbonId` | `number` | — | Connect particles into a single continuous ribbon |
+
+### Planned Phase 2 — Future Trail Improvements
+
+These should be implemented in a follow-up milestone:
+
+1. **UV Texture Modes** — Support Stretch (current), Tile, Per-Segment, Distribute modes. Tile mode is critical for chain/lightning/repeating-pattern textures. Per-Segment maps one full texture per ribbon segment. Unity has 4 modes, PopcornFX has even more.
+
+2. **UV Scrolling / Animated UV** — Scrolling UV offset over time for energy/lava/electricity effects. Configurable scroll speed and direction (U, V, or both). This is a high-demand feature across all competitors (Unity, Niagara, PopcornFX all have it).
+
+3. **Trail Width by Speed** — Dynamic ribbon width modulated by particle velocity. Fast particles → thin/stretched trails, slow particles → wide ribbons. Curve-based speed-to-width mapping via `LifetimeCurve`.
+
+4. **Trail Texture Atlas / Sheet Animation** — Support texture atlases with frame selection along the trail. Different frames for head/middle/tail segments.
+
+5. **Trail Soft Particles** — Depth-based fade when trail ribbon intersects scene geometry. Requires depth texture access from the renderer.
+
+6. **Trail Custom Alignment** — Additional alignment modes beyond camera-facing: velocity-aligned, custom-axis-aligned (useful for ground decals, tire tracks).
