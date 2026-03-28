@@ -42,7 +42,11 @@ src/
 │       ├── particle-system-vertex-shader.glsl.ts
 │       ├── particle-system-fragment-shader.glsl.ts
 │       ├── instanced-particle-vertex-shader.glsl.ts
-│       └── instanced-particle-fragment-shader.glsl.ts
+│       ├── instanced-particle-fragment-shader.glsl.ts
+│       ├── trail-vertex-shader.glsl.ts
+│       ├── trail-fragment-shader.glsl.ts
+│       ├── mesh-particle-vertex-shader.glsl.ts
+│       └── mesh-particle-fragment-shader.glsl.ts
 ├── types/                                # Custom type declarations
 └── __tests__/                            # Jest test files
 ```
