@@ -15,6 +15,7 @@ const ParticleSystemVertexShader = `
   varying float vStartLifetime;
   varying float vRotation;
   varying float vStartFrame;
+  varying float vViewZ;
 
   #include <common>
   #include <logdepthbuf_pars_vertex>
@@ -29,6 +30,7 @@ const ParticleSystemVertexShader = `
 
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     gl_PointSize = size * (100.0 / length(mvPosition.xyz));
+    vViewZ = -mvPosition.z;
     gl_Position = projectionMatrix * mvPosition;
 
     #include <logdepthbuf_vertex>

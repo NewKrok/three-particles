@@ -22,6 +22,7 @@ Particle system for ThreeJS.
 *   GPU instancing renderer (`RendererType.INSTANCED`) — removes `gl_PointSize` hardware limit, ideal for large particles or high particle counts.
 *   Trail / Ribbon renderer (`RendererType.TRAIL`) — continuous ribbon trails behind particles with configurable width, opacity, and color tapering.
 *   Mesh particle renderer (`RendererType.MESH`) — render each particle as a 3D mesh (debris, gems, coins) using GPU instancing with full 3D rotation and simple directional lighting.
+*   Soft particles — depth-based alpha fade near opaque geometry, eliminating hard intersection lines.
 *   TypeDoc API documentation available.
 
 # Live Demo & Examples

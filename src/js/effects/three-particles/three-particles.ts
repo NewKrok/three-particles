@@ -202,6 +202,10 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
     transparent: true,
     depthTest: true,
     depthWrite: false,
+    softParticles: {
+      enabled: false,
+      intensity: 1.0,
+    },
   },
   velocityOverLifetime: {
     isActive: false,
@@ -833,6 +837,10 @@ export const createParticleSystem = (
   // Position attribute is special: Points uses 'position', instanced/mesh uses 'instanceOffset'
   const posAttr = useInstancedAttributes ? 'instanceOffset' : 'position';
 
+  const softParticlesEnabled = !!(
+    renderer.softParticles?.enabled && renderer.softParticles?.depthTexture
+  );
+
   const sharedUniforms: Record<string, { value: unknown }> = {
     elapsed: { value: 0.0 },
     map: { value: particleMap },
@@ -845,6 +853,14 @@ export const createParticleSystem = (
     discardBackgroundColor: { value: renderer.discardBackgroundColor },
     backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
     ...(useInstancing ? { viewportHeight: { value: 1.0 } } : {}),
+    softParticlesEnabled: { value: softParticlesEnabled },
+    softParticlesIntensity: {
+      value: Math.max(renderer.softParticles?.intensity ?? 1.0, 0.001),
+    },
+    sceneDepthTexture: {
+      value: renderer.softParticles?.depthTexture ?? null,
+    },
+    cameraNearFar: { value: new THREE.Vector2(0.1, 1000.0) },
   };
 
   const getVertexShader = () => {
@@ -1460,6 +1476,14 @@ export const createParticleSystem = (
         discardBackgroundColor: { value: renderer.discardBackgroundColor },
         backgroundColor: { value: renderer.backgroundColor },
         backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
+        softParticlesEnabled: { value: softParticlesEnabled },
+        softParticlesIntensity: {
+          value: Math.max(renderer.softParticles?.intensity ?? 1.0, 0.001),
+        },
+        sceneDepthTexture: {
+          value: renderer.softParticles?.depthTexture ?? null,
+        },
+        cameraNearFar: { value: new THREE.Vector2(0.1, 1000.0) },
       },
       vertexShader: TrailVertexShader,
       fragmentShader: TrailFragmentShader,
@@ -1481,6 +1505,17 @@ export const createParticleSystem = (
       camera: THREE.Camera
     ) => {
       camera.getWorldPosition(trailCameraPos);
+      if (
+        softParticlesEnabled &&
+        (camera as THREE.PerspectiveCamera).isPerspectiveCamera
+      ) {
+        const perspCam = camera as THREE.PerspectiveCamera;
+        const trailUniforms = (trailMaterial as THREE.ShaderMaterial).uniforms;
+        (trailUniforms.cameraNearFar.value as THREE.Vector2).set(
+          perspCam.near,
+          perspCam.far
+        );
+      }
     };
     generalData.trailCameraPosition = trailCameraPos;
 
@@ -1517,10 +1552,27 @@ export const createParticleSystem = (
       ? new THREE.Mesh(geometry, material)
       : new THREE.Points(geometry, material);
 
-  if (useInstancing) {
-    particleSystem.onBeforeRender = (glRenderer: THREE.WebGLRenderer) => {
-      const size = glRenderer.getSize(new THREE.Vector2());
-      sharedUniforms.viewportHeight.value = size.y * glRenderer.getPixelRatio();
+  if (useInstancing || softParticlesEnabled) {
+    particleSystem.onBeforeRender = (
+      glRenderer: THREE.WebGLRenderer,
+      _scene: THREE.Scene,
+      camera: THREE.Camera
+    ) => {
+      if (useInstancing) {
+        const size = glRenderer.getSize(new THREE.Vector2());
+        sharedUniforms.viewportHeight.value =
+          size.y * glRenderer.getPixelRatio();
+      }
+      if (
+        softParticlesEnabled &&
+        (camera as THREE.PerspectiveCamera).isPerspectiveCamera
+      ) {
+        const perspCam = camera as THREE.PerspectiveCamera;
+        (sharedUniforms.cameraNearFar.value as THREE.Vector2).set(
+          perspCam.near,
+          perspCam.far
+        );
+      }
     };
   }
 

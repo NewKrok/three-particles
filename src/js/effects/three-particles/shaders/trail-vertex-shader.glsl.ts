@@ -9,6 +9,7 @@ const TrailVertexShader = `
   varying float vAlpha;
   varying vec4 vColor;
   varying vec2 vUv;
+  varying float vViewZ;
 
   #include <common>
   #include <logdepthbuf_pars_vertex>
@@ -55,6 +56,7 @@ const TrailVertexShader = `
 
     vec3 offsetPos = position + perp * trailOffset * trailHalfWidth;
     vec4 mvPosition = modelViewMatrix * vec4(offsetPos, 1.0);
+    vViewZ = -mvPosition.z;
     gl_Position = projectionMatrix * mvPosition;
 
     #include <logdepthbuf_vertex>

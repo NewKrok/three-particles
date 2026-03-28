@@ -7,15 +7,25 @@ const ParticleSystemFragmentShader = `
   uniform bool discardBackgroundColor;
   uniform vec3 backgroundColor;
   uniform float backgroundColorTolerance;
+  uniform bool softParticlesEnabled;
+  uniform float softParticlesIntensity;
+  uniform sampler2D sceneDepthTexture;
+  uniform vec2 cameraNearFar;
 
   varying vec4 vColor;
   varying float vLifetime;
   varying float vStartLifetime;
   varying float vRotation;
   varying float vStartFrame;
+  varying float vViewZ;
 
   #include <common>
   #include <logdepthbuf_pars_fragment>
+
+  float linearizeDepth(float depthSample, float near, float far) {
+    float z_ndc = 2.0 * depthSample - 1.0;
+    return 2.0 * near * far / (far + near - z_ndc * (far - near));
+  }
 
   void main()
   {
@@ -64,7 +74,17 @@ const ParticleSystemFragmentShader = `
     gl_FragColor = gl_FragColor * rotatedTexture;
 
     if (discardBackgroundColor && abs(length(rotatedTexture.rgb - backgroundColor.rgb)) < backgroundColorTolerance) discard;
-    
+
+    if (softParticlesEnabled) {
+      vec2 screenUV = gl_FragCoord.xy / vec2(textureSize(sceneDepthTexture, 0));
+      float sceneDepthSample = texture2D(sceneDepthTexture, screenUV).r;
+      float sceneDepthLinear = linearizeDepth(sceneDepthSample, cameraNearFar.x, cameraNearFar.y);
+      float depthDiff = sceneDepthLinear - vViewZ;
+      float softFade = smoothstep(0.0, softParticlesIntensity, depthDiff);
+      gl_FragColor.a *= softFade;
+      if (gl_FragColor.a < 0.001) discard;
+    }
+
     #include <logdepthbuf_fragment>
   }
 `;

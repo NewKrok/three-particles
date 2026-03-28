@@ -1,6 +1,16 @@
 
 export const examples = [
   {
+    id: "soft-ground-fog",
+    title: "Soft Ground Fog",
+    description: "Low-lying fog particles that fade smoothly near the ground plane using depth-based soft particles — no hard clipping.",
+    tags: ["softParticles", "advanced"],
+    textureId: "SOFT_SMOKE",
+    softParticles: true,
+    softParticlesIntensity: 2.0,
+    config: {"duration":5,"looping":true,"startLifetime":{"min":3.0,"max":5.0},"startSpeed":{"min":0.05,"max":0.25},"startSize":{"min":4.0,"max":8.0},"startOpacity":0.8,"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":0.7,"g":0.75,"b":0.8},"max":{"r":0.85,"g":0.88,"b":0.92}},"maxParticles":50,"gravity":0.15,"emission":{"rateOverTime":10},"shape":{"shape":"BOX","box":{"scale":{"x":10,"y":2,"z":10},"emitFrom":"VOLUME"}},"transform":{"position":{"y":-1.5}},"renderer":{"blending":"THREE.AdditiveBlending","transparent":true,"depthTest":true,"depthWrite":false,"discardBackgroundColor":true,"backgroundColorTolerance":0.2,"backgroundColor":{"r":0,"g":0,"b":0}},"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.5,"percentage":0},{"x":0.3,"y":1.0},{"x":0.7,"y":1.0,"percentage":0.7},{"x":1,"y":0.8,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.15,"y":0.8},{"x":0.7,"y":0.7,"percentage":0.7},{"x":1,"y":0,"percentage":1}]}},"rotationOverLifetime":{"isActive":true,"min":-15,"max":15},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.15,"frequency":0.2,"octaves":2,"positionAmount":0.3}},
+  },
+  {
     id: "laser-ribbon",
     title: "Laser Ribbon",
     description: "Connected ribbon linking multiple particles into a continuous laser beam with color gradient.",

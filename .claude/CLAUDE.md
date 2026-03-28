@@ -295,6 +295,7 @@ npx typedoc               # Generate documentation
 | WebGPU compute support | ⬜ Planned |
 | Preset system | ⬜ Planned |
 | Mesh particle renderer (`RendererType.MESH`) | ✅ Complete |
+| Soft particles (depth-based fade near geometry) | ✅ Complete |
 
 ---
 
@@ -379,6 +380,4 @@ These should be implemented in a follow-up milestone:
 
 4. **Trail Texture Atlas / Sheet Animation** — Support texture atlases with frame selection along the trail. Different frames for head/middle/tail segments.
 
-5. **Trail Soft Particles** — Depth-based fade when trail ribbon intersects scene geometry. Requires depth texture access from the renderer.
-
-6. **Trail Custom Alignment** — Additional alignment modes beyond camera-facing: velocity-aligned, custom-axis-aligned (useful for ground decals, tire tracks).
+5. **Trail Custom Alignment** — Additional alignment modes beyond camera-facing: velocity-aligned, custom-axis-aligned (useful for ground decals, tire tracks).

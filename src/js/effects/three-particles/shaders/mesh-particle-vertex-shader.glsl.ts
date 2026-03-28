@@ -18,6 +18,7 @@ const MeshParticleVertexShader = `
   varying float vRotation;
   varying vec3 vNormal;
   varying vec2 vUv;
+  varying float vViewZ;
 
   #include <common>
   #include <logdepthbuf_pars_vertex>
@@ -45,6 +46,7 @@ const MeshParticleVertexShader = `
     vec3 worldPos = scaledPosition + instanceOffset;
 
     vec4 mvPosition = modelViewMatrix * vec4(worldPos, 1.0);
+    vViewZ = -mvPosition.z;
     gl_Position = projectionMatrix * mvPosition;
 
     // Transform normal by quaternion for lighting

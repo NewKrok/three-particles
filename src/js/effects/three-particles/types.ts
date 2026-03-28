@@ -667,6 +667,55 @@ export type Renderer = {
    * @see MeshConfig
    */
   mesh?: MeshConfig;
+
+  /**
+   * Soft particles configuration.
+   * When enabled, particles fade smoothly near opaque geometry instead of
+   * producing a hard intersection line. Requires a depth texture from a
+   * `WebGLRenderTarget`.
+   *
+   * @see SoftParticlesConfig
+   */
+  softParticles?: SoftParticlesConfig;
+};
+
+/**
+ * Configuration for soft (depth-faded) particles.
+ * When enabled, particles fade out smoothly near opaque geometry instead
+ * of producing a hard intersection line.
+ *
+ * Requires a depth texture from a `WebGLRenderTarget` with `DepthTexture`.
+ * If `depthTexture` is not provided, soft particles are automatically disabled
+ * regardless of the `enabled` flag.
+ *
+ * @property enabled - Whether soft particle fading is active. @default false
+ * @property intensity - Controls the fade distance in world units. Higher values
+ *   produce a wider fade zone. Typical range: 0.1 to 5.0. @default 1.0
+ * @property depthTexture - A `THREE.DepthTexture` attached to the render target
+ *   that contains the scene's depth pass. Must be updated every frame before
+ *   the particle system renders.
+ *
+ * @example
+ * // Create a render target with a depth texture
+ * const rt = new THREE.WebGLRenderTarget(width, height, {
+ *   depthTexture: new THREE.DepthTexture(width, height),
+ * });
+ *
+ * // Pass it to the particle system config
+ * const config = {
+ *   renderer: {
+ *     softParticles: {
+ *       enabled: true,
+ *       intensity: 1.5,
+ *       depthTexture: rt.depthTexture,
+ *     },
+ *   },
+ * };
+ */
+export type SoftParticlesConfig = {
+  enabled?: boolean;
+  intensity?: number;
+  depthTexture?: THREE.DepthTexture;
 };
 
 /**

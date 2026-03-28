@@ -108,6 +108,32 @@ function isMeshExample(example) {
   return getConfigRendererType(example) === "MESH";
 }
 
+function isSoftParticlesExample(example) {
+  return !!example.softParticles;
+}
+
+/**
+ * Set up soft particles scene: ground plane + depth render target.
+ * Returns { groundScene, renderTarget, groundMesh } or null if not a soft particles example.
+ */
+function setupSoftParticlesScene(renderer, camera, width, height) {
+  const pixelWidth = width * renderer.getPixelRatio();
+  const pixelHeight = height * renderer.getPixelRatio();
+
+  const renderTarget = new THREE.WebGLRenderTarget(pixelWidth, pixelHeight, {
+    depthTexture: new THREE.DepthTexture(pixelWidth, pixelHeight),
+  });
+
+  // Ground plane — positioned so particles visibly intersect it
+  const groundGeom = new THREE.PlaneGeometry(40, 40);
+  const groundMat = new THREE.MeshBasicMaterial({ color: 0x444444 });
+  const groundMesh = new THREE.Mesh(groundGeom, groundMat);
+  groundMesh.rotation.x = -Math.PI / 2;
+  groundMesh.position.y = -2.5;
+
+  return { renderTarget, groundMesh };
+}
+
 class LiveDemo {
   constructor(container, exampleData, rendererType = "POINTS") {
     this.container = container;
@@ -146,11 +172,29 @@ class LiveDemo {
     this.camera.position.set(0, 0, 15);
     this.camera.lookAt(0, 0, 0);
 
+    // Soft particles: angled camera + ground plane + depth render target
+    this.softParticlesSetup = null;
+    if (isSoftParticlesExample(this.data)) {
+      this.camera.position.set(0, 4, 12);
+      this.camera.lookAt(0, -2, 0);
+      const setup = setupSoftParticlesScene(this.renderer, this.camera, width, height);
+      this.softParticlesSetup = setup;
+      this.scene.add(setup.groundMesh);
+    }
+
     const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType);
     config.renderer = config.renderer || {};
     if (!isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
+    if (this.softParticlesSetup) {
+      config.renderer.softParticles = {
+        enabled: true,
+        intensity: this.data.softParticlesIntensity || 1.5,
+        depthTexture: this.softParticlesSetup.renderTarget.depthTexture,
+      };
+    }
+
     const system = createParticleSystem(config);
     this.scene.add(system.instance);
     this.particleSystem = system;
@@ -167,6 +211,17 @@ class LiveDemo {
       this.particleSystem.update(cycleData);
     } else {
       updateParticleSystems(cycleData);
+    }
+
+    // Soft particles: render depth pass first
+    if (this.softParticlesSetup) {
+      const { renderTarget } = this.softParticlesSetup;
+      // Hide particles during depth pass
+      this.particleSystem.instance.visible = false;
+      this.renderer.setRenderTarget(renderTarget);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(null);
+      this.particleSystem.instance.visible = true;
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -193,6 +248,9 @@ class LiveDemo {
   dispose() {
     if (this.animationId) cancelAnimationFrame(this.animationId);
     if (this.particleSystem) this.particleSystem.dispose();
+    if (this.softParticlesSetup) {
+      this.softParticlesSetup.renderTarget.dispose();
+    }
     if (this.renderer) {
       this.renderer.dispose();
     }
@@ -296,11 +354,29 @@ class ExpandedDemo {
     this.camera.position.set(0, 0, 15);
     this.camera.lookAt(0, 0, 0);
 
+    // Soft particles: angled camera + ground plane + depth render target
+    this.softParticlesSetup = null;
+    if (isSoftParticlesExample(this.data)) {
+      this.camera.position.set(0, 4, 12);
+      this.camera.lookAt(0, -2, 0);
+      const setup = setupSoftParticlesScene(this.renderer, this.camera, width, height);
+      this.softParticlesSetup = setup;
+      this.scene.add(setup.groundMesh);
+    }
+
     const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType);
     config.renderer = config.renderer || {};
     if (!isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
+    if (this.softParticlesSetup) {
+      config.renderer.softParticles = {
+        enabled: true,
+        intensity: this.data.softParticlesIntensity || 1.5,
+        depthTexture: this.softParticlesSetup.renderTarget.depthTexture,
+      };
+    }
+
     const system = createParticleSystem(config);
     this.scene.add(system.instance);
     this.particleSystem = system;
@@ -334,6 +410,16 @@ class ExpandedDemo {
       this.particleSystem.update(cycleData);
     } else {
       updateParticleSystems(cycleData);
+    }
+
+    // Soft particles: render depth pass first
+    if (this.softParticlesSetup) {
+      const { renderTarget } = this.softParticlesSetup;
+      this.particleSystem.instance.visible = false;
+      this.renderer.setRenderTarget(renderTarget);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(null);
+      this.particleSystem.instance.visible = true;
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -385,11 +471,20 @@ class ExpandedDemo {
     this.renderer.setSize(width, height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    // Resize soft particles render target
+    if (this.softParticlesSetup) {
+      const pixelWidth = width * this.renderer.getPixelRatio();
+      const pixelHeight = height * this.renderer.getPixelRatio();
+      this.softParticlesSetup.renderTarget.setSize(pixelWidth, pixelHeight);
+    }
   }
 
   dispose() {
     if (this.animationId) cancelAnimationFrame(this.animationId);
     if (this.particleSystem) this.particleSystem.dispose();
+    if (this.softParticlesSetup) {
+      this.softParticlesSetup.renderTarget.dispose();
+    }
     if (this.renderer) this.renderer.dispose();
   }
 }

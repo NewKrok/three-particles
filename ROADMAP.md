@@ -31,6 +31,7 @@
 | Trail / Ribbon Renderer (`RendererType.TRAIL`) | ✅ |
 | Trail improvements (smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons) | ✅ |
 | Mesh Particle Renderer (`RendererType.MESH`) | ✅ |
+| Soft Particles (depth-based fade near geometry) | ✅ |
 
 ---
 

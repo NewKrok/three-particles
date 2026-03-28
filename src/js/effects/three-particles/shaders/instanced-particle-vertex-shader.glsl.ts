@@ -18,6 +18,7 @@ const InstancedParticleVertexShader = `
   varying float vStartLifetime;
   varying float vStartFrame;
   varying float vRotation;
+  varying float vViewZ;
 
   #include <common>
   #include <logdepthbuf_pars_vertex>
@@ -52,6 +53,7 @@ const InstancedParticleVertexShader = `
     // identical to the Points renderer).
     mvPosition.xy += position.xy * perspectiveSize;
 
+    vViewZ = -mvPosition.z;
     gl_Position = projectionMatrix * mvPosition;
 
     // Pass UV for texture sampling (quad ranges from -0.5..0.5, map to 0..1).
