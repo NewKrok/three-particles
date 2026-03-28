@@ -1,6 +1,6 @@
 # @newkrok/three-particles — Full API Reference
 
-> Three.js-based high-performance particle system library (v2.11.0)
+> Three.js-based high-performance particle system library
 > License: MIT | Author: Istvan Krisztian Somoracz
 > Repository: https://github.com/NewKrok/three-particles
 

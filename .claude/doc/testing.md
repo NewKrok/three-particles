@@ -5,7 +5,7 @@
 - **Framework:** Jest 30.x with ts-jest ESM preset
 - **Test location:** `src/__tests__/*.test.ts`
 - **Coverage target:** ≥90% statement, ≥80% branch
-- **Current coverage:** ~87% statement
+- **Current coverage:** 99.5% statement, 97.8% branch (638 tests, 27 test suites)
 
 ---
 
@@ -39,17 +39,37 @@ Coverage reports are generated in `coverage/` (text + lcov format).
 
 ---
 
-## Existing Test Files
+## Existing Test Files (27 suites, 638 tests)
 
-| File | Lines | Tests | What it covers |
-|------|-------|-------|----------------|
-| `three-particles-utils.test.ts` | 835 | 55+ | Shape position/velocity for all 5 shapes, value calculation, bezier config |
-| `three-particles-modifiers.test.ts` | 440 | 63+ | All modifiers: linear/orbital velocity, size/opacity/color/rotation over lifetime, noise |
-| `three-particles-burst.test.ts` | 239 | 21 | Burst timing, cycles, intervals, probability, max particle limits |
-| `three-particles-rate-over-distance.test.ts` | 160 | 36+ | Distance emission, pause/resume, accumulation |
-| `three-particles-bezier.test.ts` | 85 | 7 | Bezier interpolation, caching, cache cleanup |
-| `three-particles-curves.test.ts` | 35 | 4 | Easing function lookup, custom function passthrough |
-| `three-particles.test.ts` | 15 | 1 | Basic smoke test for updateParticleSystems |
+| File | What it covers |
+|------|----------------|
+| `three-particles-utils.test.ts` | Shape position/velocity for all 5 shapes, value calculation, bezier config |
+| `three-particles-utils-extended.test.ts` | Extended utility edge cases |
+| `three-particles-modifiers.test.ts` | All modifiers: linear/orbital velocity, size/opacity/color/rotation over lifetime, noise |
+| `three-particles-modifiers-extended.test.ts` | Modifier edge cases and combinations |
+| `three-particles-burst.test.ts` | Burst timing, cycles, intervals, probability, max particle limits |
+| `three-particles-rate-over-distance.test.ts` | Distance emission, pause/resume, accumulation |
+| `three-particles-bezier.test.ts` | Bezier interpolation, caching, cache cleanup |
+| `three-particles-curves.test.ts` | Easing function lookup, custom function passthrough |
+| `three-particles.test.ts` | Basic smoke test for updateParticleSystems |
+| `three-particles-core.test.ts` | Core lifecycle, looping, disposal, timing |
+| `three-particles-lifecycle.test.ts` | Particle activation, expiration, deactivation |
+| `three-particles-edge-cases.test.ts` | Zero duration, zero maxParticles, rapid dispose |
+| `three-particles-noise-rotation-callbacks.test.ts` | Noise, rotation, onUpdate/onComplete callbacks |
+| `three-particles-texture.test.ts` | Texture sheet animation |
+| `three-particles-velocity.test.ts` | Velocity and gravity interactions |
+| `three-particles-world-space.test.ts` | World vs Local simulation space |
+| `three-particles-sub-emitters.test.ts` | Sub-emitter birth/death triggers |
+| `three-particles-forces.test.ts` | Force fields: point and directional |
+| `three-particles-forces-extended.test.ts` | Force field falloff and edge cases |
+| `three-particles-serialization.test.ts` | Config serialization/deserialization |
+| `three-particles-serialization-extended.test.ts` | Serialization edge cases |
+| `three-particles-instanced.test.ts` | RendererType.INSTANCED |
+| `three-particles-trail.test.ts` | RendererType.TRAIL, ribbon rendering |
+| `three-particles-mesh.test.ts` | RendererType.MESH, 3D mesh particles |
+| `three-particles-integration.test.ts` | Integration tests across modules |
+| `three-particles-advanced.test.ts` | Advanced scenarios and combinations |
+| `three-particles-coverage-gaps.test.ts` | Targeted coverage gap tests |
 
 ---
 
@@ -267,33 +287,19 @@ it("handles edge case")
 
 ---
 
-## Coverage Gap Areas (Priority)
+## Coverage Status
 
-### High Priority — Core System (`three-particles.ts`)
+Coverage is comprehensive (99.5% statement, 97.8% branch). All major areas are well covered:
 
-Currently only 1 smoke test for 1,400+ lines of code. Needs tests for:
+- Core system lifecycle, looping, disposal
+- All shape emitters and modifiers
+- Sub-emitters, force fields, serialization
+- All renderer types (Points, Instanced, Trail, Mesh)
+- Edge cases and integration scenarios
 
-- **Particle lifecycle:** activation → update → expiration → deactivation
-- **Multiple particle systems:** coordination, independent updates
-- **Disposal:** cleanup, memory release, system removal
-- **Looping:** system restart behavior
-- **Start delay:** delayed emission start
-- **Gravity:** velocity modification over time
-- **World vs Local space:** position handling differences
-- **Texture sheet animation:** frame progression
-- **onUpdate / onComplete callbacks:** invocation timing
-- **Rate over time emission:** particle count accuracy
-
-### Medium Priority
-
-- **Complex modifier combinations:** multiple modifiers active simultaneously
-- **Edge cases:** zero duration, zero maxParticles, rapid dispose
-- **Error conditions:** invalid configs, missing required fields
-
-### Low Priority
-
-- **Shader logic:** not unit testable (needs WebGL context), covered by visual testing
-- **Enum values:** implicitly tested through integration
+**Remaining low-priority gaps:**
+- Shader logic — not unit testable (needs WebGL context), covered by visual testing
+- A few edge branches in `three-particles.ts` (lines 72, 406, 1444, 1459, 2061)
 
 ---
 

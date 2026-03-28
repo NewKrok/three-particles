@@ -3,10 +3,12 @@
 </p>
 
 # THREE Particles
-[![Run Tests](https://github.com/NewKrok/three-particles/actions/workflows/test.yml/badge.svg)](https://github.com/NewKrok/three-particles/actions/workflows/test.yml)
-[![NPM Version](https://img.shields.io/npm/v/@newkrok/three-particles.svg)](https://www.npmjs.com/package/@newkrok/three-particles)
-[![NPM Downloads](https://img.shields.io/npm/dw/@newkrok/three-particles.svg)](https://www.npmjs.com/package/@newkrok/three-particles)
-[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@newkrok/three-particles)](https://bundlephobia.com/package/@newkrok/three-particles)
+[![npm](https://img.shields.io/npm/v/@newkrok/three-particles.svg)](https://www.npmjs.com/package/@newkrok/three-particles)
+[![downloads](https://img.shields.io/npm/dm/@newkrok/three-particles.svg)](https://www.npmjs.com/package/@newkrok/three-particles)
+[![CI](https://github.com/NewKrok/three-particles/actions/workflows/ci.yml/badge.svg)](https://github.com/NewKrok/three-particles/actions/workflows/ci.yml)
+[![gzip](https://img.shields.io/bundlephobia/minzip/@newkrok/three-particles)](https://bundlephobia.com/package/@newkrok/three-particles)
+[![license](https://img.shields.io/npm/l/@newkrok/three-particles.svg)](https://github.com/NewKrok/three-particles/blob/master/LICENSE)
+[![docs](https://img.shields.io/badge/docs-online-blue)](https://newkrok.github.io/three-particles/api/)
 
 Particle system for ThreeJS.
 

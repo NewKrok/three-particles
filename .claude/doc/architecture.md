@@ -46,6 +46,8 @@ src/js/effects/three-particles/
 ├── three-particles-bezier.ts   ← Custom Bezier curve evaluation + caching
 ├── three-particles-utils.ts    ← Shape generators, value resolution, texture
 ├── three-particles-enums.ts    ← SimulationSpace, Shape, EmitFrom, etc.
+├── three-particles-forces.ts   ← Force fields and attractors
+├── three-particles-serialization.ts ← Config save/load serialization
 ├── types.ts                    ← Complete TypeScript type definitions
 └── shaders/
     ├── particle-system-vertex-shader.glsl.ts       ← POINTS: position, size, color → GPU
@@ -69,6 +71,8 @@ index.ts
         ├─► three-particles-utils.ts
         │     ├─► three-particles-curves.ts
         │     └─► three-particles-bezier.ts
+        ├─► three-particles-forces.ts
+        ├─► three-particles-serialization.ts
         ├─► three-particles-enums.ts
         ├─► types.ts
         └─► shaders/*.glsl.ts

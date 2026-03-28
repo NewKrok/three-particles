@@ -2,7 +2,38 @@
 
 ## Overview
 
-This document defines the standard workflow for every development task in the three-particles project. Follow these steps to ensure consistent quality and up-to-date documentation.
+This document defines the standard workflow for every development task. The key principle: **Claude acts as an orchestrator**, delegating work to sub-agents to keep the main conversation context clean and focused.
+
+---
+
+## Agent Orchestration Pattern
+
+For non-trivial tasks, the main Claude session should act as a coordinator — not do everything inline. This prevents context saturation and keeps the conversation manageable.
+
+### When to delegate to sub-agents
+
+| Task type | Delegate? | Agent type |
+|-----------|-----------|------------|
+| Exploring codebase / finding files | Yes | `Explore` agent |
+| Implementing a feature or fix | Yes | `general-purpose` agent (with clear spec) |
+| Writing / updating tests | Yes | `general-purpose` agent |
+| Code review | Yes | `general-purpose` agent (review prompt) |
+| Simple file edits (< 3 files) | No | Do inline |
+| Running commands (lint/test/build) | No | Do inline |
+| Doc updates | No | Do inline |
+
+### How to orchestrate
+
+1. **Plan** — Understand the task, identify affected files, break into steps
+2. **Delegate** — Spawn sub-agents for implementation, testing, and review (parallelize where possible)
+3. **Verify** — Run lint/test/build in the main session
+4. **Finalize** — Update docs, commit
+
+### Sub-agent prompts should include:
+- Clear task description with acceptance criteria
+- Relevant file paths to focus on
+- Constraints (e.g., "don't modify the public API", "follow existing patterns")
+- What NOT to do (e.g., "don't update docs, I'll handle that")
 
 ---
 
@@ -11,7 +42,7 @@ This document defines the standard workflow for every development task in the th
 ### 1. Understand the Task
 
 - Read the issue/request carefully
-- Identify which files are affected (see [Quick Reference in CLAUDE.md](../CLAUDE.md#quick-reference-key-files-to-check))
+- Identify which files are affected (see [Quick Reference in CLAUDE.md](../CLAUDE.md#quick-reference-key-files))
 - Read the relevant source code before making changes
 
 ### 2. Implement with Tests
@@ -21,13 +52,13 @@ This document defines the standard workflow for every development task in the th
 - Write tests in `src/__tests__/` following the `*.test.ts` pattern
 - Test both happy paths and edge cases
 - For particle behavior changes, test with various configurations
-- Mock Three.js objects where needed (see existing tests for patterns)
+- Mock Three.js objects where needed (see [Testing Guide](testing.md))
 
 **Test guidelines:**
-- One test file per logical unit (e.g., `three-particles-bezier.test.ts`)
+- One test file per logical unit
 - Use descriptive test names: `it("should interpolate bezier curve at midpoint")`
-- Target: ≥90% statement coverage, ≥80% branch coverage
-- Run tests continuously during development: `npm run test:watch`
+- Target: >=90% statement coverage, >=80% branch coverage
+- Run tests continuously: `npm run test:watch`
 
 ### 3. Verify Locally (Pre-Commit Checks)
 
@@ -36,7 +67,7 @@ Before committing, run **all CI checks** locally:
 ```bash
 npm run lint          # ESLint — fix any issues
 npm test              # Jest — all tests must pass
-npm run build         # TypeScript + Webpack — must succeed
+npm run build         # tsup — must succeed
 ```
 
 **Do NOT commit if any of these fail.** Fix the issues first.
@@ -49,11 +80,9 @@ npm run benchmark           # Check for performance regressions
 
 ### 4. Code Review via Agent
 
-After completing the implementation, **launch a review agent** to check the work:
+After completing the implementation, **launch a review agent**:
 
 ```
-Spawn an Explore/general-purpose agent with this prompt:
-
 "Review the changes I just made. Check for:
 1. Code quality — naming, structure, consistency with existing patterns
 2. Type safety — proper TypeScript types, no `any`
@@ -72,19 +101,10 @@ Address any valid suggestions before committing.
 Use conventional commit format (enforced by commitlint):
 
 ```bash
-# Features
-git commit -m "feat: add sphere shell emission mode"
-
-# Bug fixes
-git commit -m "fix: correct particle opacity in world space"
-
-# Performance
-git commit -m "perf: reduce allocations in modifier loop"
-
-# Breaking changes
-git commit -m "feat!: redesign ParticleSystemConfig shape options
-
-BREAKING CHANGE: shape config is now nested under `emission.shape`"
+feat: add sphere shell emission mode
+fix: correct particle opacity in world space
+perf: reduce allocations in modifier loop
+feat!: redesign ParticleSystemConfig shape options
 ```
 
 Always add:
@@ -98,13 +118,23 @@ After every task, update these files if relevant:
 
 | File | When to Update |
 |------|---------------|
-| `.claude/CLAUDE.md` | New features, status changes, version bumps, new patterns |
+| `.claude/CLAUDE.md` | New features, structural changes, new patterns. **Also remove outdated info that is just noise.** |
 | `README.md` | User-facing API changes, new examples, new features |
 | `ROADMAP.md` | Feature completions, new planned items |
-| `CHANGELOG.md` | Notable changes (auto-generated for releases, but keep manual notes) |
+| `llms.txt` / `llms-full.txt` | Public API changes, new features, version bumps — these are the LLM-facing docs |
 | JSDoc in source | New/modified public APIs |
 
-**Keep these in sync with the actual state of the project.** Outdated docs are worse than no docs.
+**llms.txt maintenance:**
+- `llms.txt` — short overview + quick start, keep concise
+- `llms-full.txt` — complete API reference, all config options, all types
+- Update whenever the public API surface changes (new config options, new enums, new functions)
+- Keep version references up to date (or remove hardcoded versions)
+
+**CLAUDE.md maintenance:**
+- After completing a task, review if CLAUDE.md contains outdated info
+- Remove version numbers that will go stale (use `package.json` as source of truth)
+- Remove detailed info that's better served by doc/ files
+- Keep CLAUDE.md focused on: project structure, rules, commands, quick reference
 
 ### 7. Push and Verify
 
@@ -121,14 +151,14 @@ After pushing, verify that CI checks pass on the PR.
 ```
 [ ] Read and understand the task
 [ ] Read relevant source code
-[ ] Implement the changes
-[ ] Write/update tests
+[ ] Delegate implementation to sub-agent(s)
+[ ] Delegate test writing to sub-agent (or same agent)
 [ ] Run: npm run lint ✓
 [ ] Run: npm test ✓
 [ ] Run: npm run build ✓
 [ ] Launch review agent → address feedback
 [ ] Commit with conventional message
-[ ] Update docs (CLAUDE.md, README, ROADMAP, CHANGELOG)
+[ ] Update docs (CLAUDE.md, README, ROADMAP, llms.txt/llms-full.txt)
 [ ] Push and verify CI
 ```
 
@@ -148,13 +178,13 @@ After pushing, verify that CI checks pass on the PR.
 - Reuse objects via pools or pre-allocated arrays where possible
 
 ### Breaking Changes
-- Use `feat!:` or add `BREAKING CHANGE` footer — this triggers a major version bump
+- Use `feat!:` or add `BREAKING CHANGE` footer — triggers a major version bump
 - Update migration notes in CHANGELOG
-- Consider backward compatibility period if possible
+- Update `llms-full.txt` with migration info
 
 ### Adding New Enums/Types
 1. Add to `three-particles-enums.ts`
 2. Add type definitions to `types.ts` with JSDoc
 3. Implement in the appropriate source file
 4. Add tests
-5. Update CLAUDE.md if it adds a new category of functionality
+5. Update `llms-full.txt` if it's a public API addition
