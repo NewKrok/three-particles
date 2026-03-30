@@ -1726,6 +1726,39 @@ export type ParticleSystem = {
   pauseEmitter: () => void;
   dispose: () => void;
   update: (cycleData: CycleData) => void;
+  /**
+   * Updates the particle system configuration at runtime without recreating the system.
+   *
+   * System-level properties (gravity, force fields, noise, emission rates, color/size/opacity
+   * over lifetime curves) take effect immediately for all particles.
+   * Per-particle spawn properties (startColor, startSize, startSpeed, startLifetime, etc.)
+   * only affect newly emitted particles — already-alive particles retain their original values.
+   *
+   * @param config - A partial configuration object. Only the provided properties will be updated;
+   *   all other settings remain unchanged.
+   *
+   * @remarks
+   * Structural properties that are set at creation time cannot be changed at runtime:
+   * `maxParticles`, `renderer.rendererType`, `shape`, and `map` (texture).
+   * Passing these will update the internal config but have no visible effect since the
+   * geometry and material are pre-allocated.
+   *
+   * @example
+   * ```typescript
+   * const system = createParticleSystem(config);
+   *
+   * // Change wind direction in real time
+   * system.updateConfig({
+   *   forceFields: [{ type: ForceFieldType.DIRECTIONAL, direction: { x: 1, y: 0, z: 0 }, strength: 5 }],
+   * });
+   *
+   * // Gradually change color of new particles
+   * system.updateConfig({
+   *   startColor: { min: { r: 1, g: 0, b: 0 }, max: { r: 1, g: 0.5, b: 0 } },
+   * });
+   * ```
+   */
+  updateConfig: (config: Partial<ParticleSystemConfig>) => void;
 };
 
 /**

@@ -94,6 +94,31 @@ const _modifierParams = {
 };
 
 /**
+ * Converts a plain {x, y, z} object to a THREE.Vector3, using the fallback if undefined.
+ */
+const toVector3 = (
+  v: { x?: number; y?: number; z?: number } | undefined,
+  fallback: THREE.Vector3
+): THREE.Vector3 =>
+  v ? new THREE.Vector3(v.x ?? 0, v.y ?? 0, v.z ?? 0) : fallback.clone();
+
+/**
+ * Normalizes raw force field configs into the internal representation with THREE.Vector3 fields.
+ */
+const normalizeForceFields = (
+  rawForceFields: Array<ForceFieldConfig> | undefined
+): Array<NormalizedForceFieldConfig> =>
+  (rawForceFields ?? []).map((ff: ForceFieldConfig) => ({
+    isActive: ff.isActive ?? true,
+    type: ff.type ?? ForceFieldType.POINT,
+    position: toVector3(ff.position, new THREE.Vector3(0, 0, 0)),
+    direction: toVector3(ff.direction, new THREE.Vector3(0, 1, 0)).normalize(),
+    strength: ff.strength ?? 1,
+    range: Math.max(0, ff.range ?? Infinity),
+    falloff: ff.falloff ?? ForceFieldFalloff.LINEAR,
+  }));
+
+/**
  * Mapping of blending mode string identifiers to Three.js blending constants.
  *
  * Used for converting serialized particle system configurations (e.g., from JSON)
@@ -552,22 +577,8 @@ export const createParticleSystem = (
     forceFields: rawForceFields,
   } = normalizedConfig;
 
-  const toVector3 = (
-    v: { x?: number; y?: number; z?: number } | undefined,
-    fallback: THREE.Vector3
-  ) => (v ? new THREE.Vector3(v.x ?? 0, v.y ?? 0, v.z ?? 0) : fallback.clone());
-
-  const normalizedForceFields: Array<NormalizedForceFieldConfig> = (
-    rawForceFields ?? []
-  ).map((ff: ForceFieldConfig) => ({
-    isActive: ff.isActive ?? true,
-    type: ff.type ?? ForceFieldType.POINT,
-    position: toVector3(ff.position, new THREE.Vector3(0, 0, 0)),
-    direction: toVector3(ff.direction, new THREE.Vector3(0, 1, 0)).normalize(),
-    strength: ff.strength ?? 1,
-    range: Math.max(0, ff.range ?? Infinity),
-    falloff: ff.falloff ?? ForceFieldFalloff.LINEAR,
-  }));
+  const normalizedForceFields: Array<NormalizedForceFieldConfig> =
+    normalizeForceFields(rawForceFields);
 
   if (typeof renderer?.blending === 'string')
     renderer.blending = blendingMap[renderer.blending];
@@ -1727,12 +1738,68 @@ export const createParticleSystem = (
     }
   };
 
+  const updateConfig = (partialConfig: Partial<ParticleSystemConfig>) => {
+    // Deep-merge partial config into the live normalizedConfig
+    ObjectUtils.deepMerge(instanceData.normalizedConfig, partialConfig, {
+      applyToFirstObject: true,
+      skippedProperties: [],
+    });
+
+    const cfg = instanceData.normalizedConfig;
+
+    // Update instance-level cached scalars
+    if (partialConfig.gravity !== undefined) {
+      instanceData.gravity = cfg.gravity;
+      // Force gravityVelocity recalculation on next frame
+      generalData.lastWorldQuaternion.x = -99999;
+    }
+    if (partialConfig.duration !== undefined)
+      instanceData.duration = cfg.duration;
+    if (partialConfig.looping !== undefined) instanceData.looping = cfg.looping;
+    if (partialConfig.simulationSpace !== undefined)
+      instanceData.simulationSpace = cfg.simulationSpace;
+    if (partialConfig.emission !== undefined)
+      instanceData.emission = cfg.emission;
+
+    // Re-normalize force fields when changed
+    if (partialConfig.forceFields !== undefined) {
+      instanceData.normalizedForceFields = normalizeForceFields(
+        cfg.forceFields
+      );
+    }
+
+    // Re-initialize noise when changed
+    if (partialConfig.noise !== undefined) {
+      const n = cfg.noise;
+      generalData.noise = {
+        isActive: n.isActive,
+        strength: n.strength,
+        noisePower: 0.15 * n.strength,
+        positionAmount: n.positionAmount,
+        rotationAmount: n.rotationAmount,
+        sizeAmount: n.sizeAmount,
+        sampler: n.isActive
+          ? new FBM({
+              seed: Math.random(),
+              scale: n.frequency,
+              octaves: n.octaves,
+            })
+          : undefined,
+        offsets: n.useRandomOffset
+          ? generalData.noise.offsets ??
+            Array.from({ length: maxParticles }, () => Math.random() * 100)
+          : undefined,
+      };
+    }
+  };
+
   return {
     instance: wrapper || particleSystem,
     resumeEmitter,
     pauseEmitter,
     dispose,
     update,
+    updateConfig,
   };
 };
 

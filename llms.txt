@@ -50,6 +50,7 @@ function animate() {
 - `resumeEmitter()` — Resume particle emission
 - `dispose()` — Clean up and free resources
 - `update(cycleData)` — Update this specific system only
+- `updateConfig(config)` — Update configuration at runtime without recreating the system
 
 ## Key Configuration Properties
 

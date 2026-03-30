@@ -64,12 +64,18 @@ const effect = {
   // Your effect configuration here
   // It can be empty to use default settings
 };
-const { instance } = createParticleSystem(effect);
-scene.add(instance);
+const system = createParticleSystem(effect);
+scene.add(system.instance);
 
 // Update the particle system in your animation loop
 // Pass the current time, delta time, and elapsed time
 updateParticleSystems({now, delta, elapsed});
+
+// Update configuration at runtime without recreating the system
+system.updateConfig({
+  gravity: -9.8,
+  forceFields: [{ type: 'DIRECTIONAL', direction: { x: 1, y: 0, z: 0 }, strength: 5 }],
+});
 ```
 
 # Usage with React Three Fiber
