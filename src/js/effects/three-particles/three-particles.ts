@@ -1972,23 +1972,25 @@ const updateParticleSystemInstance = (
   // Transform force field positions/directions into local space once per frame
   // (particle positions in the buffer are in local space, so force fields must match)
   if (hasForceFields) {
-    while (_localForceFields.length < normalizedForceFields.length) {
-      _localForceFields.push({
-        isActive: true,
-        type: ForceFieldType.POINT,
-        position: new THREE.Vector3(),
-        direction: new THREE.Vector3(),
-        strength: 0,
-        range: 0,
-        falloff: ForceFieldFalloff.LINEAR,
-      });
-    }
-
     _inverseQuat.copy(worldQuaternion).invert();
+
+    _localForceFields.length = normalizedForceFields.length;
 
     for (let i = 0; i < normalizedForceFields.length; i++) {
       const src = normalizedForceFields[i];
-      const dst = _localForceFields[i];
+      let dst = _localForceFields[i];
+      if (!dst) {
+        dst = {
+          isActive: true,
+          type: ForceFieldType.POINT,
+          position: new THREE.Vector3(),
+          direction: new THREE.Vector3(),
+          strength: 0,
+          range: 0,
+          falloff: ForceFieldFalloff.LINEAR,
+        };
+        _localForceFields[i] = dst;
+      }
       dst.isActive = src.isActive;
       dst.type = src.type;
       dst.strength = src.strength;
