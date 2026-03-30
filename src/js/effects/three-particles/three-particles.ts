@@ -1147,14 +1147,14 @@ export const createParticleSystem = (
     generalData.startValues.startColorB[particleIndex] =
       aColorB.array[particleIndex];
 
-    aStartFrame.array[particleIndex] =
-      normalizedConfig.textureSheetAnimation.startFrame
-        ? calculateValue(
-            generalData.particleSystemId,
-            normalizedConfig.textureSheetAnimation.startFrame,
-            0
-          )
-        : 0;
+    aStartFrame.array[particleIndex] = normalizedConfig.textureSheetAnimation
+      .startFrame
+      ? calculateValue(
+          generalData.particleSystemId,
+          normalizedConfig.textureSheetAnimation.startFrame,
+          0
+        )
+      : 0;
     aStartFrame.needsUpdate = true;
 
     aStartLifetime.array[particleIndex] =
@@ -1788,8 +1788,8 @@ export const createParticleSystem = (
             })
           : undefined,
         offsets: n.useRandomOffset
-          ? generalData.noise.offsets ??
-            Array.from({ length: maxParticles }, () => Math.random() * 100)
+          ? (generalData.noise.offsets ??
+            Array.from({ length: maxParticles }, () => Math.random() * 100))
           : undefined,
       };
     }

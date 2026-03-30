@@ -168,7 +168,10 @@ describe('integration — updateConfig force field position effects', () => {
     let activeIdx = 0;
     for (let i = 0; i < isActiveArr.length; i++) {
       if (isActiveArr[i]) {
-        if (activeIdx < xBefore.length && posArr[i * 3] > xBefore[activeIdx] + 0.1) {
+        if (
+          activeIdx < xBefore.length &&
+          posArr[i * 3] > xBefore[activeIdx] + 0.1
+        ) {
           movedCount++;
         }
         activeIdx++;
