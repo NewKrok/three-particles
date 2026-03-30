@@ -67,6 +67,7 @@ function animate() {
 | `resumeEmitter()` | `() => void` | Resume emitting particles |
 | `dispose()` | `() => void` | Destroy system, free resources |
 | `update(cycleData)` | `(CycleData) => void` | Update this system individually |
+| `updateConfig(config)` | `(Partial<ParticleSystemConfig>) => void` | Update configuration at runtime without recreating the system. System-level properties (gravity, force fields, noise, emission, color/size/opacity over lifetime) take effect immediately. Per-particle spawn properties (startColor, startSize, etc.) affect only newly emitted particles. |
 
 ---
 

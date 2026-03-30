@@ -138,7 +138,7 @@ Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into 
 
 ## Project Status
 
-Completed: Core system, all shape emitters, lifetime modifiers, noise, burst/distance emission, texture sheet animation, world/local space, sub-emitters, force fields, GPU instancing, trail renderer (with smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons), mesh renderer, soft particles, serialization, TypeDoc, visual editor, examples page, CI/CD, benchmark suite, React Three Fiber docs, llms.txt.
+Completed: Core system, all shape emitters, lifetime modifiers, noise, burst/distance emission, texture sheet animation, world/local space, sub-emitters, force fields, GPU instancing, trail renderer (with smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons), mesh renderer, soft particles, serialization, TypeDoc, visual editor, examples page, CI/CD, benchmark suite, React Three Fiber docs, llms.txt, real-time config updates (`updateConfig`).
 
 **Planned:** Trail Phase 2 (UV texture modes, UV scrolling, width by speed), WebGPU compute, preset system.
 

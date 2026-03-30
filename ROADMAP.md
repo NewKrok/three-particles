@@ -32,6 +32,7 @@
 | Trail improvements (smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons) | ✅ |
 | Mesh Particle Renderer (`RendererType.MESH`) | ✅ |
 | Soft Particles (depth-based fade near geometry) | ✅ |
+| Real-time config updates (`updateConfig`) | ✅ |
 
 ---
 
