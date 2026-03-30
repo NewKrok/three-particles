@@ -1123,20 +1123,21 @@ export const createParticleSystem = (
       generalData.noise.offsets[particleIndex] = Math.random() * 100;
 
     const colorRandomRatio = Math.random();
+    const cfgStartColor = normalizedConfig.startColor;
 
     aColorR.array[particleIndex] =
-      startColor.min!.r! +
-      colorRandomRatio * (startColor.max!.r! - startColor.min!.r!);
+      cfgStartColor.min!.r! +
+      colorRandomRatio * (cfgStartColor.max!.r! - cfgStartColor.min!.r!);
     aColorR.needsUpdate = true;
 
     aColorG.array[particleIndex] =
-      startColor.min!.g! +
-      colorRandomRatio * (startColor.max!.g! - startColor.min!.g!);
+      cfgStartColor.min!.g! +
+      colorRandomRatio * (cfgStartColor.max!.g! - cfgStartColor.min!.g!);
     aColorG.needsUpdate = true;
 
     aColorB.array[particleIndex] =
-      startColor.min!.b! +
-      colorRandomRatio * (startColor.max!.b! - startColor.min!.b!);
+      cfgStartColor.min!.b! +
+      colorRandomRatio * (cfgStartColor.max!.b! - cfgStartColor.min!.b!);
     aColorB.needsUpdate = true;
 
     generalData.startValues.startColorR[particleIndex] =
@@ -1146,26 +1147,27 @@ export const createParticleSystem = (
     generalData.startValues.startColorB[particleIndex] =
       aColorB.array[particleIndex];
 
-    aStartFrame.array[particleIndex] = textureSheetAnimation.startFrame
-      ? calculateValue(
-          generalData.particleSystemId,
-          textureSheetAnimation.startFrame,
-          0
-        )
-      : 0;
+    aStartFrame.array[particleIndex] =
+      normalizedConfig.textureSheetAnimation.startFrame
+        ? calculateValue(
+            generalData.particleSystemId,
+            normalizedConfig.textureSheetAnimation.startFrame,
+            0
+          )
+        : 0;
     aStartFrame.needsUpdate = true;
 
     aStartLifetime.array[particleIndex] =
       calculateValue(
         generalData.particleSystemId,
-        startLifetime,
+        normalizedConfig.startLifetime,
         generalData.normalizedLifetimePercentage
       ) * 1000;
     aStartLifetime.needsUpdate = true;
 
     generalData.startValues.startSize[particleIndex] = calculateValue(
       generalData.particleSystemId,
-      startSize,
+      normalizedConfig.startSize,
       generalData.normalizedLifetimePercentage
     );
     aSize.array[particleIndex] =
@@ -1174,7 +1176,7 @@ export const createParticleSystem = (
 
     generalData.startValues.startOpacity[particleIndex] = calculateValue(
       generalData.particleSystemId,
-      startOpacity,
+      normalizedConfig.startOpacity,
       generalData.normalizedLifetimePercentage
     );
     aColorA.array[particleIndex] =
@@ -1183,7 +1185,7 @@ export const createParticleSystem = (
 
     aRotation.array[particleIndex] = calculateValue(
       generalData.particleSystemId,
-      startRotation,
+      normalizedConfig.startRotation,
       generalData.normalizedLifetimePercentage
     );
     aRotation.needsUpdate = true;
@@ -1209,8 +1211,8 @@ export const createParticleSystem = (
 
     calculatePositionAndVelocity(
       generalData,
-      shape,
-      startSpeed,
+      normalizedConfig.shape,
+      normalizedConfig.startSpeed,
       startPositions[particleIndex],
       velocities[particleIndex]
     );

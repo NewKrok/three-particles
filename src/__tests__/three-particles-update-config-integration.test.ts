@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   ForceFieldType,
+  Shape,
   SimulationSpace,
 } from '../js/effects/three-particles/three-particles-enums.js';
 import {
@@ -520,6 +521,261 @@ describe('integration — rapid successive updateConfig calls', () => {
 
     // System should still be functional
     expect(countActive(ps)).toBeGreaterThan(0);
+
+    ps.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: updateConfig startColor verified with actual color values
+// ---------------------------------------------------------------------------
+
+describe('integration — updateConfig startColor with value verification', () => {
+  it('should spawn new particles with updated startColor after old ones expire', () => {
+    const { ps, step } = createTestSystem({
+      startLifetime: 0.2, // 200ms — particles die quickly
+      startColor: {
+        min: { r: 1, g: 1, b: 1 },
+        max: { r: 1, g: 1, b: 1 },
+      },
+    });
+
+    // Emit white particles
+    step(100);
+    const attrs = getAttributes(ps);
+    const isActiveArr = attrs.isActive.array;
+    const colorGArr = attrs.colorG.array as Float32Array;
+
+    // Verify all active particles are white (G=1)
+    for (let i = 0; i < isActiveArr.length; i++) {
+      if (isActiveArr[i]) {
+        expect(colorGArr[i]).toBeCloseTo(1, 1);
+      }
+    }
+
+    // Change to pure red (G=0)
+    ps.updateConfig({
+      startColor: {
+        min: { r: 1, g: 0, b: 0 },
+        max: { r: 1, g: 0, b: 0 },
+      },
+    });
+
+    // Wait for old particles to die (200ms lifetime) and new ones to spawn
+    step(500, 400);
+    step(800, 300);
+
+    // All active particles should now be red (G=0)
+    let allRed = true;
+    let activeCount = 0;
+    for (let i = 0; i < isActiveArr.length; i++) {
+      if (isActiveArr[i]) {
+        activeCount++;
+        if (colorGArr[i] > 0.01) allRed = false;
+      }
+    }
+    expect(activeCount).toBeGreaterThan(0);
+    expect(allRed).toBe(true);
+
+    ps.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: updateConfig startSize verified with actual size values
+// ---------------------------------------------------------------------------
+
+describe('integration — updateConfig startSize with value verification', () => {
+  it('should spawn new particles with updated startSize', () => {
+    const { ps, step } = createTestSystem({
+      startLifetime: 0.2,
+      startSize: 1,
+    });
+
+    // Emit size-1 particles
+    step(100);
+    const attrs = getAttributes(ps);
+    const sizeArr = attrs.size.array as Float32Array;
+    const isActiveArr = attrs.isActive.array;
+
+    for (let i = 0; i < isActiveArr.length; i++) {
+      if (isActiveArr[i]) {
+        expect(sizeArr[i]).toBeCloseTo(1, 1);
+      }
+    }
+
+    // Change to size 5
+    ps.updateConfig({ startSize: 5 });
+
+    // Wait for old particles to die and new ones to spawn
+    step(500, 400);
+    step(800, 300);
+
+    let allLarge = true;
+    let activeCount = 0;
+    for (let i = 0; i < isActiveArr.length; i++) {
+      if (isActiveArr[i]) {
+        activeCount++;
+        if (sizeArr[i] < 4) allLarge = false;
+      }
+    }
+    expect(activeCount).toBeGreaterThan(0);
+    expect(allLarge).toBe(true);
+
+    ps.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: updateConfig startSpeed verified with position spread
+// ---------------------------------------------------------------------------
+
+describe('integration — updateConfig startSpeed with position verification', () => {
+  it('should spawn faster particles after startSpeed increase', () => {
+    const { ps, step } = createTestSystem({
+      startLifetime: 1,
+      startSpeed: 0.1,
+      gravity: 0,
+    });
+
+    // Emit slow particles
+    step(100);
+    step(300, 200);
+
+    const attrs = getAttributes(ps);
+    const posArr = attrs.position.array as Float32Array;
+    const isActiveArr = attrs.isActive.array;
+
+    // Record max distance from origin for slow particles
+    let maxDistSlow = 0;
+    for (let i = 0; i < isActiveArr.length; i++) {
+      if (isActiveArr[i]) {
+        const px = posArr[i * 3],
+          py = posArr[i * 3 + 1],
+          pz = posArr[i * 3 + 2];
+        maxDistSlow = Math.max(
+          maxDistSlow,
+          Math.sqrt(px * px + py * py + pz * pz)
+        );
+      }
+    }
+
+    // Change to very fast particles
+    ps.updateConfig({ startSpeed: 50 });
+
+    // Emit fast particles
+    step(600, 300);
+    step(1000, 400);
+
+    let maxDistFast = 0;
+    for (let i = 0; i < isActiveArr.length; i++) {
+      if (isActiveArr[i]) {
+        const px = posArr[i * 3],
+          py = posArr[i * 3 + 1],
+          pz = posArr[i * 3 + 2];
+        maxDistFast = Math.max(
+          maxDistFast,
+          Math.sqrt(px * px + py * py + pz * pz)
+        );
+      }
+    }
+
+    expect(maxDistFast).toBeGreaterThan(maxDistSlow * 2);
+
+    ps.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: updateConfig startLifetime verified
+// ---------------------------------------------------------------------------
+
+describe('integration — updateConfig startLifetime', () => {
+  it('should spawn particles with updated lifetime', () => {
+    const { ps, step } = createTestSystem({
+      startLifetime: 0.1, // very short: 100ms
+      emission: { rateOverTime: 50, rateOverDistance: 0 },
+    });
+
+    // Emit short-lived particles
+    step(50);
+    step(200, 150);
+    // After 200ms, all 100ms-lifetime particles should be dead except very recent
+    const countShort = countActive(ps);
+
+    // Change to long-lived particles
+    ps.updateConfig({ startLifetime: 10 });
+
+    // Emit long-lived particles
+    step(400, 200);
+    step(700, 300);
+    step(1200, 500);
+    const countLong = countActive(ps);
+
+    // With 10s lifetime, particles accumulate instead of dying
+    expect(countLong).toBeGreaterThan(countShort);
+
+    ps.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: updateConfig shape change
+// ---------------------------------------------------------------------------
+
+describe('integration — updateConfig shape change', () => {
+  it('should use updated shape for new particles', () => {
+    const { ps, step } = createTestSystem({
+      startLifetime: 0.2,
+      startSpeed: 0,
+      gravity: 0,
+      shape: {
+        shape: Shape.SPHERE,
+        sphere: { radius: 0.01, radiusThickness: 1, arc: 360 },
+      },
+    });
+
+    // Emit particles from tiny sphere — all near origin
+    step(100);
+    const attrs = getAttributes(ps);
+    const posArr = attrs.position.array as Float32Array;
+    const isActiveArr = attrs.isActive.array;
+
+    let maxDist1 = 0;
+    for (let i = 0; i < isActiveArr.length; i++) {
+      if (isActiveArr[i]) {
+        const px = posArr[i * 3],
+          py = posArr[i * 3 + 1],
+          pz = posArr[i * 3 + 2];
+        maxDist1 = Math.max(maxDist1, Math.sqrt(px * px + py * py + pz * pz));
+      }
+    }
+    expect(maxDist1).toBeLessThan(0.1);
+
+    // Change to large sphere
+    ps.updateConfig({
+      shape: {
+        shape: Shape.SPHERE,
+        sphere: { radius: 10, radiusThickness: 1, arc: 360 },
+      },
+    });
+
+    // Wait for old particles to die and new ones to spawn from large sphere
+    step(500, 400);
+    step(800, 300);
+
+    let maxDist2 = 0;
+    for (let i = 0; i < isActiveArr.length; i++) {
+      if (isActiveArr[i]) {
+        const px = posArr[i * 3],
+          py = posArr[i * 3 + 1],
+          pz = posArr[i * 3 + 2];
+        maxDist2 = Math.max(maxDist2, Math.sqrt(px * px + py * py + pz * pz));
+      }
+    }
+
+    // New particles should be spread across a much larger area
+    expect(maxDist2).toBeGreaterThan(1);
 
     ps.dispose();
   });
