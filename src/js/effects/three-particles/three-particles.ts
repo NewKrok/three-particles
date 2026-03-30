@@ -78,6 +78,11 @@ let createdParticleSystems: Array<ParticleSystemInstance> = [];
 // Pre-allocated objects for updateParticleSystemInstance to avoid GC pressure
 const _subEmitterPosition = new THREE.Vector3();
 const _lastWorldPositionSnapshot = new THREE.Vector3();
+// Force field local-space conversion helpers (reused across frames)
+const _localForceFieldPos = new THREE.Vector3();
+const _localForceFieldDir = new THREE.Vector3();
+const _inverseQuat = new THREE.Quaternion();
+let _localForceFields: Array<NormalizedForceFieldConfig> = [];
 // Trail ribbon helpers (reused across frames to avoid allocations)
 const _trailDir = new THREE.Vector3();
 const _trailPerp = new THREE.Vector3();
@@ -1964,6 +1969,42 @@ const updateParticleSystemInstance = (
     particleSystem.worldToLocal(gravityVelocity);
   }
 
+  // Transform force field positions/directions into local space once per frame
+  // (particle positions in the buffer are in local space, so force fields must match)
+  if (hasForceFields) {
+    while (_localForceFields.length < normalizedForceFields.length) {
+      _localForceFields.push({
+        isActive: true,
+        type: ForceFieldType.POINT,
+        position: new THREE.Vector3(),
+        direction: new THREE.Vector3(),
+        strength: 0,
+        range: 0,
+        falloff: ForceFieldFalloff.LINEAR,
+      });
+    }
+
+    _inverseQuat.copy(worldQuaternion).invert();
+
+    for (let i = 0; i < normalizedForceFields.length; i++) {
+      const src = normalizedForceFields[i];
+      const dst = _localForceFields[i];
+      dst.isActive = src.isActive;
+      dst.type = src.type;
+      dst.strength = src.strength;
+      dst.range = src.range;
+      dst.falloff = src.falloff;
+
+      _localForceFieldPos.copy(src.position);
+      particleSystem.worldToLocal(_localForceFieldPos);
+      dst.position.copy(_localForceFieldPos);
+
+      _localForceFieldDir.copy(src.direction);
+      _localForceFieldDir.applyQuaternion(_inverseQuat);
+      dst.direction.copy(_localForceFieldDir);
+    }
+  }
+
   const creationTimes = generalData.creationTimes;
   const isActiveArr = ma.isActive.array;
   const startLifetimeArr = ma.startLifetime.array;
@@ -1995,7 +2036,7 @@ const updateParticleSystemInstance = (
         if (hasForceFields) {
           applyForceFields({
             particleSystemId: generalData.particleSystemId,
-            forceFields: normalizedForceFields,
+            forceFields: _localForceFields,
             velocity,
             positionArr,
             positionIndex: index * 3,
