@@ -323,8 +323,8 @@ describe('integration — multiple systems with independent config updates', () 
     expect(countActive(ps1)).toBeGreaterThan(0);
     expect(countActive(ps2)).toBeGreaterThan(0);
 
-    // Update only ps1 with downward gravity
-    ps1.updateConfig({ gravity: -100 });
+    // Update only ps1 with downward gravity (positive = downward in this engine)
+    ps1.updateConfig({ gravity: 100 });
     // ps2 stays at gravity: 0
 
     // Step both via global updater
