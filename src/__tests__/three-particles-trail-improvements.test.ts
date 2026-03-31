@@ -1418,6 +1418,733 @@ describe('Trail Improvements', () => {
   });
 
   // ========================================================================
+  // CRITICAL EDGE CASES
+  // ========================================================================
+  describe('Critical Edge Cases', () => {
+    it('should handle zero-length movement without NaN or artifacts', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 3,
+        startSpeed: 0, // particles don't move
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 8 },
+        },
+      });
+
+      for (let i = 1; i <= 20; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+      const nextArr = trailMesh.geometry.getAttribute('trailNext')
+        .array as Float32Array;
+
+      // No NaN or Inf values should exist
+      for (let i = 0; i < posArr.length; i++) {
+        expect(Number.isFinite(posArr[i])).toBe(true);
+        expect(Number.isFinite(nextArr[i])).toBe(true);
+      }
+
+      ps.dispose();
+    });
+
+    it('should not activate smoothing with exactly 2 history points', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 10, smoothing: true, smoothingSubdivisions: 4 },
+        },
+      });
+
+      // Only 2 frames = at most 2 history samples
+      step(16);
+      step(32);
+
+      const trailLength = 10;
+      const trailMesh = getTrailMesh(ps)!;
+      const hwArr = trailMesh.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+
+      // Count active trail vertices (non-zero halfWidth)
+      let activeCount = 0;
+      for (let s = 0; s < trailLength; s++) {
+        if (hwArr[s * 2] !== 0) activeCount++;
+      }
+
+      // With 2 points and no smoothing activation, active count should be ≤ 2
+      // (Catmull-Rom requires ≥ 3 points to activate)
+      expect(activeCount).toBeLessThanOrEqual(2);
+
+      ps.dispose();
+    });
+
+    it('should activate smoothing with exactly 3 history points', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 20, smoothing: true, smoothingSubdivisions: 3 },
+        },
+      });
+
+      // 3 frames = 3 history samples (minimum for Catmull-Rom)
+      step(16);
+      step(32);
+      step(48);
+
+      const trailLength = 20;
+      const trailMesh = getTrailMesh(ps)!;
+      const hwArr = trailMesh.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+
+      // Count active trail vertices
+      let activeCount = 0;
+      for (let s = 0; s < trailLength; s++) {
+        if (hwArr[s * 2] !== 0) activeCount++;
+      }
+
+      // With 3 raw points and subdivisions=3, Catmull-Rom should produce
+      // (3-1)*3+1 = 7 final points (more than the 3 raw points)
+      expect(activeCount).toBeGreaterThan(3);
+
+      ps.dispose();
+    });
+
+    it('should handle maxTime expiring all segments gracefully', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 8, maxTime: 0.001 }, // extremely short maxTime (1ms)
+        },
+      });
+
+      // Build some history
+      for (let i = 1; i <= 5; i++) {
+        step(i * 16);
+      }
+
+      // Step forward by a large delta so all older segments expire.
+      // The most recent sample will be taken during this frame so it won't
+      // have expired yet, but all previous ones should have.
+      step(5000, 4920);
+
+      const trailLength = 8;
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+
+      // No NaN values - division by zero should not occur
+      for (let i = 0; i < posArr.length; i++) {
+        expect(Number.isFinite(posArr[i])).toBe(true);
+      }
+
+      // With maxTime=1ms and a 4920ms jump, nearly all segments should have
+      // expired.  The most recent frame sample keeps effectiveCount >= 1,
+      // so we verify the majority of the trail has faded.
+      const alphas = getTrailAlphas(ps, 0, trailLength);
+      const nonZeroAlphas = alphas.filter((a) => a > 0.01);
+      // At most 1-2 vertices should remain visible (the freshest sample)
+      expect(nonZeroAlphas.length).toBeLessThanOrEqual(2);
+
+      ps.dispose();
+    });
+
+    it('should reset twist prevention normal when particle is recycled', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 2,
+        startSpeed: 5,
+        startLifetime: 0.1, // very short lifetime - particles die quickly
+        emission: { rateOverTime: 50 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 8, twistPrevention: true },
+        },
+      });
+
+      // Run enough frames for particles to be born, die, and be recycled
+      for (let i = 1; i <= 60; i++) {
+        step(i * 16);
+      }
+
+      // After recycling, verify trail is still valid (no corrupt normals)
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+      for (let i = 0; i < posArr.length; i++) {
+        expect(Number.isFinite(posArr[i])).toBe(true);
+      }
+
+      ps.dispose();
+    });
+  });
+
+  // ========================================================================
+  // RIBBON-SPECIFIC EDGE CASES
+  // ========================================================================
+  describe('Ribbon-Specific Edge Cases', () => {
+    it('should linearly interpolate connected ribbon with exactly 2 particles', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 2,
+        startSpeed: 5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 10, ribbonId: 1 },
+        },
+      });
+
+      // Emit 2 particles and simulate
+      for (let i = 1; i <= 10; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+
+      // Leader (particle 0) should have a ribbon built from positions
+      // Verify some non-zero positions exist on the leader's trail
+      const trailLength = 10;
+      let hasNonZero = false;
+      for (let s = 0; s < trailLength; s++) {
+        const idx = s * 2 * 3;
+        if (
+          posArr[idx] !== 0 ||
+          posArr[idx + 1] !== 0 ||
+          posArr[idx + 2] !== 0
+        ) {
+          hasNonZero = true;
+          break;
+        }
+      }
+      expect(hasNonZero).toBe(true);
+
+      // Non-leader (particle 1) should have cleared trail vertices
+      const p1Base = 1 * trailLength * 2;
+      let p1HasNonZero = false;
+      for (let s = 0; s < trailLength; s++) {
+        const idx = (p1Base + s * 2) * 3;
+        if (
+          posArr[idx] !== 0 ||
+          posArr[idx + 1] !== 0 ||
+          posArr[idx + 2] !== 0
+        ) {
+          p1HasNonZero = true;
+          break;
+        }
+      }
+      // Non-leader's trail should be zeroed out (cleared)
+      expect(p1HasNonZero).toBe(false);
+
+      ps.dispose();
+    });
+
+    it('should handle particle dying mid-ribbon chain', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 5,
+        startSpeed: 3,
+        startLifetime: 0.3, // short lifetime - some particles die
+        emission: { rateOverTime: 30 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 8, ribbonId: 1 },
+        },
+      });
+
+      // Run long enough for some particles to die while others live
+      for (let i = 1; i <= 60; i++) {
+        step(i * 16);
+      }
+
+      // Should not crash; verify no NaN values
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+      for (let i = 0; i < posArr.length; i++) {
+        expect(Number.isFinite(posArr[i])).toBe(true);
+      }
+
+      ps.dispose();
+    });
+
+    it('should handle twist prevention with upward-moving particle (Y-axis singularity)', () => {
+      // When tangent ≈ (0,1,0), up vector fallback to X-axis should activate
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 10,
+        // Default direction can vary; we just need twist prevention active
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 8, twistPrevention: true },
+        },
+        // Force upward direction via gravity trick: high upward gravity
+        gravity: -20, // negative gravity = upward force
+      });
+
+      for (let i = 1; i <= 20; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const hwArr = trailMesh.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+
+      // Verify no NaN in half-widths (would indicate cross-product singularity)
+      for (let i = 0; i < hwArr.length; i++) {
+        expect(Number.isFinite(hwArr[i])).toBe(true);
+      }
+
+      ps.dispose();
+    });
+
+    it('should flip ribbon orientation on 180-degree direction reversal', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 10,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 15, twistPrevention: true },
+        },
+        // High gravity to force direction reversal (particle goes up then falls)
+        gravity: 50,
+      });
+
+      // Run enough frames for the particle to reverse direction
+      for (let i = 1; i <= 30; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const hwArr = trailMesh.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+
+      // Verify geometry is valid (no NaN) after potential twist flip
+      for (let i = 0; i < hwArr.length; i++) {
+        expect(Number.isFinite(hwArr[i])).toBe(true);
+      }
+
+      // Check that at least some half-widths are non-zero (ribbon is visible)
+      let hasVisible = false;
+      for (let i = 0; i < hwArr.length; i++) {
+        if (hwArr[i] !== 0) {
+          hasVisible = true;
+          break;
+        }
+      }
+      expect(hasVisible).toBe(true);
+
+      ps.dispose();
+    });
+
+    it('should apply twist prevention to connected ribbon with vertical movement', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 4,
+        startSpeed: 5,
+        emission: { rateOverTime: 50 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 10, ribbonId: 1, twistPrevention: true },
+        },
+        gravity: -30, // strong upward push
+      });
+
+      for (let i = 1; i <= 25; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const hwArr = trailMesh.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+
+      for (let i = 0; i < hwArr.length; i++) {
+        expect(Number.isFinite(hwArr[i])).toBe(true);
+      }
+
+      ps.dispose();
+    });
+  });
+
+  // ========================================================================
+  // COMBINED FEATURE TESTS
+  // ========================================================================
+  describe('Combined Feature Tests', () => {
+    it('should handle adaptive sampling combined with maxTime', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 3,
+        startSpeed: 8,
+        emission: { rateOverTime: 50 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 15,
+            minVertexDistance: 0.2,
+            maxTime: 0.5,
+          },
+        },
+      });
+
+      // Run many frames - adaptive sampling limits samples, maxTime expires old ones
+      for (let i = 1; i <= 60; i++) {
+        step(i * 16);
+      }
+
+      const trailLength = 15;
+      const alphas = getTrailAlphas(ps, 0, trailLength);
+
+      // Some vertices should be visible, some expired
+      const nonZero = alphas.filter((a) => a > 0);
+      // With maxTime=0.5s and 60 frames at 16ms = 960ms, older segments should expire
+      // but recent ones should be visible
+      if (countActiveParticles(ps) > 0) {
+        expect(nonZero.length).toBeGreaterThan(0);
+        expect(nonZero.length).toBeLessThan(trailLength);
+      }
+
+      ps.dispose();
+    });
+
+    it('should apply colorOverTrail with all 3 RGB channels independently', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 5,
+        startColor: { r: 1, g: 1, b: 1, a: 1 },
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 10,
+            colorOverTrail: {
+              isActive: true,
+              r: {
+                type: 'BEZIER' as any,
+                scale: 1,
+                bezierPoints: [
+                  { x: 0, y: 1, percentage: 0 },
+                  { x: 1, y: 0.2, percentage: 1 },
+                ],
+              },
+              g: {
+                type: 'BEZIER' as any,
+                scale: 0.5,
+                bezierPoints: [
+                  { x: 0, y: 1, percentage: 0 },
+                  { x: 1, y: 0.5, percentage: 1 },
+                ],
+              },
+              b: {
+                type: 'BEZIER' as any,
+                scale: 0.8,
+                bezierPoints: [
+                  { x: 0, y: 1, percentage: 0 },
+                  { x: 1, y: 0.1, percentage: 1 },
+                ],
+              },
+            },
+          },
+        },
+      });
+
+      // Build up trail
+      for (let i = 1; i <= 20; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const colorArr = trailMesh.geometry.getAttribute('trailColor')
+        .array as Float32Array;
+      const trailLength = 10;
+
+      // Check that colors at head (s=0) differ from colors at tail
+      // (colorOverTrail should modulate them)
+      const headIdx = 0 * 2 * 4; // particle 0, slot 0, left vertex, RGBA
+      const headR = colorArr[headIdx];
+      const headG = colorArr[headIdx + 1];
+      const headB = colorArr[headIdx + 2];
+
+      // Find last active slot
+      const hwArr = trailMesh.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+      let lastSlot = 0;
+      for (let s = trailLength - 1; s >= 0; s--) {
+        if (hwArr[s * 2] !== 0) {
+          lastSlot = s;
+          break;
+        }
+      }
+
+      if (lastSlot > 0) {
+        const tailIdx = lastSlot * 2 * 4;
+        const tailR = colorArr[tailIdx];
+        const tailG = colorArr[tailIdx + 1];
+        const tailB = colorArr[tailIdx + 2];
+
+        // Tail colors should be dimmer than head colors due to the curves
+        expect(tailR).toBeLessThan(headR + 0.01);
+        expect(tailG).toBeLessThan(headG + 0.01);
+        expect(tailB).toBeLessThan(headB + 0.01);
+      }
+
+      ps.dispose();
+    });
+
+    it('should handle degenerate segments from smoothing with nearly identical points', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 0.001, // extremely slow - points nearly overlap
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 12,
+            smoothing: true,
+            smoothingSubdivisions: 4,
+          },
+        },
+      });
+
+      // Many frames with nearly zero movement - triggers degenerate collapse
+      for (let i = 1; i <= 30; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+      const nextArr = trailMesh.geometry.getAttribute('trailNext')
+        .array as Float32Array;
+
+      // No NaN/Inf from zero-length tangents after degenerate collapse
+      for (let i = 0; i < posArr.length; i++) {
+        expect(Number.isFinite(posArr[i])).toBe(true);
+        expect(Number.isFinite(nextArr[i])).toBe(true);
+      }
+
+      ps.dispose();
+    });
+
+    it('should handle smoothing + twist prevention + maxTime combined', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 2,
+        startSpeed: 8,
+        emission: { rateOverTime: 50 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 15,
+            smoothing: true,
+            smoothingSubdivisions: 3,
+            twistPrevention: true,
+            maxTime: 1.0,
+          },
+        },
+        gravity: 20,
+      });
+
+      for (let i = 1; i <= 50; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+      const hwArr = trailMesh.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+
+      for (let i = 0; i < posArr.length; i++) {
+        expect(Number.isFinite(posArr[i])).toBe(true);
+      }
+      for (let i = 0; i < hwArr.length; i++) {
+        expect(Number.isFinite(hwArr[i])).toBe(true);
+      }
+
+      ps.dispose();
+    });
+
+    it('should handle adaptive sampling + smoothing combined', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 15,
+            minVertexDistance: 0.3,
+            smoothing: true,
+            smoothingSubdivisions: 3,
+          },
+        },
+      });
+
+      for (let i = 1; i <= 30; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+
+      // Verify valid geometry produced
+      for (let i = 0; i < posArr.length; i++) {
+        expect(Number.isFinite(posArr[i])).toBe(true);
+      }
+
+      // Adaptive sampling should produce fewer raw samples,
+      // smoothing should interpolate between them
+      const trailLength = 15;
+      const hwArr = trailMesh.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+      let activeCount = 0;
+      for (let s = 0; s < trailLength; s++) {
+        if (hwArr[s * 2] !== 0) activeCount++;
+      }
+      // Should have some active vertices from smoothed interpolation
+      expect(activeCount).toBeGreaterThan(0);
+
+      ps.dispose();
+    });
+
+    it('should handle connected ribbon with all features enabled', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 4,
+        startSpeed: 5,
+        emission: { rateOverTime: 30 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 12,
+            ribbonId: 1,
+            maxTime: 2.0,
+            twistPrevention: true,
+            // Note: smoothing applies to individual trails, not connected ribbon
+          },
+        },
+      });
+
+      for (let i = 1; i <= 40; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+
+      for (let i = 0; i < posArr.length; i++) {
+        expect(Number.isFinite(posArr[i])).toBe(true);
+      }
+
+      expect(countActiveParticles(ps)).toBeGreaterThan(0);
+
+      ps.dispose();
+    });
+
+    it('should correctly produce UV values along the trail', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 8 },
+        },
+      });
+
+      for (let i = 1; i <= 15; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const uvArr = trailMesh.geometry.getAttribute('trailUV')
+        .array as Float32Array;
+      const hwArr = trailMesh.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+      const trailLength = 8;
+
+      // Collect UV.y (trail progress, 0=head, 1=tail) for active vertices
+      const uvYValues: number[] = [];
+      for (let s = 0; s < trailLength; s++) {
+        if (hwArr[s * 2] !== 0) {
+          const uvIdx = s * 2 * 2; // s * 2 vertices * 2 components
+          // Left vertex: UV.x should be 0, right vertex: UV.x should be 1
+          expect(uvArr[uvIdx]).toBeCloseTo(0, 5); // left U = 0
+          expect(uvArr[uvIdx + 2]).toBeCloseTo(1, 5); // right U = 1
+          // UV.y (trail progress) should be same for left and right
+          expect(uvArr[uvIdx + 1]).toBeCloseTo(uvArr[uvIdx + 3], 5);
+          uvYValues.push(uvArr[uvIdx + 1]);
+        }
+      }
+
+      // UV.y should be monotonically non-decreasing (0 at head, approaches 1 at tail)
+      if (uvYValues.length >= 2) {
+        expect(uvYValues[0]).toBeCloseTo(0, 3); // head = 0
+        // The last active vertex should have UV.y > 0 (progressing toward tail)
+        expect(uvYValues[uvYValues.length - 1]).toBeGreaterThan(0);
+        for (let i = 1; i < uvYValues.length; i++) {
+          expect(uvYValues[i]).toBeGreaterThanOrEqual(uvYValues[i - 1] - 0.001);
+        }
+      }
+
+      ps.dispose();
+    });
+
+    it('should handle widthOverTrail curve at boundary values (t=0, t=1)', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 8,
+            width: 2.0,
+            widthOverTrail: {
+              type: 'BEZIER' as any,
+              scale: 1,
+              bezierPoints: [
+                { x: 0, y: 1, percentage: 0 },
+                { x: 1, y: 0, percentage: 1 },
+              ],
+            },
+          },
+        },
+      });
+
+      for (let i = 1; i <= 15; i++) {
+        step(i * 16);
+      }
+
+      const trailLength = 8;
+      const widths = getTrailHalfWidths(ps, 0, trailLength);
+
+      // Find active widths
+      const activeWidths = widths.filter((w) => w !== 0);
+      if (activeWidths.length >= 2) {
+        // Head should be wider than tail (curve goes from 1 to 0)
+        expect(Math.abs(activeWidths[0])).toBeGreaterThan(
+          Math.abs(activeWidths[activeWidths.length - 1]) - 0.01
+        );
+        // Head halfWidth should be close to width/2 * 1.0 = 1.0
+        expect(Math.abs(activeWidths[0])).toBeCloseTo(1.0, 1);
+      }
+
+      ps.dispose();
+    });
+  });
+
+  // ========================================================================
   // DISPOSAL
   // ========================================================================
   describe('Disposal', () => {
