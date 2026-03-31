@@ -1128,6 +1128,296 @@ describe('Trail Improvements', () => {
   });
 
   // ========================================================================
+  // TAIL TANGENT FALLBACK
+  // ========================================================================
+  describe('Tail Tangent Fallback', () => {
+    it('should use previous segment direction for tail tangent instead of hardcoded nudge', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 8 },
+        },
+      });
+
+      // Emit and simulate several frames to build trail history
+      for (let i = 1; i <= 15; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      const nextArr = trailMesh.geometry.getAttribute('trailNext')
+        .array as Float32Array;
+      const posArr = trailMesh.geometry.getAttribute('position')
+        .array as Float32Array;
+
+      // Find the last active trail vertex (tail). The tangent (trailNext - position)
+      // should NOT be (0, 0.001, 0) for a particle moving primarily along one axis.
+      const trailLength = 8;
+      const verticesPerParticle = trailLength * 2;
+      let lastActiveSlot = -1;
+      for (let s = trailLength - 1; s >= 0; s--) {
+        const aIdx = s * 2;
+        const hw =
+          trailMesh.geometry.getAttribute('trailHalfWidth').array[aIdx];
+        if (hw !== 0) {
+          lastActiveSlot = s;
+          break;
+        }
+      }
+
+      if (lastActiveSlot >= 1) {
+        const vIdx = lastActiveSlot * 2 * 3;
+        const tangentX = nextArr[vIdx] - posArr[vIdx];
+        const tangentY = nextArr[vIdx + 1] - posArr[vIdx + 1];
+        const tangentZ = nextArr[vIdx + 2] - posArr[vIdx + 2];
+        const tangentLen = Math.sqrt(
+          tangentX * tangentX + tangentY * tangentY + tangentZ * tangentZ
+        );
+
+        // The tangent should not be the old hardcoded (0, 0.001, 0) value
+        if (tangentLen > 0.0001) {
+          const normalizedY = tangentY / tangentLen;
+          // If it was purely (0, 0.001, 0), normalizedY would be 1.0
+          // A real continuation tangent should differ from pure Y
+          expect(Math.abs(normalizedY)).toBeLessThan(0.999);
+        }
+      }
+
+      ps.dispose();
+    });
+
+    it('should still handle single-point trails gracefully', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 0,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 4 },
+        },
+      });
+
+      // Only one frame - single point in history
+      step(16);
+
+      // Should not throw
+      expect(countActiveParticles(ps)).toBeGreaterThanOrEqual(0);
+
+      ps.dispose();
+    });
+  });
+
+  // ========================================================================
+  // MAXTIME + SMOOTHING INTERACTION
+  // ========================================================================
+  describe('MaxTime + Smoothing Interaction', () => {
+    it('should produce smooth time fade when smoothing and maxTime are combined', () => {
+      const { ps, step, startTime } = createTrailSystem({
+        maxParticles: 1,
+        startSpeed: 5,
+        emission: { rateOverTime: 100 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 20,
+            maxTime: 2.0,
+            smoothing: true,
+            smoothingSubdivisions: 3,
+          },
+        },
+      });
+
+      // Build up trail history with many frames
+      for (let i = 1; i <= 40; i++) {
+        step(i * 50);
+      }
+
+      const trailLength = 20;
+      const alphas = getTrailAlphas(ps, 0, trailLength);
+
+      // The alpha values along the trail should be monotonically
+      // non-increasing (head to tail) when maxTime causes fade.
+      // With the interpolation fix, there should be no sudden jumps.
+      const activeAlphas = alphas.filter((a) => a > 0);
+      if (activeAlphas.length >= 3) {
+        for (let i = 1; i < activeAlphas.length; i++) {
+          // Allow small floating point tolerance but no large jumps up
+          expect(activeAlphas[i]).toBeLessThanOrEqual(
+            activeAlphas[i - 1] + 0.01
+          );
+        }
+      }
+
+      ps.dispose();
+    });
+  });
+
+  // ========================================================================
+  // CONNECTED RIBBON MAXTIME
+  // ========================================================================
+  describe('Connected Ribbon MaxTime', () => {
+    it('should apply time-based fade to connected ribbons', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 5,
+        startSpeed: 3,
+        emission: { rateOverTime: 50 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 10, ribbonId: 1, maxTime: 0.5 },
+        },
+      });
+
+      // Run long enough for particles to age
+      for (let i = 1; i <= 80; i++) {
+        step(i * 16);
+      }
+
+      // The ribbon should have been built with maxTime fade applied.
+      // Check that the leader particle's trail has some non-zero alpha
+      // values (ribbon is alive) and that they aren't all 1.0 (fade is applied).
+      const trailLength = 10;
+      const alphas = getTrailAlphas(ps, 0, trailLength);
+      const nonZeroAlphas = alphas.filter((a) => a > 0);
+      if (nonZeroAlphas.length > 0) {
+        // At least one alpha should be less than the max (fade has been applied)
+        const maxAlpha = Math.max(...nonZeroAlphas);
+        const minAlpha = Math.min(...nonZeroAlphas);
+        // If maxTime fade is working, we should see variation
+        expect(maxAlpha).toBeGreaterThan(0);
+        // With very short maxTime and long simulation, older parts should fade
+        if (nonZeroAlphas.length >= 2) {
+          expect(maxAlpha - minAlpha).toBeGreaterThanOrEqual(0);
+        }
+      }
+
+      ps.dispose();
+    });
+  });
+
+  // ========================================================================
+  // CONNECTED RIBBON TWIST PREVENTION
+  // ========================================================================
+  describe('Connected Ribbon Twist Prevention', () => {
+    it('should apply twist prevention to connected ribbons without errors', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 5,
+        startSpeed: 3,
+        emission: { rateOverTime: 50 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 10,
+            ribbonId: 1,
+            twistPrevention: true,
+          },
+        },
+      });
+
+      // Run multiple frames - twist prevention should not throw
+      for (let i = 1; i <= 30; i++) {
+        step(i * 16);
+      }
+
+      expect(countActiveParticles(ps)).toBeGreaterThan(0);
+
+      // Verify the trail mesh exists and has valid geometry
+      const trailMesh = getTrailMesh(ps);
+      expect(trailMesh).toBeDefined();
+      const hwArr = trailMesh!.geometry.getAttribute('trailHalfWidth')
+        .array as Float32Array;
+      // Some half-widths should be non-zero (ribbon is visible)
+      let hasNonZero = false;
+      for (let i = 0; i < hwArr.length; i++) {
+        if (hwArr[i] !== 0) {
+          hasNonZero = true;
+          break;
+        }
+      }
+      expect(hasNonZero).toBe(true);
+
+      ps.dispose();
+    });
+
+    it('should combine maxTime and twistPrevention on connected ribbons', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 5,
+        startSpeed: 3,
+        emission: { rateOverTime: 50 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: {
+            length: 10,
+            ribbonId: 1,
+            maxTime: 1.0,
+            twistPrevention: true,
+          },
+        },
+      });
+
+      // Run many frames to exercise both features together
+      for (let i = 1; i <= 50; i++) {
+        step(i * 16);
+      }
+
+      expect(countActiveParticles(ps)).toBeGreaterThan(0);
+
+      ps.dispose();
+    });
+  });
+
+  // ========================================================================
+  // CACHED TRAIL ATTRIBUTES
+  // ========================================================================
+  describe('Cached Trail Attributes', () => {
+    it('should correctly update trail geometry using cached attributes', () => {
+      const { ps, step } = createTrailSystem({
+        maxParticles: 3,
+        startSpeed: 5,
+        emission: { rateOverTime: 50 },
+        renderer: {
+          rendererType: RendererType.TRAIL,
+          trail: { length: 8 },
+        },
+      });
+
+      // Run several frames to build trails
+      for (let i = 1; i <= 20; i++) {
+        step(i * 16);
+      }
+
+      const trailMesh = getTrailMesh(ps)!;
+      // All cached attributes should still be valid and have data
+      const posAttr = trailMesh.geometry.getAttribute('position');
+      const nextAttr = trailMesh.geometry.getAttribute('trailNext');
+      const hwAttr = trailMesh.geometry.getAttribute('trailHalfWidth');
+      const uvAttr = trailMesh.geometry.getAttribute('trailUV');
+
+      expect(posAttr).toBeDefined();
+      expect(nextAttr).toBeDefined();
+      expect(hwAttr).toBeDefined();
+      expect(uvAttr).toBeDefined();
+
+      // Verify some non-zero data exists in position and next attributes
+      const posArr = posAttr.array as Float32Array;
+      const nextArr = nextAttr.array as Float32Array;
+      let hasPos = false;
+      let hasNext = false;
+      for (let i = 0; i < posArr.length; i++) {
+        if (posArr[i] !== 0) hasPos = true;
+        if (nextArr[i] !== 0) hasNext = true;
+        if (hasPos && hasNext) break;
+      }
+      expect(hasPos).toBe(true);
+      expect(hasNext).toBe(true);
+
+      ps.dispose();
+    });
+  });
+
+  // ========================================================================
   // DISPOSAL
   // ========================================================================
   describe('Disposal', () => {

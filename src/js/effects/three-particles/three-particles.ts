@@ -1414,6 +1414,9 @@ export const createParticleSystem = (
   let trailPositionAttr: THREE.BufferAttribute | undefined;
   let trailAlphaAttr: THREE.BufferAttribute | undefined;
   let trailColorAttr: THREE.BufferAttribute | undefined;
+  let trailNextAttr: THREE.BufferAttribute | undefined;
+  let trailHalfWidthAttr: THREE.BufferAttribute | undefined;
+  let trailUVAttr: THREE.BufferAttribute | undefined;
   let trailIndexAttr: THREE.BufferAttribute | undefined;
   let trailWidthCurveFn: CurveFunction | undefined;
   let trailOpacityCurveFn: CurveFunction | undefined;
@@ -1463,15 +1466,15 @@ export const createParticleSystem = (
 
     trailPositionAttr = new THREE.BufferAttribute(trailPositions, 3);
     trailPositionAttr.setUsage(THREE.DynamicDrawUsage);
-    const trailNextAttr = new THREE.BufferAttribute(trailNextPositions, 3);
+    trailNextAttr = new THREE.BufferAttribute(trailNextPositions, 3);
     trailNextAttr.setUsage(THREE.DynamicDrawUsage);
     trailAlphaAttr = new THREE.BufferAttribute(trailAlphas, 1);
     trailAlphaAttr.setUsage(THREE.DynamicDrawUsage);
     trailColorAttr = new THREE.BufferAttribute(trailColors, 4);
     trailColorAttr.setUsage(THREE.DynamicDrawUsage);
-    const trailHalfWidthAttr = new THREE.BufferAttribute(trailHalfWidths, 1);
+    trailHalfWidthAttr = new THREE.BufferAttribute(trailHalfWidths, 1);
     trailHalfWidthAttr.setUsage(THREE.DynamicDrawUsage);
-    const trailUVAttr = new THREE.BufferAttribute(trailUVs, 2);
+    trailUVAttr = new THREE.BufferAttribute(trailUVs, 2);
     trailUVAttr.setUsage(THREE.DynamicDrawUsage);
     trailIndexAttr = new THREE.BufferAttribute(trailIndices, 1);
 
@@ -1710,6 +1713,9 @@ export const createParticleSystem = (
           trailPositionAttr,
           trailAlphaAttr,
           trailColorAttr,
+          trailNextAttr: trailNextAttr as THREE.BufferAttribute,
+          trailHalfWidthAttr: trailHalfWidthAttr as THREE.BufferAttribute,
+          trailUVAttr: trailUVAttr as THREE.BufferAttribute,
           trailWidthCurveFn,
           trailOpacityCurveFn,
           trailColorOverTrailFns,
@@ -2413,6 +2419,9 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
     trailPositionAttr,
     trailAlphaAttr,
     trailColorAttr,
+    trailNextAttr: trailNextAttrCached,
+    trailHalfWidthAttr: trailHalfWidthAttrCached,
+    trailUVAttr: trailUVAttrCached,
     trailWidthCurveFn,
     trailOpacityCurveFn,
     trailColorOverTrailFns,
@@ -2424,6 +2433,9 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
     !trailPositionAttr ||
     !trailAlphaAttr ||
     !trailColorAttr ||
+    !trailNextAttrCached ||
+    !trailHalfWidthAttrCached ||
+    !trailUVAttrCached ||
     !trailWidthCurveFn ||
     !trailOpacityCurveFn ||
     !trailConfig ||
@@ -2459,16 +2471,9 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
   const trailPosArr = trailPositionAttr.array as Float32Array;
   const trailAlphaArr = trailAlphaAttr.array as Float32Array;
   const trailColorArr = trailColorAttr.array as Float32Array;
-  const trailMesh = props.trailMesh!;
-  const trailNextArr = (
-    trailMesh.geometry.getAttribute('trailNext') as THREE.BufferAttribute
-  ).array as Float32Array;
-  const trailUVArr = (
-    trailMesh.geometry.getAttribute('trailUV') as THREE.BufferAttribute
-  ).array as Float32Array;
-  const trailHalfWidthArr = (
-    trailMesh.geometry.getAttribute('trailHalfWidth') as THREE.BufferAttribute
-  ).array as Float32Array;
+  const trailNextArr = trailNextAttrCached.array as Float32Array;
+  const trailUVArr = trailUVAttrCached.array as Float32Array;
+  const trailHalfWidthArr = trailHalfWidthAttrCached.array as Float32Array;
   const verticesPerParticle = trailLength * 2;
   const creationTimesLength = generalData.creationTimes.length;
   let hasUpdates = false;
@@ -2770,8 +2775,18 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
           nx = finalPts[(s + 1) * 3];
           ny = finalPts[(s + 1) * 3 + 1];
           nz = finalPts[(s + 1) * 3 + 2];
+        } else if (finalCount >= 2) {
+          // Tail: reuse the direction from the previous segment so the
+          // ribbon end keeps the same orientation as the last real segment
+          // instead of collapsing when the tangent aligns with the Y axis.
+          const prevX = finalPts[(s - 1) * 3];
+          const prevY = finalPts[(s - 1) * 3 + 1];
+          const prevZ = finalPts[(s - 1) * 3 + 2];
+          nx = hx + (hx - prevX);
+          ny = hy + (hy - prevY);
+          nz = hz + (hz - prevZ);
         } else {
-          // Tail: nudge to avoid zero tangent
+          // Single point: nudge to avoid zero tangent
           nx = hx;
           ny = hy + 0.001;
           nz = hz;
@@ -2783,20 +2798,30 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
         // --- MaxTime: apply additional age-based fade ---
         let timeFade = 1.0;
         if (maxTime > 0 && sampleTimes && effectiveCount > 0) {
-          // Map the current vertex index back to the nearest raw sample
-          // for time lookup. When smoothing is active, multiple smoothed
-          // vertices may correspond to one raw segment.
-          const rawS = useSmoothing
-            ? Math.min(
-                Math.floor((s / Math.max(finalCount - 1, 1)) * (rawCount - 1)),
-                rawCount - 1
-              )
-            : Math.min(s, rawCount - 1);
-          const sampleSlot =
-            (historyIndex[index] - 1 - rawS + trailLength * 2) % trailLength;
+          // Map the current smoothed vertex back to the raw sample timeline.
+          // When smoothing is active we interpolate between the two bracketing
+          // raw samples' timestamps so the fade is smooth instead of stepping.
           const sampleBase = index * trailLength;
-          const age = now - sampleTimes[sampleBase + sampleSlot];
-          timeFade = 1.0 - Math.min(age / maxTimeMs, 1.0);
+          if (useSmoothing && rawCount >= 2) {
+            const rawF = (s / Math.max(finalCount - 1, 1)) * (rawCount - 1);
+            const rawLo = Math.min(Math.floor(rawF), rawCount - 1);
+            const rawHi = Math.min(rawLo + 1, rawCount - 1);
+            const frac = rawF - rawLo;
+            const slotLo =
+              (historyIndex[index] - 1 - rawLo + trailLength * 2) % trailLength;
+            const slotHi =
+              (historyIndex[index] - 1 - rawHi + trailLength * 2) % trailLength;
+            const ageLo = now - sampleTimes[sampleBase + slotLo];
+            const ageHi = now - sampleTimes[sampleBase + slotHi];
+            const age = ageLo + (ageHi - ageLo) * frac;
+            timeFade = 1.0 - Math.min(age / maxTimeMs, 1.0);
+          } else {
+            const rawS = Math.min(s, rawCount - 1);
+            const sampleSlot =
+              (historyIndex[index] - 1 - rawS + trailLength * 2) % trailLength;
+            const age = now - sampleTimes[sampleBase + sampleSlot];
+            timeFade = 1.0 - Math.min(age / maxTimeMs, 1.0);
+          }
         }
 
         const widthScale = trailWidthCurveFn(t);
@@ -3076,6 +3101,14 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
         nx = _rawPoints[(s + 1) * 3];
         ny = _rawPoints[(s + 1) * 3 + 1];
         nz = _rawPoints[(s + 1) * 3 + 2];
+      } else if (filledCount >= 2) {
+        // Tail: reuse previous segment direction
+        const prevX = _rawPoints[(s - 1) * 3];
+        const prevY = _rawPoints[(s - 1) * 3 + 1];
+        const prevZ = _rawPoints[(s - 1) * 3 + 2];
+        nx = ptx + (ptx - prevX);
+        ny = pty + (pty - prevY);
+        nz = ptz + (ptz - prevZ);
       } else {
         nx = ptx;
         ny = pty + 0.001;
@@ -3083,10 +3116,26 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
       }
 
       const t = filledCount > 1 ? s / (filledCount - 1) : 0;
+
+      // --- MaxTime: apply age-based fade to connected ribbon ---
+      let ribbonTimeFade = 1.0;
+      if (maxTime > 0 && controlCount >= 2) {
+        // Map the vertex to the nearest control point(s) and use
+        // their creation times to compute an interpolated age.
+        const ctrlF = t * (controlCount - 1);
+        const ctrlLo = Math.min(Math.floor(ctrlF), controlCount - 1);
+        const ctrlHi = Math.min(ctrlLo + 1, controlCount - 1);
+        const frac = ctrlF - ctrlLo;
+        const ageLo = now - generalData.creationTimes[_ribbonIndices[ctrlLo]];
+        const ageHi = now - generalData.creationTimes[_ribbonIndices[ctrlHi]];
+        const age = ageLo + (ageHi - ageLo) * frac;
+        ribbonTimeFade = 1.0 - Math.min(age / maxTimeMs, 1.0);
+      }
+
       const widthScale = trailWidthCurveFn(t);
       const opacityScale = trailOpacityCurveFn(t);
       const halfWidth = trailConfig.width * widthScale * 0.5;
-      const alpha = leaderCa * opacityScale;
+      const alpha = leaderCa * opacityScale * ribbonTimeFade;
       const fr = trailColorOverTrailFns
         ? leaderCr * trailColorOverTrailFns.r(t)
         : leaderCr;
@@ -3124,6 +3173,59 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
       );
     }
 
+    // --- Twist Prevention for connected ribbon (applied to leader) ---
+    if (useTwistPrevention && prevNormal && filledCount >= 2) {
+      const nIdx = leader * 3;
+      const tx = _rawPoints[3] - _rawPoints[0];
+      const ty = _rawPoints[4] - _rawPoints[1];
+      const tz = _rawPoints[5] - _rawPoints[2];
+      const tLen = Math.sqrt(tx * tx + ty * ty + tz * tz);
+      if (tLen > 0.0001) {
+        const ntx = tx / tLen;
+        const nty = ty / tLen;
+        const ntz = tz / tLen;
+        let upx = 0,
+          upy = 1,
+          upz = 0;
+        const dot = ntx * upx + nty * upy + ntz * upz;
+        if (Math.abs(dot) > 0.999) {
+          upx = 1;
+          upy = 0;
+          upz = 0;
+        }
+        let cnx = nty * upz - ntz * upy;
+        let cny = ntz * upx - ntx * upz;
+        let cnz = ntx * upy - nty * upx;
+        const cnLen = Math.sqrt(cnx * cnx + cny * cny + cnz * cnz);
+        if (cnLen > 0.0001) {
+          cnx /= cnLen;
+          cny /= cnLen;
+          cnz /= cnLen;
+        }
+        const prevNx = prevNormal[nIdx];
+        const prevNy = prevNormal[nIdx + 1];
+        const prevNz = prevNormal[nIdx + 2];
+        const hasPrev = prevNx !== 0 || prevNy !== 0 || prevNz !== 0;
+        if (hasPrev) {
+          const normalDot = cnx * prevNx + cny * prevNy + cnz * prevNz;
+          if (normalDot < 0) {
+            for (let s = 0; s < Math.min(filledCount, trailLength); s++) {
+              const aIdx = leaderVertBase + s * 2;
+              const hw = trailHalfWidthArr[aIdx];
+              trailHalfWidthArr[aIdx] = -hw;
+              trailHalfWidthArr[aIdx + 1] = -hw;
+            }
+            cnx = -cnx;
+            cny = -cny;
+            cnz = -cnz;
+          }
+        }
+        prevNormal[nIdx] = cnx;
+        prevNormal[nIdx + 1] = cny;
+        prevNormal[nIdx + 2] = cnz;
+      }
+    }
+
     // Clear non-leader ribbon particles' trail vertices
     for (let ri = 1; ri < _ribbonCount; ri++) {
       const pIdx = _ribbonIndices[ri];
@@ -3156,18 +3258,9 @@ const updateTrailGeometry = (props: ParticleSystemInstance, now: number) => {
     trailPositionAttr.needsUpdate = true;
     trailAlphaAttr.needsUpdate = true;
     trailColorAttr.needsUpdate = true;
-    const nextAttr = trailMesh.geometry.getAttribute(
-      'trailNext'
-    ) as THREE.BufferAttribute;
-    const hwAttr = trailMesh.geometry.getAttribute(
-      'trailHalfWidth'
-    ) as THREE.BufferAttribute;
-    nextAttr.needsUpdate = true;
-    hwAttr.needsUpdate = true;
-    const uvAttr = trailMesh.geometry.getAttribute(
-      'trailUV'
-    ) as THREE.BufferAttribute;
-    uvAttr.needsUpdate = true;
+    trailNextAttrCached.needsUpdate = true;
+    trailHalfWidthAttrCached.needsUpdate = true;
+    trailUVAttrCached.needsUpdate = true;
   }
 };
 
