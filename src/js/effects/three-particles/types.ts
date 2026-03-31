@@ -1677,6 +1677,12 @@ export type ParticleSystemInstance = {
   trailAlphaAttr?: THREE.BufferAttribute;
   /** Trail geometry color attribute */
   trailColorAttr?: THREE.BufferAttribute;
+  /** Trail geometry next-position attribute (cached to avoid repeated getAttribute) */
+  trailNextAttr?: THREE.BufferAttribute;
+  /** Trail geometry half-width attribute (cached) */
+  trailHalfWidthAttr?: THREE.BufferAttribute;
+  /** Trail geometry UV attribute (cached) */
+  trailUVAttr?: THREE.BufferAttribute;
   /** Trail width curve function */
   trailWidthCurveFn?: CurveFunction;
   /** Trail opacity curve function */
