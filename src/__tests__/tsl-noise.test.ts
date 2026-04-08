@@ -9,11 +9,12 @@
  * - Re-exported types are accessible
  */
 
+import { float, vec3 } from 'three/tsl';
+
 import {
   snoise3D,
   particleNoise3,
 } from '../js/effects/three-particles/webgpu/tsl-noise.js';
-import { float, vec3 } from 'three/tsl';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
