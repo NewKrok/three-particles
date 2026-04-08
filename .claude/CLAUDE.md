@@ -113,6 +113,7 @@ Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into 
 | [CI/CD Pipeline](doc/ci-cd.md) | Release process, workflow troubleshooting, version bump logic |
 | [Development Workflow](doc/workflow.md) | Step-by-step workflow, agent orchestration pattern, pre-commit checks |
 | [Testing Guide](doc/testing.md) | Mocking patterns, test helpers, coverage targets, writing effective tests |
+| [WebGPU Compute Plan](doc/webgpu-compute-plan.md) | WebGPU implementation phases, TSL migration, compute shader architecture |
 
 ---
 
