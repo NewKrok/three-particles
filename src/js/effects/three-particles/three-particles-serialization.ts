@@ -205,6 +205,7 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
     'looping',
     'gravity',
     'simulationSpace',
+    'simulationBackend',
     'maxParticles',
   ] as const) {
     if (field in raw) (config as RawObject)[field] = raw[field];

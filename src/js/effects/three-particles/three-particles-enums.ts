@@ -235,7 +235,33 @@ export const enum ForceFieldFalloff {
 
   /**
    * Force decreases with the square of distance: `1 - (d/range)²`.
-   * More physically realistic than linear falloff.
+   * More physically realistic than linear fallback.
    */
   QUADRATIC = 'QUADRATIC',
+}
+
+/**
+ * Defines the simulation backend used for particle updates.
+ *
+ * @enum {string}
+ */
+export const enum SimulationBackend {
+  /**
+   * Automatically select the best backend based on the renderer type.
+   * Uses GPU compute when a WebGPU-capable renderer is detected, otherwise falls back to CPU.
+   */
+  AUTO = 'AUTO',
+
+  /**
+   * Force CPU-based simulation (JavaScript update loop).
+   * Always available regardless of renderer type.
+   */
+  CPU = 'CPU',
+
+  /**
+   * Force GPU compute shader simulation.
+   * Requires a WebGPU-capable renderer (e.g. `THREE.WebGPURenderer`).
+   * Falls back to CPU if the renderer does not support compute.
+   */
+  GPU = 'GPU',
 }

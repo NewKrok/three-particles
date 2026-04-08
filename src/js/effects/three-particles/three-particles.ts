@@ -18,6 +18,7 @@ import {
   LifeTimeCurve,
   RendererType,
   Shape,
+  SimulationBackend,
   SimulationSpace,
   SubEmitterTrigger,
   TimeMode,
@@ -190,6 +191,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   },
   gravity: 0.0,
   simulationSpace: SimulationSpace.LOCAL,
+  simulationBackend: SimulationBackend.AUTO,
   maxParticles: 100.0,
   emission: {
     rateOverTime: 10.0,

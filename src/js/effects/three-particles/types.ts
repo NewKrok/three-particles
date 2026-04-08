@@ -8,6 +8,7 @@ import {
   LifeTimeCurve,
   RendererType,
   Shape,
+  SimulationBackend,
   SimulationSpace,
   SubEmitterTrigger,
   TimeMode,
@@ -1188,6 +1189,19 @@ export type ParticleSystemConfig = {
    * simulationSpace: SimulationSpace.WORLD;
    */
   simulationSpace?: SimulationSpace;
+
+  /**
+   * Selects the simulation backend for particle updates.
+   *
+   * - `AUTO` (default): Uses GPU compute when a WebGPU-capable renderer is
+   *   detected, otherwise falls back to CPU.
+   * - `CPU`: Always uses the JavaScript update loop (works with any renderer).
+   * - `GPU`: Requests GPU compute simulation. Falls back to CPU if the renderer
+   *   does not support compute shaders.
+   *
+   * @default SimulationBackend.AUTO
+   */
+  simulationBackend?: SimulationBackend;
 
   /**
    * Defines the maximum number of particles allowed in the system.
