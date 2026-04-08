@@ -1718,6 +1718,14 @@ export type ParticleSystemInstance = {
     twistPrevention: boolean;
     ribbonId?: number;
   };
+  /** GPU compute pipeline for WebGPU simulation (Phase 2+). */
+  computePipeline?: {
+    computeNode: unknown;
+    uniforms: unknown;
+    buffers: unknown;
+  };
+  /** Whether this system uses GPU compute for simulation. */
+  useGPUCompute?: boolean;
 };
 
 /**
