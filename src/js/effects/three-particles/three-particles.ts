@@ -25,6 +25,7 @@ import {
 } from './three-particles-enums';
 import { applyForceFields } from './three-particles-forces.js';
 import { applyModifiers } from './three-particles-modifiers.js';
+import { isComputeCapableRenderer } from './three-particles-renderer-detect.js';
 import {
   calculateRandomPositionAndVelocityOnBox,
   calculateRandomPositionAndVelocityOnCircle,
@@ -75,6 +76,52 @@ const normalizeTrailCurve = (
 
 let _particleSystemId = 0;
 let createdParticleSystems: Array<ParticleSystemInstance> = [];
+
+// ─── WebGPU TSL Material Support (opt-in via registerTSLMaterialFactory) ─────
+
+type TSLMaterialFactory = {
+  createTSLParticleMaterial: (
+    rendererType: RendererType,
+    sharedUniforms: Record<string, { value: unknown }>,
+    rendererConfig: {
+      transparent: boolean;
+      blending: THREE.Blending;
+      depthTest: boolean;
+      depthWrite: boolean;
+    }
+  ) => THREE.Material;
+  createTSLTrailMaterial: (
+    trailUniforms: Record<string, { value: unknown }>,
+    rendererConfig: {
+      transparent: boolean;
+      blending: THREE.Blending;
+      depthTest: boolean;
+      depthWrite: boolean;
+    }
+  ) => THREE.Material;
+};
+
+let _tslMaterialFactory: TSLMaterialFactory | null = null;
+
+/**
+ * Registers the TSL (Three Shading Language) material factory for WebGPU support.
+ *
+ * Call this once before creating particle systems that use WebGPU rendering.
+ * The factory is typically imported from the WebGPU sub-module:
+ *
+ * @example
+ * ```typescript
+ * import { registerTSLMaterialFactory } from '@newkrok/three-particles';
+ * import { createTSLParticleMaterial, createTSLTrailMaterial } from '@newkrok/three-particles/webgpu';
+ *
+ * registerTSLMaterialFactory({ createTSLParticleMaterial, createTSLTrailMaterial });
+ * ```
+ */
+export const registerTSLMaterialFactory = (
+  factory: TSLMaterialFactory
+): void => {
+  _tslMaterialFactory = factory;
+};
 
 // Pre-allocated objects for updateParticleSystemInstance to avoid GC pressure
 const _subEmitterPosition = new THREE.Vector3();
@@ -893,15 +940,33 @@ export const createParticleSystem = (
     return ParticleSystemFragmentShader;
   };
 
-  const material = new THREE.ShaderMaterial({
-    uniforms: sharedUniforms,
-    vertexShader: getVertexShader(),
-    fragmentShader: getFragmentShader(),
+  // Determine whether to use TSL materials (WebGPU path)
+  const useTSL = (() => {
+    const backend = normalizedConfig.simulationBackend;
+    if (backend === SimulationBackend.CPU) return false;
+    // GPU or AUTO: use TSL if factory is registered
+    return _tslMaterialFactory !== null;
+  })();
+
+  const rendererConfig = {
     transparent: renderer.transparent,
     blending: renderer.blending,
     depthTest: renderer.depthTest,
     depthWrite: renderer.depthWrite,
-  });
+  };
+
+  const material: THREE.Material = useTSL
+    ? _tslMaterialFactory!.createTSLParticleMaterial(
+        renderer.rendererType ?? RendererType.POINTS,
+        sharedUniforms,
+        rendererConfig
+      )
+    : new THREE.ShaderMaterial({
+        uniforms: sharedUniforms,
+        vertexShader: getVertexShader(),
+        fragmentShader: getFragmentShader(),
+        ...rendererConfig,
+      });
 
   let geometry: THREE.BufferGeometry | THREE.InstancedBufferGeometry;
 
@@ -1492,30 +1557,34 @@ export const createParticleSystem = (
     trailGeometry.setAttribute('trailUV', trailUVAttr);
     trailGeometry.setIndex(trailIndexAttr);
 
-    const trailMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        map: { value: particleMap },
-        useMap: { value: !!particleMap },
-        discardBackgroundColor: { value: renderer.discardBackgroundColor },
-        backgroundColor: { value: renderer.backgroundColor },
-        backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
-        softParticlesEnabled: { value: softParticlesEnabled },
-        softParticlesIntensity: {
-          value: Math.max(renderer.softParticles?.intensity ?? 1.0, 0.001),
-        },
-        sceneDepthTexture: {
-          value: renderer.softParticles?.depthTexture ?? null,
-        },
-        cameraNearFar: { value: new THREE.Vector2(0.1, 1000.0) },
+    const trailUniformValues = {
+      map: { value: particleMap },
+      useMap: { value: !!particleMap },
+      discardBackgroundColor: { value: renderer.discardBackgroundColor },
+      backgroundColor: { value: renderer.backgroundColor },
+      backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
+      softParticlesEnabled: { value: softParticlesEnabled },
+      softParticlesIntensity: {
+        value: Math.max(renderer.softParticles?.intensity ?? 1.0, 0.001),
       },
-      vertexShader: TrailVertexShader,
-      fragmentShader: TrailFragmentShader,
-      transparent: renderer.transparent,
-      blending: renderer.blending,
-      depthTest: renderer.depthTest,
-      depthWrite: renderer.depthWrite,
-      side: THREE.DoubleSide,
-    });
+      sceneDepthTexture: {
+        value: renderer.softParticles?.depthTexture ?? null,
+      },
+      cameraNearFar: { value: new THREE.Vector2(0.1, 1000.0) },
+    };
+
+    const trailMaterial: THREE.Material = useTSL
+      ? _tslMaterialFactory!.createTSLTrailMaterial(
+          trailUniformValues,
+          rendererConfig
+        )
+      : new THREE.ShaderMaterial({
+          uniforms: trailUniformValues,
+          vertexShader: TrailVertexShader,
+          fragmentShader: TrailFragmentShader,
+          ...rendererConfig,
+          side: THREE.DoubleSide,
+        });
 
     trailMesh = new THREE.Mesh(trailGeometry, trailMaterial);
     trailMesh.frustumCulled = false;
@@ -1533,8 +1602,7 @@ export const createParticleSystem = (
         (camera as THREE.PerspectiveCamera).isPerspectiveCamera
       ) {
         const perspCam = camera as THREE.PerspectiveCamera;
-        const trailUniforms = (trailMaterial as THREE.ShaderMaterial).uniforms;
-        (trailUniforms.cameraNearFar.value as THREE.Vector2).set(
+        (trailUniformValues.cameraNearFar.value as THREE.Vector2).set(
           perspCam.near,
           perspCam.far
         );
@@ -1689,7 +1757,7 @@ export const createParticleSystem = (
     particleSystem,
     wrapper,
     mappedAttributes,
-    elapsedUniform: material.uniforms.elapsed,
+    elapsedUniform: sharedUniforms.elapsed as { value: number },
     generalData,
     onUpdate,
     onComplete,
