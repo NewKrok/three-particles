@@ -6,6 +6,7 @@
  * - Soft particle depth fade
  * - Background color discard
  */
+import { Vector3 } from 'three';
 import {
   Fn,
   vec2,
@@ -63,12 +64,7 @@ export function createParticleUniforms(sharedUniforms: SharedUniforms) {
       float(sharedUniforms.discardBackgroundColor.value ? 1 : 0)
     ),
     uBgColor: uniform(
-      new /* avoid importing THREE just for this */ (sharedUniforms
-        .cameraNearFar.value.constructor as new (
-        x: number,
-        y: number,
-        z: number
-      ) => THREE.Vector3)(
+      new Vector3(
         sharedUniforms.backgroundColor.value.r,
         sharedUniforms.backgroundColor.value.g,
         sharedUniforms.backgroundColor.value.b

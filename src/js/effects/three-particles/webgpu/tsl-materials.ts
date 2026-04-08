@@ -10,27 +10,20 @@ import { RendererType } from '../three-particles-enums.js';
 import { createInstancedBillboardTSLMaterial } from './tsl-instanced-billboard-material.js';
 import { createMeshParticleTSLMaterial } from './tsl-mesh-particle-material.js';
 import { createPointSpriteTSLMaterial } from './tsl-point-sprite-material.js';
-import { createTrailRibbonTSLMaterial } from './tsl-trail-ribbon-material.js';
+import {
+  createTrailRibbonTSLMaterial,
+  type TrailUniforms,
+} from './tsl-trail-ribbon-material.js';
 import type { SharedUniforms } from './tsl-shared.js';
 import type * as THREE from 'three';
+
+export type { TrailUniforms };
 
 export type RendererConfig = {
   transparent: boolean;
   blending: THREE.Blending;
   depthTest: boolean;
   depthWrite: boolean;
-};
-
-export type TrailUniforms = {
-  map: { value: THREE.Texture | null };
-  useMap: { value: boolean };
-  discardBackgroundColor: { value: boolean };
-  backgroundColor: { value: { r: number; g: number; b: number } };
-  backgroundColorTolerance: { value: number };
-  softParticlesEnabled: { value: boolean };
-  softParticlesIntensity: { value: number };
-  sceneDepthTexture: { value: THREE.Texture | null };
-  cameraNearFar: { value: THREE.Vector2 };
 };
 
 /**

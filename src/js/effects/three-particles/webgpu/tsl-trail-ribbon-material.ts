@@ -17,6 +17,8 @@ import { DoubleSide } from 'three';
 import {
   Fn,
   attribute,
+  cameraPosition,
+  cameraViewMatrix,
   vec2,
   vec3,
   vec4,
@@ -174,23 +176,22 @@ export function createTrailRibbonTSLMaterial(
       tangentLen.lessThan(0.0001).select(vec3(0.0, 1.0, 0.0), rawTangent)
     );
 
-    // View-space position of the current vertex (used for viewDir + vViewZ)
+    // View-space position for depth (vViewZ)
     const mvCurrent = modelViewMatrix.mul(vec4(current, 1.0));
 
-    // View direction: from vertex toward camera in world space
-    // In view space the camera is at the origin, so viewDir = normalize(-mvPos.xyz)
-    const viewDir = normalize(mvCurrent.xyz.negate());
+    // View direction in local/world space (tangent is in the same space)
+    const viewDir = normalize(cameraPosition.sub(current));
 
     // Primary billboard perpendicular
     const rawPerp = cross(tangent, viewDir);
     const perpLen = length(rawPerp);
 
     // Camera right vector extracted from the view matrix (column 0)
-    // viewMatrix[col][row] — in TSL column-major: element(col, row)
+    // Using cameraViewMatrix (view-only, no model transform)
     const camRight = vec3(
-      modelViewMatrix.element(0).element(0),
-      modelViewMatrix.element(1).element(0),
-      modelViewMatrix.element(2).element(0)
+      cameraViewMatrix.element(0).element(0),
+      cameraViewMatrix.element(1).element(0),
+      cameraViewMatrix.element(2).element(0)
     );
 
     // Fallback perpendicular: project camRight onto the plane perpendicular to tangent
@@ -243,13 +244,13 @@ export function createTrailRibbonTSLMaterial(
 
     // Soft edge fade: vUv.x runs [0, 1] across the ribbon width.
     // edgeDist = 1 − |2·x − 1| peaks at 0.5 (centre) and is 0 at edges.
-    const edgeDist = float(1.0).sub(abs(aTrailUV.x.mul(2.0).sub(1.0)));
+    const edgeDist = float(1.0).sub(abs(vUv.x.mul(2.0).sub(1.0)));
     const edgeFade = smoothstep(float(0.0), float(0.4), edgeDist);
 
     // Optional texture: modulate colour by luminance (perceptual weighting)
     // and multiply alpha by texture alpha — matching the GLSL shader.
     If(u.uUseMap.greaterThan(0.5), () => {
-      const texColor = texture(u.uMap, aTrailUV);
+      const texColor = texture(u.uMap, vUv);
       const texBrightness = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
       outColor.rgb.assign(
         outColor.rgb.mul(float(0.5).add(texBrightness.mul(0.5)))

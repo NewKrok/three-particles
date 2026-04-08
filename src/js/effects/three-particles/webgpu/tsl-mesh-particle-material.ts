@@ -19,6 +19,7 @@ import {
   vec3,
   vec4,
   float,
+  cameraProjectionMatrix,
   modelViewMatrix,
   positionLocal,
   normalLocal,
@@ -167,7 +168,8 @@ export function createMeshParticleTSLMaterial(
     const mvNormal = modelViewMatrix.mul(vec4(rotatedNormal, 0.0)).xyz;
     vNormal.assign(mvNormal.normalize());
 
-    return worldPos;
+    // Return clip-space position (manual MVP to avoid double-transform)
+    return cameraProjectionMatrix.mul(mvPos);
   })();
 
   // ── Fragment stage ─────────────────────────────────────────────────────────
@@ -262,8 +264,8 @@ export function createMeshParticleTSLMaterial(
   material.depthTest = rendererConfig.depthTest;
   material.depthWrite = rendererConfig.depthWrite;
 
-  // positionNode receives the world-space vertex position computed in vertexSetup
-  material.positionNode = vertexSetup;
+  // vertexNode receives a clip-space vec4 (manual MVP to avoid double-transform)
+  material.vertexNode = vertexSetup;
   material.colorNode = fragmentColor;
 
   return material;
