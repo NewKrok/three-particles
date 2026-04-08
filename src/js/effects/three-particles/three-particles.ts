@@ -18,12 +18,14 @@ import {
   LifeTimeCurve,
   RendererType,
   Shape,
+  SimulationBackend,
   SimulationSpace,
   SubEmitterTrigger,
   TimeMode,
 } from './three-particles-enums';
 import { applyForceFields } from './three-particles-forces.js';
 import { applyModifiers } from './three-particles-modifiers.js';
+import { isComputeCapableRenderer } from './three-particles-renderer-detect.js';
 import {
   calculateRandomPositionAndVelocityOnBox,
   calculateRandomPositionAndVelocityOnCircle,
@@ -74,6 +76,52 @@ const normalizeTrailCurve = (
 
 let _particleSystemId = 0;
 let createdParticleSystems: Array<ParticleSystemInstance> = [];
+
+// ─── WebGPU TSL Material Support (opt-in via registerTSLMaterialFactory) ─────
+
+type TSLMaterialFactory = {
+  createTSLParticleMaterial: (
+    rendererType: RendererType,
+    sharedUniforms: Record<string, { value: unknown }>,
+    rendererConfig: {
+      transparent: boolean;
+      blending: THREE.Blending;
+      depthTest: boolean;
+      depthWrite: boolean;
+    }
+  ) => THREE.Material;
+  createTSLTrailMaterial: (
+    trailUniforms: Record<string, { value: unknown }>,
+    rendererConfig: {
+      transparent: boolean;
+      blending: THREE.Blending;
+      depthTest: boolean;
+      depthWrite: boolean;
+    }
+  ) => THREE.Material;
+};
+
+let _tslMaterialFactory: TSLMaterialFactory | null = null;
+
+/**
+ * Registers the TSL (Three Shading Language) material factory for WebGPU support.
+ *
+ * Call this once before creating particle systems that use WebGPU rendering.
+ * The factory is typically imported from the WebGPU sub-module:
+ *
+ * @example
+ * ```typescript
+ * import { registerTSLMaterialFactory } from '@newkrok/three-particles';
+ * import { createTSLParticleMaterial, createTSLTrailMaterial } from '@newkrok/three-particles/webgpu';
+ *
+ * registerTSLMaterialFactory({ createTSLParticleMaterial, createTSLTrailMaterial });
+ * ```
+ */
+export const registerTSLMaterialFactory = (
+  factory: TSLMaterialFactory
+): void => {
+  _tslMaterialFactory = factory;
+};
 
 // Pre-allocated objects for updateParticleSystemInstance to avoid GC pressure
 const _subEmitterPosition = new THREE.Vector3();
@@ -190,6 +238,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
   },
   gravity: 0.0,
   simulationSpace: SimulationSpace.LOCAL,
+  simulationBackend: SimulationBackend.AUTO,
   maxParticles: 100.0,
   emission: {
     rateOverTime: 10.0,
@@ -891,15 +940,33 @@ export const createParticleSystem = (
     return ParticleSystemFragmentShader;
   };
 
-  const material = new THREE.ShaderMaterial({
-    uniforms: sharedUniforms,
-    vertexShader: getVertexShader(),
-    fragmentShader: getFragmentShader(),
+  // Determine whether to use TSL materials (WebGPU path)
+  const useTSL = (() => {
+    const backend = normalizedConfig.simulationBackend;
+    if (backend === SimulationBackend.CPU) return false;
+    // GPU or AUTO: use TSL if factory is registered
+    return _tslMaterialFactory !== null;
+  })();
+
+  const rendererConfig = {
     transparent: renderer.transparent,
     blending: renderer.blending,
     depthTest: renderer.depthTest,
     depthWrite: renderer.depthWrite,
-  });
+  };
+
+  const material: THREE.Material = useTSL
+    ? _tslMaterialFactory!.createTSLParticleMaterial(
+        renderer.rendererType ?? RendererType.POINTS,
+        sharedUniforms,
+        rendererConfig
+      )
+    : new THREE.ShaderMaterial({
+        uniforms: sharedUniforms,
+        vertexShader: getVertexShader(),
+        fragmentShader: getFragmentShader(),
+        ...rendererConfig,
+      });
 
   let geometry: THREE.BufferGeometry | THREE.InstancedBufferGeometry;
 
@@ -1490,30 +1557,34 @@ export const createParticleSystem = (
     trailGeometry.setAttribute('trailUV', trailUVAttr);
     trailGeometry.setIndex(trailIndexAttr);
 
-    const trailMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        map: { value: particleMap },
-        useMap: { value: !!particleMap },
-        discardBackgroundColor: { value: renderer.discardBackgroundColor },
-        backgroundColor: { value: renderer.backgroundColor },
-        backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
-        softParticlesEnabled: { value: softParticlesEnabled },
-        softParticlesIntensity: {
-          value: Math.max(renderer.softParticles?.intensity ?? 1.0, 0.001),
-        },
-        sceneDepthTexture: {
-          value: renderer.softParticles?.depthTexture ?? null,
-        },
-        cameraNearFar: { value: new THREE.Vector2(0.1, 1000.0) },
+    const trailUniformValues = {
+      map: { value: particleMap },
+      useMap: { value: !!particleMap },
+      discardBackgroundColor: { value: renderer.discardBackgroundColor },
+      backgroundColor: { value: renderer.backgroundColor },
+      backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
+      softParticlesEnabled: { value: softParticlesEnabled },
+      softParticlesIntensity: {
+        value: Math.max(renderer.softParticles?.intensity ?? 1.0, 0.001),
       },
-      vertexShader: TrailVertexShader,
-      fragmentShader: TrailFragmentShader,
-      transparent: renderer.transparent,
-      blending: renderer.blending,
-      depthTest: renderer.depthTest,
-      depthWrite: renderer.depthWrite,
-      side: THREE.DoubleSide,
-    });
+      sceneDepthTexture: {
+        value: renderer.softParticles?.depthTexture ?? null,
+      },
+      cameraNearFar: { value: new THREE.Vector2(0.1, 1000.0) },
+    };
+
+    const trailMaterial: THREE.Material = useTSL
+      ? _tslMaterialFactory!.createTSLTrailMaterial(
+          trailUniformValues,
+          rendererConfig
+        )
+      : new THREE.ShaderMaterial({
+          uniforms: trailUniformValues,
+          vertexShader: TrailVertexShader,
+          fragmentShader: TrailFragmentShader,
+          ...rendererConfig,
+          side: THREE.DoubleSide,
+        });
 
     trailMesh = new THREE.Mesh(trailGeometry, trailMaterial);
     trailMesh.frustumCulled = false;
@@ -1531,8 +1602,7 @@ export const createParticleSystem = (
         (camera as THREE.PerspectiveCamera).isPerspectiveCamera
       ) {
         const perspCam = camera as THREE.PerspectiveCamera;
-        const trailUniforms = (trailMaterial as THREE.ShaderMaterial).uniforms;
-        (trailUniforms.cameraNearFar.value as THREE.Vector2).set(
+        (trailUniformValues.cameraNearFar.value as THREE.Vector2).set(
           perspCam.near,
           perspCam.far
         );
@@ -1687,7 +1757,7 @@ export const createParticleSystem = (
     particleSystem,
     wrapper,
     mappedAttributes,
-    elapsedUniform: material.uniforms.elapsed,
+    elapsedUniform: sharedUniforms.elapsed as { value: number },
     generalData,
     onUpdate,
     onComplete,
@@ -1707,6 +1777,7 @@ export const createParticleSystem = (
     activateParticle,
     onParticleDeath,
     onParticleBirth,
+    useGPUCompute: false,
     ...(useTrail
       ? {
           trailMesh,
@@ -1916,6 +1987,8 @@ const updateParticleSystemInstance = (
     onParticleDeath,
     onParticleBirth,
     mappedAttributes: ma,
+    useGPUCompute,
+    computePipeline,
   } = props;
 
   const hasForceFields = normalizedForceFields.length > 0;
@@ -2020,75 +2093,123 @@ const updateParticleSystemInstance = (
   const lifetimeArr = ma.lifetime.array;
   const creationTimesLength = creationTimes.length;
 
-  let positionNeedsUpdate = false;
-  let lifetimeNeedsUpdate = false;
+  // ── GPU Compute Path ──────────────────────────────────────────────────
+  // When GPU compute is active, the per-particle physics (gravity, velocity,
+  // position, lifetime) runs on the GPU. CPU still handles:
+  //   - Death detection for sub-emitter callbacks
+  //   - Emission (particle activation)
+  //   - Modifiers (Phase 3 will move these to GPU too)
+  if (useGPUCompute && computePipeline) {
+    const cp =
+      computePipeline as import('./webgpu/compute-particle-update.js').ParticleComputePipeline;
+    // Update per-frame compute uniforms
+    (cp.uniforms.delta as unknown as { value: number }).value = delta;
+    (cp.uniforms.deltaMs as unknown as { value: number }).value = delta * 1000;
+    const gv = cp.uniforms.gravityVelocity as unknown as {
+      value: { set: (x: number, y: number, z: number) => void };
+    };
+    gv.value.set(gravityVelocity.x, gravityVelocity.y, gravityVelocity.z);
+    const wpc = cp.uniforms.worldPositionChange as unknown as {
+      value: { set: (x: number, y: number, z: number) => void };
+    };
+    wpc.value.set(
+      generalData.worldPositionChange.x,
+      generalData.worldPositionChange.y,
+      generalData.worldPositionChange.z
+    );
+    (cp.uniforms.simulationSpaceWorld as unknown as { value: number }).value =
+      simulationSpace === SimulationSpace.WORLD ? 1 : 0;
 
-  _modifierParams.delta = delta;
-  _modifierParams.generalData = generalData;
-  _modifierParams.normalizedConfig = normalizedConfig;
-  _modifierParams.attributes = ma;
-
-  for (let index = 0; index < creationTimesLength; index++) {
-    if (isActiveArr[index]) {
-      const particleLifetime = now - creationTimes[index];
-      if (particleLifetime > startLifetimeArr[index]) {
-        if (onParticleDeath)
-          onParticleDeath(index, positionArr, velocities[index], now);
-        deactivateParticle(index);
-      } else {
-        const velocity = velocities[index];
-        velocity.x -= gravityVelocity.x * delta;
-        velocity.y -= gravityVelocity.y * delta;
-        velocity.z -= gravityVelocity.z * delta;
-
-        if (hasForceFields) {
-          applyForceFields({
-            particleSystemId: generalData.particleSystemId,
-            forceFields: _localForceFields,
-            velocity,
-            positionArr,
-            positionIndex: index * 3,
-            delta,
-            systemLifetimePercentage: generalData.normalizedLifetimePercentage,
-          });
+    // CPU-side death detection (for sub-emitter callbacks)
+    for (let index = 0; index < creationTimesLength; index++) {
+      if (isActiveArr[index]) {
+        const particleLifetime = now - creationTimes[index];
+        if (particleLifetime > startLifetimeArr[index]) {
+          if (onParticleDeath)
+            onParticleDeath(index, positionArr, velocities[index], now);
+          deactivateParticle(index);
         }
-
-        if (
-          gravity !== 0 ||
-          velocity.x !== 0 ||
-          velocity.y !== 0 ||
-          velocity.z !== 0 ||
-          worldPositionChange.x !== 0 ||
-          worldPositionChange.y !== 0 ||
-          worldPositionChange.z !== 0
-        ) {
-          const positionIndex = index * 3;
-
-          if (simulationSpace === SimulationSpace.WORLD) {
-            positionArr[positionIndex] -= worldPositionChange.x;
-            positionArr[positionIndex + 1] -= worldPositionChange.y;
-            positionArr[positionIndex + 2] -= worldPositionChange.z;
-          }
-
-          positionArr[positionIndex] += velocity.x * delta;
-          positionArr[positionIndex + 1] += velocity.y * delta;
-          positionArr[positionIndex + 2] += velocity.z * delta;
-          positionNeedsUpdate = true;
-        }
-
-        lifetimeArr[index] = particleLifetime;
-        lifetimeNeedsUpdate = true;
-
-        _modifierParams.particleLifetimePercentage =
-          particleLifetime / startLifetimeArr[index];
-        _modifierParams.particleIndex = index;
-        applyModifiers(_modifierParams);
       }
     }
-  }
 
-  if (positionNeedsUpdate) ma.position.needsUpdate = true;
-  if (lifetimeNeedsUpdate) ma.lifetime.needsUpdate = true;
+    // Note: renderer.compute(cp.computeNode) is called from the
+    // ParticleSystem.update() wrapper, not here, because we need
+    // access to the renderer reference which is not available in
+    // the internal update function.
+  } else {
+    // ── CPU Path (existing logic, unchanged) ────────────────────────────
+
+    let positionNeedsUpdate = false;
+    let lifetimeNeedsUpdate = false;
+
+    _modifierParams.delta = delta;
+    _modifierParams.generalData = generalData;
+    _modifierParams.normalizedConfig = normalizedConfig;
+    _modifierParams.attributes = ma;
+
+    for (let index = 0; index < creationTimesLength; index++) {
+      if (isActiveArr[index]) {
+        const particleLifetime = now - creationTimes[index];
+        if (particleLifetime > startLifetimeArr[index]) {
+          if (onParticleDeath)
+            onParticleDeath(index, positionArr, velocities[index], now);
+          deactivateParticle(index);
+        } else {
+          const velocity = velocities[index];
+          velocity.x -= gravityVelocity.x * delta;
+          velocity.y -= gravityVelocity.y * delta;
+          velocity.z -= gravityVelocity.z * delta;
+
+          if (hasForceFields) {
+            applyForceFields({
+              particleSystemId: generalData.particleSystemId,
+              forceFields: _localForceFields,
+              velocity,
+              positionArr,
+              positionIndex: index * 3,
+              delta,
+              systemLifetimePercentage:
+                generalData.normalizedLifetimePercentage,
+            });
+          }
+
+          if (
+            gravity !== 0 ||
+            velocity.x !== 0 ||
+            velocity.y !== 0 ||
+            velocity.z !== 0 ||
+            worldPositionChange.x !== 0 ||
+            worldPositionChange.y !== 0 ||
+            worldPositionChange.z !== 0
+          ) {
+            const positionIndex = index * 3;
+
+            if (simulationSpace === SimulationSpace.WORLD) {
+              positionArr[positionIndex] -= worldPositionChange.x;
+              positionArr[positionIndex + 1] -= worldPositionChange.y;
+              positionArr[positionIndex + 2] -= worldPositionChange.z;
+            }
+
+            positionArr[positionIndex] += velocity.x * delta;
+            positionArr[positionIndex + 1] += velocity.y * delta;
+            positionArr[positionIndex + 2] += velocity.z * delta;
+            positionNeedsUpdate = true;
+          }
+
+          lifetimeArr[index] = particleLifetime;
+          lifetimeNeedsUpdate = true;
+
+          _modifierParams.particleLifetimePercentage =
+            particleLifetime / startLifetimeArr[index];
+          _modifierParams.particleIndex = index;
+          applyModifiers(_modifierParams);
+        }
+      }
+    }
+
+    if (positionNeedsUpdate) ma.position.needsUpdate = true;
+    if (lifetimeNeedsUpdate) ma.lifetime.needsUpdate = true;
+  } // end of CPU/GPU compute branch
 
   if (isEnabled && (looping || lifetime < duration * 1000)) {
     const emissionDelta = now - lastEmissionTime;

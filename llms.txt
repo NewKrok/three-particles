@@ -198,6 +198,48 @@ forceFields: [
 ]
 ```
 
+## WebGPU Compute Support
+
+Optional GPU-accelerated particle simulation via Three.js WebGPU renderer and TSL (Three Shading Language). Enables 50K-100K+ particles with full physics on the GPU.
+
+### Setup
+
+```typescript
+import { createParticleSystem, registerTSLMaterialFactory, SimulationBackend } from "@newkrok/three-particles";
+import { createTSLParticleMaterial, createTSLTrailMaterial } from "@newkrok/three-particles/webgpu";
+
+// Register TSL materials (once, before creating systems)
+registerTSLMaterialFactory({ createTSLParticleMaterial, createTSLTrailMaterial });
+
+// Create system with GPU backend
+const system = createParticleSystem({
+  simulationBackend: SimulationBackend.GPU, // or AUTO (default)
+  maxParticles: 50000,
+  // ... rest of config
+});
+```
+
+### SimulationBackend
+
+| Value | Behavior |
+|-------|----------|
+| `AUTO` (default) | GPU if WebGPURenderer detected, else CPU |
+| `CPU` | Always JavaScript update loop |
+| `GPU` | Request GPU compute, falls back to CPU if unavailable |
+
+### What runs on GPU
+
+- Core physics: gravity, velocity integration, position update, lifetime
+- All 7 modifiers: size/opacity/color over lifetime, rotation, linear/orbital velocity, noise
+- Force fields: point attractors/repulsors and directional forces with falloff
+- Curves: baked into 256-sample lookup textures for GPU evaluation
+
+### What stays on CPU
+
+- Emission (particle activation/deactivation)
+- Sub-emitter callbacks (onParticleBirth, onParticleDeath)
+- Configuration changes (`updateConfig`)
+
 ## Usage with React Three Fiber
 
 No wrapper package needed — use hooks directly:

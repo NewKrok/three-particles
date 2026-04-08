@@ -21,9 +21,22 @@ src/js/effects/three-particles/
 ├── three-particles-utils.ts          # Shape generators, value resolution, texture
 ├── three-particles-enums.ts          # SimulationSpace, Shape, EmitFrom, etc.
 ├── three-particles-forces.ts         # Force fields and attractors
+├── three-particles-renderer-detect.ts # WebGPU renderer detection
 ├── three-particles-serialization.ts  # Config save/load serialization
 ├── types.ts                          # Complete TypeScript type definitions
-└── shaders/                          # GLSL shaders (points, instanced, trail, mesh)
+├── shaders/                          # GLSL shaders (points, instanced, trail, mesh)
+└── webgpu/                           # WebGPU compute + TSL materials
+    ├── tsl-materials.ts              # TSL material factory
+    ├── tsl-shared.ts                 # Shared TSL nodes (texture animation, soft particles)
+    ├── tsl-point-sprite-material.ts  # POINTS renderer TSL material
+    ├── tsl-instanced-billboard-material.ts # INSTANCED renderer TSL material
+    ├── tsl-mesh-particle-material.ts # MESH renderer TSL material
+    ├── tsl-trail-ribbon-material.ts  # TRAIL renderer TSL material
+    ├── compute-particle-update.ts    # Core physics compute shader
+    ├── compute-modifiers.ts          # All 7 modifiers compute shader
+    ├── compute-force-fields.ts       # Force field GPU compute
+    ├── curve-bake.ts                 # Curve baking (bezier/easing → Float32Array)
+    └── tsl-noise.ts                  # 3D simplex noise in TSL
 ```
 
 **Tests:** `src/__tests__/*.test.ts`
@@ -113,6 +126,7 @@ Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into 
 | [CI/CD Pipeline](doc/ci-cd.md) | Release process, workflow troubleshooting, version bump logic |
 | [Development Workflow](doc/workflow.md) | Step-by-step workflow, agent orchestration pattern, pre-commit checks |
 | [Testing Guide](doc/testing.md) | Mocking patterns, test helpers, coverage targets, writing effective tests |
+| [WebGPU Compute Plan](doc/webgpu-compute-plan.md) | WebGPU implementation phases, TSL migration, compute shader architecture |
 
 ---
 
@@ -138,8 +152,8 @@ Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into 
 
 ## Project Status
 
-Completed: Core system, all shape emitters, lifetime modifiers, noise, burst/distance emission, texture sheet animation, world/local space, sub-emitters, force fields, GPU instancing, trail renderer (with smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons), mesh renderer, soft particles, serialization, TypeDoc, visual editor, examples page, CI/CD, benchmark suite, React Three Fiber docs, llms.txt, real-time config updates (`updateConfig`).
+Completed: Core system, all shape emitters, lifetime modifiers, noise, burst/distance emission, texture sheet animation, world/local space, sub-emitters, force fields, GPU instancing, trail renderer (with smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons), mesh renderer, soft particles, serialization, TypeDoc, visual editor, examples page, CI/CD, benchmark suite, React Three Fiber docs, llms.txt, real-time config updates (`updateConfig`), WebGPU compute support (TSL shaders, GPU physics, modifiers, force fields, noise, curve baking).
 
-**Planned:** Trail Phase 2 (UV texture modes, UV scrolling, width by speed), WebGPU compute, preset system.
+**Planned:** Trail Phase 2 (UV texture modes, UV scrolling, width by speed), preset system.
 
 **Coverage target:** >=90% statement, >=80% branch.

@@ -25,6 +25,7 @@ Particle system for ThreeJS.
 *   Trail / Ribbon renderer (`RendererType.TRAIL`) — continuous ribbon trails behind particles with configurable width, opacity, and color tapering.
 *   Mesh particle renderer (`RendererType.MESH`) — render each particle as a 3D mesh (debris, gems, coins) using GPU instancing with full 3D rotation and simple directional lighting.
 *   Soft particles — depth-based alpha fade near opaque geometry, eliminating hard intersection lines.
+*   **WebGPU compute support** — GPU compute shaders for particle simulation (gravity, velocity, modifiers, force fields, noise) via Three.js TSL. Automatic fallback to CPU when WebGPU is unavailable.
 *   TypeDoc API documentation available.
 
 # Live Demo & Examples
