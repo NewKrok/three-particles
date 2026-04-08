@@ -41,6 +41,7 @@ import {
   StorageInstancedBufferAttribute,
 } from 'three/webgpu';
 
+import { createForceFieldComputeNodes } from './compute-force-fields.js';
 import { snoise3D } from './tsl-noise.js';
 import type { BakedCurveMap } from './curve-bake.js';
 
@@ -55,6 +56,7 @@ export type ModifierFlags = {
   linearVelocity: boolean;
   orbitalVelocity: boolean;
   noise: boolean;
+  forceFields: boolean;
 };
 
 /** Per-frame modifier uniform values. */
@@ -201,8 +203,14 @@ export function createModifierComputeUpdate(
   buffers: ModifierStorageBuffers,
   maxParticles: number,
   curveMap: BakedCurveMap,
-  flags: ModifierFlags
+  flags: ModifierFlags,
+  forceFieldCount = 0
 ): ModifierComputePipeline {
+  // ── Force field nodes (if any) ──
+  const forceFieldNodes = flags.forceFields
+    ? createForceFieldComputeNodes(forceFieldCount)
+    : null;
+
   // ── Per-frame uniforms ──
 
   const uDelta = uniform(float(0));
@@ -265,6 +273,11 @@ export function createModifierComputeUpdate(
 
     // Gravity
     vel.assign(vel.sub(vec3(uGravityVelocity).mul(uDelta)));
+
+    // Force fields (applied after gravity, before position integration)
+    if (forceFieldNodes) {
+      forceFieldNodes.apply({ pos, vel, delta: uDelta });
+    }
 
     // World-space compensation
     If(uSimSpaceWorld.greaterThan(0.5), () => {
@@ -495,5 +508,12 @@ export function createModifierComputeUpdate(
       noiseSizeAmount: uNoiseSizeAmount,
     },
     buffers,
+    /** Force field buffer and count uniform (null if no force fields). */
+    forceFieldNodes: forceFieldNodes
+      ? {
+          buffer: forceFieldNodes.buffer,
+          countUniform: forceFieldNodes.countUniform,
+        }
+      : null,
   };
 }
