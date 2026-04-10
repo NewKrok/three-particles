@@ -6,7 +6,7 @@
  * - Soft particle depth fade
  * - Background color discard
  */
-import { Vector3 } from 'three';
+import { DataTexture, Vector3 } from 'three';
 import {
   Fn,
   vec2,
@@ -31,6 +31,16 @@ import {
 
 import type * as THREE from 'three';
 
+/** 1x1 white placeholder texture for null uniform slots. */
+let _dummyTexture: DataTexture | null = null;
+export function getDummyTexture(): DataTexture {
+  if (!_dummyTexture) {
+    _dummyTexture = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+    _dummyTexture.needsUpdate = true;
+  }
+  return _dummyTexture;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SharedUniforms = {
@@ -52,8 +62,9 @@ export type SharedUniforms = {
 // ─── Uniform creators ────────────────────────────────────────────────────────
 
 export function createParticleUniforms(sharedUniforms: SharedUniforms) {
+  const dummy = getDummyTexture();
   return {
-    uMap: uniform(sharedUniforms.map.value),
+    uMap: sharedUniforms.map.value ?? dummy,
     uElapsed: uniform(float(sharedUniforms.elapsed.value)),
     uFps: uniform(float(sharedUniforms.fps.value)),
     uUseFPSForFrameIndex: uniform(
@@ -75,7 +86,7 @@ export function createParticleUniforms(sharedUniforms: SharedUniforms) {
       float(sharedUniforms.softParticlesEnabled.value ? 1 : 0)
     ),
     uSoftIntensity: uniform(float(sharedUniforms.softParticlesIntensity.value)),
-    uSceneDepthTex: uniform(sharedUniforms.sceneDepthTexture.value),
+    uSceneDepthTex: sharedUniforms.sceneDepthTexture.value ?? dummy,
     uCameraNearFar: uniform(sharedUniforms.cameraNearFar.value),
   };
 }

@@ -11,10 +11,10 @@ import { ParticleSystem } from '../js/effects/three-particles/types.js';
  */
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = ps.instance as THREE.Points;
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -314,10 +314,10 @@ describe('Sub-emitters', () => {
       let totalSubActive = 0;
       for (let i = 1; i < scene.children.length; i++) {
         const child = scene.children[i] as THREE.Points;
-        const isActiveArr = child.geometry?.attributes?.isActive?.array;
-        if (isActiveArr) {
-          for (let j = 0; j < isActiveArr.length; j++) {
-            if (isActiveArr[j]) totalSubActive++;
+        const isActiveSub = child.geometry?.attributes?.isActive;
+        if (isActiveSub) {
+          for (let j = 0; j < isActiveSub.count; j++) {
+            if (isActiveSub.getX(j)) totalSubActive++;
           }
         }
       }
@@ -396,10 +396,10 @@ describe('Sub-emitters', () => {
       const subPoints = subWrapper.children[0] as THREE.Points;
       expect(subPoints?.geometry?.attributes?.isActive).toBeDefined();
 
-      const isActiveArr = subPoints.geometry.attributes.isActive.array;
+      const isActiveAttr = subPoints.geometry.attributes.isActive;
       let activeCount = 0;
-      for (let i = 0; i < isActiveArr.length; i++) {
-        if (isActiveArr[i]) activeCount++;
+      for (let i = 0; i < isActiveAttr.count; i++) {
+        if (isActiveAttr.getX(i)) activeCount++;
       }
       expect(activeCount).toBe(5);
 

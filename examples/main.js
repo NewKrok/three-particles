@@ -10,6 +10,55 @@ const version = await initVersionSwitcher() || "2.4.0";
 const particleModule = await import(cdnUrl(version));
 const { createParticleSystem, updateParticleSystems } = particleModule;
 
+// ─── WebGPU support ────────────────────────────────────────────────
+// The importmap maps "three" to three.webgpu.js for a unified Three.js
+// instance. All examples use WebGPURenderer (auto WebGL fallback).
+// GPU-tagged examples get TSL NodeMaterials; others use GLSL ShaderMaterial
+// via simulationBackend: "CPU".
+let webgpuAvailable = false;
+
+try {
+  if (navigator.gpu) {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (adapter) {
+      if (version === "local" && particleModule.registerTSLMaterialFactory) {
+        const { createTSLParticleMaterial, createTSLTrailMaterial } = await import(
+          "./three-particles-webgpu.esm.js"
+        );
+        particleModule.registerTSLMaterialFactory({
+          createTSLParticleMaterial,
+          createTSLTrailMaterial,
+        });
+      }
+      webgpuAvailable = true;
+    }
+  }
+} catch {
+  // WebGPU not available
+}
+
+// Debug: log WGSL shader compilation errors with source code
+if (typeof GPUDevice !== "undefined") {
+  const _origCSM = GPUDevice.prototype.createShaderModule;
+  GPUDevice.prototype.createShaderModule = function(descriptor) {
+    const module = _origCSM.call(this, descriptor);
+    module.getCompilationInfo().then(info => {
+      const errors = info.messages.filter(m => m.type === "error");
+      if (errors.length > 0) {
+        console.group("%c[WGSL Shader Error]", "color:red;font-weight:bold");
+        errors.forEach(e => console.error(`Line ${e.lineNum}:${e.linePos} — ${e.message}`));
+        console.log(descriptor.code);
+        console.groupEnd();
+      }
+    });
+    return module;
+  };
+}
+
+function isWebGPUExample(example) {
+  return example.tags && example.tags.includes("webgpu");
+}
+
 // Texture ID to file mapping
 const TEXTURE_MAP = {
   FLAME: "textures/flame.webp",
@@ -64,9 +113,22 @@ const MESH_GEOMETRIES = {
   CYLINDER: () => new THREE.CylinderGeometry(0.3, 0.3, 1, 8),
 };
 
-function prepareConfig(config, textureId, meshType) {
+function prepareConfig(config, textureId, meshType, forceGPU = false) {
   const prepared = JSON.parse(JSON.stringify(config));
   delete prepared._editorData;
+  // Only WebGPU-tagged examples use TSL materials; force CPU for the rest
+  // so they keep using the proven GLSL ShaderMaterial path.
+  if (!forceGPU) {
+    prepared.simulationBackend = "CPU";
+  } else {
+    // WebGPU does not support point primitives (gl_PointCoord / gl_PointSize).
+    // Force POINTS → INSTANCED (billboard quads) for GPU examples.
+    const rt = prepared.renderer?.rendererType;
+    if (!rt || rt === "POINTS") {
+      prepared.renderer = prepared.renderer || {};
+      prepared.renderer.rendererType = "INSTANCED";
+    }
+  }
   if (prepared.renderer?.blending) {
     prepared.renderer.blending = resolveBlending(prepared.renderer.blending);
   }
@@ -143,10 +205,11 @@ class LiveDemo {
     this.paused = false;
     this.pausedDuration = 0;
     this.pauseStartTime = 0;
+    this.disposed = false;
     this.init();
   }
 
-  init() {
+  async init() {
     const canvas = this.container.querySelector("canvas");
     canvas.style.display = "block";
     const img = this.container.querySelector(".preview-img");
@@ -159,11 +222,13 @@ class LiveDemo {
     const width = canvas.clientWidth || 320;
     const height = canvas.clientHeight || 220;
 
-    this.renderer = new THREE.WebGLRenderer({
+    this.renderer = new THREE.WebGPURenderer({
       canvas,
       antialias: true,
       alpha: true,
     });
+    await this.renderer.init();
+    if (this.disposed) { this.renderer.dispose(); return; }
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -182,9 +247,10 @@ class LiveDemo {
       this.scene.add(setup.groundMesh);
     }
 
-    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType);
+    const useGPU = webgpuAvailable && isWebGPUExample(this.data);
+    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType, useGPU);
     config.renderer = config.renderer || {};
-    if (!isTrailExample(this.data) && !isMeshExample(this.data)) {
+    if (!useGPU && !isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
     if (this.softParticlesSetup) {
@@ -246,6 +312,7 @@ class LiveDemo {
   }
 
   dispose() {
+    this.disposed = true;
     if (this.animationId) cancelAnimationFrame(this.animationId);
     if (this.particleSystem) this.particleSystem.dispose();
     if (this.softParticlesSetup) {
@@ -334,18 +401,21 @@ class ExpandedDemo {
     this.paused = false;
     this.pausedDuration = 0;
     this.pauseStartTime = 0;
+    this.disposed = false;
     this.init();
   }
 
-  init() {
+  async init() {
     const width = this.canvas.clientWidth || 800;
     const height = this.canvas.clientHeight || 600;
 
-    this.renderer = new THREE.WebGLRenderer({
+    this.renderer = new THREE.WebGPURenderer({
       canvas: this.canvas,
       antialias: true,
       alpha: true,
     });
+    await this.renderer.init();
+    if (this.disposed) { this.renderer.dispose(); return; }
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -364,9 +434,10 @@ class ExpandedDemo {
       this.scene.add(setup.groundMesh);
     }
 
-    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType);
+    const useGPU = webgpuAvailable && isWebGPUExample(this.data);
+    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType, useGPU);
     config.renderer = config.renderer || {};
-    if (!isTrailExample(this.data) && !isMeshExample(this.data)) {
+    if (!useGPU && !isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
     if (this.softParticlesSetup) {
@@ -480,6 +551,7 @@ class ExpandedDemo {
   }
 
   dispose() {
+    this.disposed = true;
     if (this.animationId) cancelAnimationFrame(this.animationId);
     if (this.particleSystem) this.particleSystem.dispose();
     if (this.softParticlesSetup) {
@@ -530,6 +602,8 @@ function openExpandModal(exampleData, rendererType) {
     toggle.innerHTML = `<span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span>`;
   } else if (isMeshExample(exampleData)) {
     toggle.innerHTML = `<span class="trail-badge" title="3D Mesh renderer">MESH</span>`;
+  } else if (isWebGPUExample(exampleData)) {
+    toggle.innerHTML = `<span class="trail-badge webgpu-badge" title="${webgpuAvailable ? "Running with WebGPU renderer" : "WebGPU not available — using WebGL fallback"}">${webgpuAvailable ? "WebGPU" : "WebGL (fallback)"}</span>`;
   } else {
     toggle.innerHTML = `
       <button data-type="POINTS" title="Point sprites (THREE.Points)">POINTS</button>
@@ -555,7 +629,7 @@ document.getElementById("expand-overlay").addEventListener("click", (e) => {
 });
 document.getElementById("expand-renderer-toggle").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-type]");
-  if (!btn || (expandExampleData && (isTrailExample(expandExampleData) || isMeshExample(expandExampleData)))) return;
+  if (!btn || (expandExampleData && (isTrailExample(expandExampleData) || isMeshExample(expandExampleData) || isWebGPUExample(expandExampleData)))) return;
   const type = btn.dataset.type;
   const toggle = document.getElementById("expand-renderer-toggle");
   toggle.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
@@ -644,7 +718,9 @@ examples.forEach((example) => {
             ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span></div>`
             : isMeshExample(example)
               ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge" title="3D Mesh renderer">MESH</span></div>`
-              : `<div class="renderer-toggle">
+              : isWebGPUExample(example)
+                ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge webgpu-badge" title="${webgpuAvailable ? "Running with WebGPU renderer" : "WebGPU not available — using WebGL fallback"}">${webgpuAvailable ? "WebGPU" : "WebGL"}</span></div>`
+                : `<div class="renderer-toggle">
               <button class="active" data-type="POINTS" title="Point sprites (THREE.Points)">PTS</button>
               <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INST</button>
             </div>`
@@ -691,7 +767,7 @@ examples.forEach((example) => {
 
   cardRendererTypes.set(card, getConfigRendererType(example));
 
-  if (!isTrailExample(example) && !isMeshExample(example)) {
+  if (!isTrailExample(example) && !isMeshExample(example) && !isWebGPUExample(example)) {
     card.querySelector(".renderer-toggle").addEventListener("click", (e) => {
       e.stopPropagation();
       const btn = e.target.closest("button[data-type]");

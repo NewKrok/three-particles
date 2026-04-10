@@ -42,7 +42,7 @@ import {
   type Node,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
-import { linearizeDepth } from './tsl-shared.js';
+import { getDummyTexture, linearizeDepth } from './tsl-shared.js';
 import type * as THREE from 'three';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -75,8 +75,9 @@ export type TrailUniforms = {
 // ─── Internal uniform creators ───────────────────────────────────────────────
 
 function createTrailUniforms(trailUniforms: TrailUniforms) {
+  const dummy = getDummyTexture();
   return {
-    uMap: uniform(trailUniforms.map.value),
+    uMap: trailUniforms.map.value ?? dummy,
     uUseMap: uniform(float(trailUniforms.useMap.value ? 1 : 0)),
     uDiscardBg: uniform(
       float(trailUniforms.discardBackgroundColor.value ? 1 : 0)
@@ -97,7 +98,7 @@ function createTrailUniforms(trailUniforms: TrailUniforms) {
       float(trailUniforms.softParticlesEnabled.value ? 1 : 0)
     ),
     uSoftIntensity: uniform(float(trailUniforms.softParticlesIntensity.value)),
-    uSceneDepthTex: uniform(trailUniforms.sceneDepthTexture.value),
+    uSceneDepthTex: trailUniforms.sceneDepthTexture.value ?? dummy,
     uCameraNearFar: uniform(trailUniforms.cameraNearFar.value),
   };
 }
@@ -262,9 +263,7 @@ export function createTrailRibbonTSLMaterial(
     outColor.a.assign(outColor.a.mul(vAlpha).mul(edgeFade));
 
     // Early discard for fully transparent fragments
-    If(outColor.a.lessThan(0.001), () => {
-      Discard();
-    });
+    Discard(outColor.a.lessThan(0.001));
 
     // Soft particles — depth-difference fade
     If(u.uSoftEnabled.greaterThan(0.5), () => {
@@ -277,22 +276,20 @@ export function createTrailRibbonTSLMaterial(
       const depthDiff = sceneDepthLinear.sub(vViewZ);
       const softFade = smoothstep(float(0.0), u.uSoftIntensity, depthDiff);
       outColor.a.assign(outColor.a.mul(softFade));
-      If(outColor.a.lessThan(0.001), () => {
-        Discard();
-      });
     });
+    Discard(outColor.a.lessThan(0.001));
 
     // Background color discard
-    If(u.uDiscardBg.greaterThan(0.5), () => {
-      const diff = vec3(
-        outColor.r.sub(u.uBgColor.x),
-        outColor.g.sub(u.uBgColor.y),
-        outColor.b.sub(u.uBgColor.z)
-      );
-      If(abs(length(diff)).lessThan(u.uBgTolerance), () => {
-        Discard();
-      });
-    });
+    const diff = vec3(
+      outColor.r.sub(u.uBgColor.x),
+      outColor.g.sub(u.uBgColor.y),
+      outColor.b.sub(u.uBgColor.z)
+    );
+    Discard(
+      u.uDiscardBg
+        .greaterThan(0.5)
+        .and(abs(length(diff)).lessThan(u.uBgTolerance))
+    );
 
     return outColor;
   })();

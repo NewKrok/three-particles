@@ -13,10 +13,10 @@ const countActiveParticles = (ps: ParticleSystem): number => {
     const child = points.children[0] as THREE.Points;
     geometry = child.geometry;
   }
-  const isActiveArr = geometry.attributes.isActive.array;
+  const isActiveAttr = geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };

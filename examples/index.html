@@ -239,6 +239,8 @@
       padding: 4px 8px; color: #f7a14f; font-size: inherit; font-family: inherit;
       letter-spacing: 0.02em; line-height: 1;
     }
+    .webgpu-badge { color: #66bb6a; }
+    .webgpu-badge.fallback { color: #888; }
 
     /* Expand modal */
     .expand-overlay {
@@ -439,9 +441,11 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.webgpu.js",
       "three/": "https://cdn.jsdelivr.net/npm/three@0.182.0/",
-      "THREE": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js"
+      "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.tsl.js",
+      "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.webgpu.js",
+      "THREE": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.webgpu.js"
     }
   }
   </script>

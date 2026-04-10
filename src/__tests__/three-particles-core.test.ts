@@ -22,10 +22,10 @@ import {
  */
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = ps.instance as THREE.Points;
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -266,10 +266,10 @@ describe('createParticleSystem', () => {
       maxParticles: 10,
     });
     const points = ps.instance as THREE.Points;
-    const startLifetimeArr = points.geometry.attributes.startLifetime.array;
+    const startLifetimeAttr = points.geometry.attributes.startLifetime;
     for (let i = 0; i < 10; i++) {
-      expect(startLifetimeArr[i]).toBeGreaterThanOrEqual(1000);
-      expect(startLifetimeArr[i]).toBeLessThanOrEqual(3000);
+      expect(startLifetimeAttr.getX(i)).toBeGreaterThanOrEqual(1000);
+      expect(startLifetimeAttr.getX(i)).toBeLessThanOrEqual(3000);
     }
     ps.dispose();
   });
@@ -383,10 +383,10 @@ describe('createParticleSystem', () => {
     });
 
     const points = ps.instance as THREE.Points;
-    const startFrameArr = points.geometry.attributes.startFrame.array;
+    const startFrameAttr = points.geometry.attributes.startFrame;
     for (let i = 0; i < 10; i++) {
-      expect(startFrameArr[i]).toBeGreaterThanOrEqual(0);
-      expect(startFrameArr[i]).toBeLessThanOrEqual(15);
+      expect(startFrameAttr.getX(i)).toBeGreaterThanOrEqual(0);
+      expect(startFrameAttr.getX(i)).toBeLessThanOrEqual(15);
     }
     ps.dispose();
   });
@@ -635,11 +635,11 @@ describe('Particle activation and color', () => {
 
     // Check that at least one active particle has the correct color
     let foundColoredParticle = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
-        expect(attrs.colorR.array[i]).toBeCloseTo(1);
-        expect(attrs.colorG.array[i]).toBeCloseTo(0);
-        expect(attrs.colorB.array[i]).toBeCloseTo(0);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
+        expect(attrs.colorR.getX(i)).toBeCloseTo(1);
+        expect(attrs.colorG.getX(i)).toBeCloseTo(0);
+        expect(attrs.colorB.getX(i)).toBeCloseTo(0);
         foundColoredParticle = true;
         break;
       }
@@ -660,10 +660,10 @@ describe('Particle activation and color', () => {
 
     step(100);
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
-        expect(attrs.colorR.array[i]).toBeGreaterThanOrEqual(0);
-        expect(attrs.colorR.array[i]).toBeLessThanOrEqual(1);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
+        expect(attrs.colorR.getX(i)).toBeGreaterThanOrEqual(0);
+        expect(attrs.colorR.getX(i)).toBeLessThanOrEqual(1);
         break;
       }
     }
@@ -682,9 +682,9 @@ describe('Particle activation and color', () => {
     step(100);
     // After lifetime, some particles should be deactivated
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (!attrs.isActive.array[i]) {
-        expect(attrs.colorA.array[i]).toBe(0);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (!attrs.isActive.getX(i)) {
+        expect(attrs.colorA.getX(i)).toBe(0);
       }
     }
 
@@ -707,8 +707,8 @@ describe('Gravity', () => {
     // Particles should have moved due to gravity
     const attrs = getAttributes(ps);
     let positionChanged = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
         const posIndex = i * 3;
         const y = attrs.position.array[posIndex + 1];
         // With negative gravity the particle should move in y direction

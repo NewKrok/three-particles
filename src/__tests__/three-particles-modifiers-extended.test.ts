@@ -1,4 +1,13 @@
 import * as THREE from 'three';
+import {
+  SCALAR_STRIDE,
+  S_SIZE,
+  S_ROTATION,
+  S_COLOR_R,
+  S_COLOR_G,
+  S_COLOR_B,
+  S_COLOR_A,
+} from '../js/effects/three-particles/three-particles-constants.js';
 import { LifeTimeCurve } from '../js/effects/three-particles/three-particles-enums.js';
 import { applyModifiers } from '../js/effects/three-particles/three-particles-modifiers.js';
 import {
@@ -7,18 +16,15 @@ import {
   NormalizedParticleSystemConfig,
 } from '../js/effects/three-particles/types.js';
 
+const createScalarArray = (maxParticles = 3) =>
+  new Float32Array(maxParticles * SCALAR_STRIDE);
+
 const createAttributes = (maxParticles = 3) =>
   ({
     position: {
       array: new Float32Array(maxParticles * 3),
       needsUpdate: false,
     },
-    rotation: { array: new Float32Array(maxParticles), needsUpdate: false },
-    size: { array: new Float32Array(maxParticles), needsUpdate: false },
-    colorA: { array: new Float32Array(maxParticles), needsUpdate: false },
-    colorR: { array: new Float32Array(maxParticles), needsUpdate: false },
-    colorG: { array: new Float32Array(maxParticles), needsUpdate: false },
-    colorB: { array: new Float32Array(maxParticles), needsUpdate: false },
   }) as unknown as THREE.NormalBufferAttributes;
 
 const createBaseConfig = (): NormalizedParticleSystemConfig =>
@@ -48,7 +54,8 @@ const createBaseGeneralData = (maxParticles = 3): GeneralData =>
 describe('applyModifiers - size over lifetime', () => {
   it('should scale size by easing curve value', () => {
     const attributes = createAttributes();
-    attributes.size.array[0] = 2;
+    const scalarArray = createScalarArray();
+    scalarArray[0 * SCALAR_STRIDE + S_SIZE] = 2;
 
     const generalData = createBaseGeneralData();
     generalData.startValues.startSize[0] = 2;
@@ -68,16 +75,17 @@ describe('applyModifiers - size over lifetime', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
-    expect(attributes.size.array[0]).toBeCloseTo(1); // 2 * 0.5
-    expect(attributes.size.needsUpdate).toBe(true);
+    expect(scalarArray[0 * SCALAR_STRIDE + S_SIZE]).toBeCloseTo(1); // 2 * 0.5
   });
 
   it('should handle size curve at start of life (t=0)', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     const generalData = createBaseGeneralData();
     generalData.startValues.startSize[0] = 5;
 
@@ -96,15 +104,17 @@ describe('applyModifiers - size over lifetime', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0,
       particleIndex: 0,
     });
 
-    expect(attributes.size.array[0]).toBeCloseTo(0); // 5 * 0
+    expect(scalarArray[0 * SCALAR_STRIDE + S_SIZE]).toBeCloseTo(0); // 5 * 0
   });
 
   it('should handle size curve at end of life (t=1)', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     const generalData = createBaseGeneralData();
     generalData.startValues.startSize[0] = 3;
 
@@ -123,17 +133,19 @@ describe('applyModifiers - size over lifetime', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 1,
       particleIndex: 0,
     });
 
-    expect(attributes.size.array[0]).toBeCloseTo(3); // 3 * 1
+    expect(scalarArray[0 * SCALAR_STRIDE + S_SIZE]).toBeCloseTo(3); // 3 * 1
   });
 });
 
 describe('applyModifiers - opacity over lifetime', () => {
   it('should scale opacity by curve value', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     const generalData = createBaseGeneralData();
     generalData.startValues.startOpacity[0] = 0.8;
 
@@ -152,16 +164,17 @@ describe('applyModifiers - opacity over lifetime', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
-    expect(attributes.colorA.array[0]).toBeCloseTo(0.4); // 0.8 * 0.5
-    expect(attributes.colorA.needsUpdate).toBe(true);
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_A]).toBeCloseTo(0.4); // 0.8 * 0.5
   });
 
   it('should fade to zero at end of life', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     const generalData = createBaseGeneralData();
     generalData.startValues.startOpacity[0] = 1;
 
@@ -180,17 +193,19 @@ describe('applyModifiers - opacity over lifetime', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 1,
       particleIndex: 0,
     });
 
-    expect(attributes.colorA.array[0]).toBeCloseTo(0);
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_A]).toBeCloseTo(0);
   });
 });
 
 describe('applyModifiers - color over lifetime', () => {
   it('should modify RGB channels independently', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     const generalData = createBaseGeneralData();
     generalData.startValues.startColorR[0] = 1;
     generalData.startValues.startColorG[0] = 0.8;
@@ -221,23 +236,22 @@ describe('applyModifiers - color over lifetime', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
-    expect(attributes.colorR.array[0]).toBeCloseTo(0.5); // 1 * 0.5
-    expect(attributes.colorG.array[0]).toBeCloseTo(0.6); // 0.8 * 0.75
-    expect(attributes.colorB.array[0]).toBeCloseTo(0.6); // 0.6 * 1.0
-    expect(attributes.colorR.needsUpdate).toBe(true);
-    expect(attributes.colorG.needsUpdate).toBe(true);
-    expect(attributes.colorB.needsUpdate).toBe(true);
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_R]).toBeCloseTo(0.5); // 1 * 0.5
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_G]).toBeCloseTo(0.6); // 0.8 * 0.75
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_B]).toBeCloseTo(0.6); // 0.6 * 1.0
   });
 });
 
 describe('applyModifiers - rotation over lifetime', () => {
   it('should accumulate rotation over time', () => {
     const attributes = createAttributes();
-    attributes.rotation.array[0] = 0;
+    const scalarArray = createScalarArray();
+    scalarArray[0 * SCALAR_STRIDE + S_ROTATION] = 0;
 
     const generalData = createBaseGeneralData();
     generalData.lifetimeValues.rotationOverLifetime = [5, 0, 0];
@@ -249,18 +263,19 @@ describe('applyModifiers - rotation over lifetime', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
     // rotation += 5 * 0.5 * 0.02 = 0.05
-    expect(attributes.rotation.array[0]).toBeCloseTo(0.05);
-    expect(attributes.rotation.needsUpdate).toBe(true);
+    expect(scalarArray[0 * SCALAR_STRIDE + S_ROTATION]).toBeCloseTo(0.05);
   });
 
   it('should not modify rotation when no rotationOverLifetime data', () => {
     const attributes = createAttributes();
-    attributes.rotation.array[0] = 1.5;
+    const scalarArray = createScalarArray();
+    scalarArray[0 * SCALAR_STRIDE + S_ROTATION] = 1.5;
 
     const generalData = createBaseGeneralData();
     const config = createBaseConfig();
@@ -270,17 +285,19 @@ describe('applyModifiers - rotation over lifetime', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
-    expect(attributes.rotation.array[0]).toBe(1.5);
+    expect(scalarArray[0 * SCALAR_STRIDE + S_ROTATION]).toBe(1.5);
   });
 });
 
 describe('applyModifiers - linear velocity', () => {
   it('should move particle in X direction with constant speed', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     attributes.position.array[0] = 0; // x
 
     const generalData = createBaseGeneralData();
@@ -298,6 +315,7 @@ describe('applyModifiers - linear velocity', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -308,6 +326,7 @@ describe('applyModifiers - linear velocity', () => {
 
   it('should apply value modifier curve for linear velocity', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     attributes.position.array[0] = 0;
 
     const generalData = createBaseGeneralData();
@@ -329,6 +348,7 @@ describe('applyModifiers - linear velocity', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -339,6 +359,7 @@ describe('applyModifiers - linear velocity', () => {
 
   it('should move particle in all three axes', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
 
     const generalData = createBaseGeneralData();
     generalData.linearVelocityData = [
@@ -355,6 +376,7 @@ describe('applyModifiers - linear velocity', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -368,6 +390,7 @@ describe('applyModifiers - linear velocity', () => {
 describe('applyModifiers - orbital velocity', () => {
   it('should rotate particle around emission point', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     // Particle at offset position (1, 0, 0)
     attributes.position.array[0] = 1;
     attributes.position.array[1] = 0;
@@ -389,6 +412,7 @@ describe('applyModifiers - orbital velocity', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -399,6 +423,7 @@ describe('applyModifiers - orbital velocity', () => {
 
   it('should apply orbital velocity modifier curves', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     attributes.position.array[0] = 1;
     attributes.position.array[1] = 0;
     attributes.position.array[2] = 0;
@@ -423,6 +448,7 @@ describe('applyModifiers - orbital velocity', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -434,8 +460,9 @@ describe('applyModifiers - orbital velocity', () => {
 describe('applyModifiers - combined modifiers', () => {
   it('should apply size, opacity, and color modifiers together', () => {
     const attributes = createAttributes();
-    attributes.size.array[0] = 2;
-    attributes.colorA.array[0] = 1;
+    const scalarArray = createScalarArray();
+    scalarArray[0 * SCALAR_STRIDE + S_SIZE] = 2;
+    scalarArray[0 * SCALAR_STRIDE + S_COLOR_A] = 1;
 
     const generalData = createBaseGeneralData();
     generalData.startValues.startSize[0] = 2;
@@ -473,22 +500,24 @@ describe('applyModifiers - combined modifiers', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
-    expect(attributes.size.array[0]).toBeCloseTo(1); // 2 * 0.5
-    expect(attributes.colorA.array[0]).toBeCloseTo(0.8); // 1 * 0.8
-    expect(attributes.colorR.array[0]).toBeCloseTo(0.3); // 1 * 0.3
-    expect(attributes.colorG.array[0]).toBeCloseTo(0.6); // 1 * 0.6
-    expect(attributes.colorB.array[0]).toBeCloseTo(0.9); // 1 * 0.9
+    expect(scalarArray[0 * SCALAR_STRIDE + S_SIZE]).toBeCloseTo(1); // 2 * 0.5
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_A]).toBeCloseTo(0.8); // 1 * 0.8
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_R]).toBeCloseTo(0.3); // 1 * 0.3
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_G]).toBeCloseTo(0.6); // 1 * 0.6
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_B]).toBeCloseTo(0.9); // 1 * 0.9
   });
 
   it('should apply modifiers to specific particle index', () => {
     const attributes = createAttributes();
-    attributes.size.array[0] = 1;
-    attributes.size.array[1] = 3;
-    attributes.size.array[2] = 5;
+    const scalarArray = createScalarArray();
+    scalarArray[0 * SCALAR_STRIDE + S_SIZE] = 1;
+    scalarArray[1 * SCALAR_STRIDE + S_SIZE] = 3;
+    scalarArray[2 * SCALAR_STRIDE + S_SIZE] = 5;
 
     const generalData = createBaseGeneralData();
     generalData.startValues.startSize = [1, 3, 5];
@@ -509,25 +538,27 @@ describe('applyModifiers - combined modifiers', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 1,
     });
 
-    expect(attributes.size.array[0]).toBe(1); // Unchanged
-    expect(attributes.size.array[1]).toBeCloseTo(6); // 3 * 2
-    expect(attributes.size.array[2]).toBe(5); // Unchanged
+    expect(scalarArray[0 * SCALAR_STRIDE + S_SIZE]).toBe(1); // Unchanged
+    expect(scalarArray[1 * SCALAR_STRIDE + S_SIZE]).toBeCloseTo(6); // 3 * 2
+    expect(scalarArray[2 * SCALAR_STRIDE + S_SIZE]).toBe(5); // Unchanged
   });
 });
 
 describe('applyModifiers - no modifiers active', () => {
   it('should not modify any attributes when nothing is active', () => {
     const attributes = createAttributes();
+    const scalarArray = createScalarArray();
     attributes.position.array[0] = 1;
     attributes.position.array[1] = 2;
     attributes.position.array[2] = 3;
-    attributes.size.array[0] = 5;
-    attributes.colorA.array[0] = 0.7;
-    attributes.rotation.array[0] = 1.2;
+    scalarArray[0 * SCALAR_STRIDE + S_SIZE] = 5;
+    scalarArray[0 * SCALAR_STRIDE + S_COLOR_A] = 0.7;
+    scalarArray[0 * SCALAR_STRIDE + S_ROTATION] = 1.2;
 
     const generalData = createBaseGeneralData();
     const config = createBaseConfig();
@@ -537,6 +568,7 @@ describe('applyModifiers - no modifiers active', () => {
       generalData,
       normalizedConfig: config,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -544,12 +576,9 @@ describe('applyModifiers - no modifiers active', () => {
     expect(attributes.position.array[0]).toBe(1);
     expect(attributes.position.array[1]).toBe(2);
     expect(attributes.position.array[2]).toBe(3);
-    expect(attributes.size.array[0]).toBe(5);
-    expect(attributes.colorA.array[0]).toBeCloseTo(0.7);
-    expect(attributes.rotation.array[0]).toBeCloseTo(1.2);
+    expect(scalarArray[0 * SCALAR_STRIDE + S_SIZE]).toBe(5);
+    expect(scalarArray[0 * SCALAR_STRIDE + S_COLOR_A]).toBeCloseTo(0.7);
+    expect(scalarArray[0 * SCALAR_STRIDE + S_ROTATION]).toBeCloseTo(1.2);
     expect(attributes.position.needsUpdate).toBe(false);
-    expect(attributes.size.needsUpdate).toBe(false);
-    expect(attributes.colorA.needsUpdate).toBe(false);
-    expect(attributes.rotation.needsUpdate).toBe(false);
   });
 });

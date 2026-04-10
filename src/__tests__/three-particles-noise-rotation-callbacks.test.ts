@@ -5,10 +5,10 @@ import { ParticleSystem } from '../js/effects/three-particles/types.js';
 
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = ps.instance as THREE.Points;
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -256,8 +256,8 @@ describe('Rotation Over Lifetime', () => {
     const attrs = getAttributes(ps);
     // After some time, rotation should have been modified
     let hasRotation = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i] && attrs.rotation.array[i] !== 0) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i) && attrs.rotation.getX(i) !== 0) {
         hasRotation = true;
         break;
       }
@@ -406,11 +406,11 @@ describe('Opacity Over Lifetime', () => {
 
     const attrs = getAttributes(ps);
     // Active particles should have modified opacity
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
         // Opacity should be between 0 and 1
-        expect(attrs.colorA.array[i]).toBeGreaterThanOrEqual(0);
-        expect(attrs.colorA.array[i]).toBeLessThanOrEqual(1);
+        expect(attrs.colorA.getX(i)).toBeGreaterThanOrEqual(0);
+        expect(attrs.colorA.getX(i)).toBeLessThanOrEqual(1);
       }
     }
 
@@ -492,10 +492,10 @@ describe('Color Over Lifetime', () => {
     step(100);
 
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
         // Color should remain at start value when colorOverLifetime is inactive
-        expect(attrs.colorR.array[i]).toBeCloseTo(1, 1);
+        expect(attrs.colorR.getX(i)).toBeCloseTo(1, 1);
         break;
       }
     }

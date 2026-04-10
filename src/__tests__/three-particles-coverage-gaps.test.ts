@@ -525,11 +525,14 @@ describe('velocityOverLifetime — Z-axis lifetime curves', () => {
         ? ps.instance
         : (ps.instance.children[0] as THREE.Points);
     const posArr = points.geometry.attributes.position.array;
-    const isActiveArr = points.geometry.attributes.isActive.array;
+    const isActiveAttr = points.geometry.attributes.isActive;
 
     let hasZMovement = false;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i] && Math.abs(posArr[i * 3 + 2] as number) > 0.01) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (
+        isActiveAttr.getX(i) &&
+        Math.abs(posArr[i * 3 + 2] as number) > 0.01
+      ) {
         hasZMovement = true;
         break;
       }

@@ -218,17 +218,17 @@ export function createMeshParticleTSLMaterial(
     outColor.assign(outColor.mul(texColor));
 
     // Background color discard
-    If(u.uDiscardBg.greaterThan(0.5), () => {
-      const bgDiff = vec4(
-        texColor.x.sub(u.uBgColor.x),
-        texColor.y.sub(u.uBgColor.y),
-        texColor.z.sub(u.uBgColor.z),
-        float(0.0)
-      );
-      If(abs(length(bgDiff.xyz)).lessThan(u.uBgTolerance), () => {
-        Discard();
-      });
-    });
+    const bgDiff = vec4(
+      texColor.x.sub(u.uBgColor.x),
+      texColor.y.sub(u.uBgColor.y),
+      texColor.z.sub(u.uBgColor.z),
+      float(0.0)
+    );
+    Discard(
+      u.uDiscardBg
+        .greaterThan(0.5)
+        .and(abs(length(bgDiff.xyz)).lessThan(u.uBgTolerance))
+    );
 
     // Simple directional lighting from camera direction (+Z in view space).
     // lightIntensity = 0.5 + 0.5 * max(dot(vNormal, vec3(0,0,1)), 0.0)
@@ -248,10 +248,8 @@ export function createMeshParticleTSLMaterial(
       const depthDiff = sceneDepthLinear.sub(vViewZ);
       const softFade = smoothstep(float(0.0), u.uSoftIntensity, depthDiff);
       outColor.assign(vec4(outColor.xyz, outColor.w.mul(softFade)));
-      If(outColor.w.lessThan(0.001), () => {
-        Discard();
-      });
     });
+    Discard(outColor.w.lessThan(0.001));
 
     return outColor;
   })();

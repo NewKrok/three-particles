@@ -63,10 +63,10 @@ const getTrailMesh = (ps: ParticleSystem): THREE.Mesh | undefined => {
  */
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = getSimulationObject(ps);
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -173,10 +173,10 @@ describe('Trail Improvements', () => {
       // Check that most trail slots have collapsed positions (few samples recorded)
       // The first active particle should have at most a few distinct positions
       const points = getSimulationObject(ps);
-      const isActive = points.geometry.attributes.isActive.array;
+      const isActiveA = points.geometry.attributes.isActive;
       let firstActive = -1;
-      for (let i = 0; i < isActive.length; i++) {
-        if (isActive[i]) {
+      for (let i = 0; i < isActiveA.count; i++) {
+        if (isActiveA.getX(i)) {
           firstActive = i;
           break;
         }
@@ -221,10 +221,10 @@ describe('Trail Improvements', () => {
 
       // With fast speed and low threshold, most slots should have been filled
       const points = getSimulationObject(ps);
-      const isActive = points.geometry.attributes.isActive.array;
+      const isActiveA = points.geometry.attributes.isActive;
       let firstActive = -1;
-      for (let i = 0; i < isActive.length; i++) {
-        if (isActive[i]) {
+      for (let i = 0; i < isActiveA.count; i++) {
+        if (isActiveA.getX(i)) {
           firstActive = i;
           break;
         }
@@ -310,10 +310,10 @@ describe('Trail Improvements', () => {
       const trailMesh = getTrailMesh(ps)!;
       const alphaArr = trailMesh.geometry.getAttribute('trailAlpha').array;
       const points = getSimulationObject(ps);
-      const isActive = points.geometry.attributes.isActive.array;
+      const isActiveA = points.geometry.attributes.isActive;
       let firstActive = -1;
-      for (let i = 0; i < isActive.length; i++) {
-        if (isActive[i]) {
+      for (let i = 0; i < isActiveA.count; i++) {
+        if (isActiveA.getX(i)) {
           firstActive = i;
           break;
         }
@@ -746,10 +746,10 @@ describe('Trail Improvements', () => {
 
       // Find leader (first active particle sorted by age)
       const points = getSimulationObject(ps);
-      const isActive = points.geometry.attributes.isActive.array;
+      const isActiveA = points.geometry.attributes.isActive;
       let leaderIdx = -1;
-      for (let i = 0; i < isActive.length; i++) {
-        if (isActive[i]) {
+      for (let i = 0; i < isActiveA.count; i++) {
+        if (isActiveA.getX(i)) {
           leaderIdx = i;
           break;
         }
@@ -794,10 +794,10 @@ describe('Trail Improvements', () => {
 
       // Find all active particles
       const points = getSimulationObject(ps);
-      const isActive = points.geometry.attributes.isActive.array;
+      const isActiveA = points.geometry.attributes.isActive;
       const activeIndices: number[] = [];
-      for (let i = 0; i < isActive.length; i++) {
-        if (isActive[i]) activeIndices.push(i);
+      for (let i = 0; i < isActiveA.count; i++) {
+        if (isActiveA.getX(i)) activeIndices.push(i);
       }
 
       // Non-leader particles should have zero alpha in all trail slots
@@ -835,12 +835,12 @@ describe('Trail Improvements', () => {
 
       // Each active particle should have its own trail
       const points = getSimulationObject(ps);
-      const isActive = points.geometry.attributes.isActive.array;
+      const isActiveA = points.geometry.attributes.isActive;
       const trailLength = 8;
       const verticesPerParticle = trailLength * 2;
       let particlesWithTrails = 0;
-      for (let i = 0; i < isActive.length; i++) {
-        if (isActive[i]) {
+      for (let i = 0; i < isActiveA.count; i++) {
+        if (isActiveA.getX(i)) {
           const base = i * verticesPerParticle;
           let hasAlpha = false;
           for (let s = 0; s < trailLength; s++) {

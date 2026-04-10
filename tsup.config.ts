@@ -9,6 +9,8 @@ const libraryExternal = [
   '@newkrok/three-utils',
   'easing-functions',
   'three-noise',
+  'three/tsl',
+  'three/webgpu',
 ];
 
 export default defineConfig([
@@ -21,6 +23,16 @@ export default defineConfig([
     clean: true,
     outDir: 'dist',
     external: libraryExternal,
+    treeshake: true,
+  },
+  // WebGPU entry point (TSL material factories)
+  {
+    entry: { webgpu: 'src/webgpu.ts' },
+    format: ['esm'],
+    dts: false,
+    sourcemap: true,
+    outDir: 'dist',
+    external: [...libraryExternal, '@newkrok/three-particles'],
     treeshake: true,
   },
   // Minified browser bundle — all deps except "three" are inlined so the

@@ -1,5 +1,14 @@
 import * as THREE from 'three';
 
+import {
+  SCALAR_STRIDE,
+  S_SIZE,
+  S_ROTATION,
+  S_COLOR_R,
+  S_COLOR_G,
+  S_COLOR_B,
+  S_COLOR_A,
+} from './three-particles-constants.js';
 import { calculateValue } from './three-particles-utils.js';
 import {
   GeneralData,
@@ -77,6 +86,7 @@ export const applyModifiers = ({
   generalData,
   normalizedConfig,
   attributes,
+  scalarArray,
   particleLifetimePercentage,
   particleIndex,
 }: {
@@ -84,6 +94,7 @@ export const applyModifiers = ({
   generalData: GeneralData;
   normalizedConfig: NormalizedParticleSystemConfig;
   attributes: MappedAttributes;
+  scalarArray: Float32Array;
   particleLifetimePercentage: number;
   particleIndex: number;
 }) => {
@@ -98,6 +109,7 @@ export const applyModifiers = ({
 
   const positionIndex = particleIndex * 3;
   const positionArr = attributes.position.array;
+  const base = particleIndex * SCALAR_STRIDE;
 
   if (linearVelocityData) {
     const { speed, valueModifiers } = linearVelocityData[particleIndex];
@@ -161,9 +173,8 @@ export const applyModifiers = ({
       normalizedConfig.sizeOverLifetime.lifetimeCurve,
       particleLifetimePercentage
     );
-    attributes.size.array[particleIndex] =
+    scalarArray[base + S_SIZE] =
       startValues.startSize[particleIndex] * multiplier;
-    attributes.size.needsUpdate = true;
   }
 
   if (normalizedConfig.opacityOverLifetime.isActive) {
@@ -172,9 +183,8 @@ export const applyModifiers = ({
       normalizedConfig.opacityOverLifetime.lifetimeCurve,
       particleLifetimePercentage
     );
-    attributes.colorA.array[particleIndex] =
+    scalarArray[base + S_COLOR_A] =
       startValues.startOpacity[particleIndex] * multiplier;
-    attributes.colorA.needsUpdate = true;
   }
 
   if (normalizedConfig.colorOverLifetime.isActive) {
@@ -194,22 +204,17 @@ export const applyModifiers = ({
       particleLifetimePercentage
     );
 
-    attributes.colorR.array[particleIndex] =
+    scalarArray[base + S_COLOR_R] =
       startValues.startColorR[particleIndex] * rMultiplier;
-    attributes.colorG.array[particleIndex] =
+    scalarArray[base + S_COLOR_G] =
       startValues.startColorG[particleIndex] * gMultiplier;
-    attributes.colorB.array[particleIndex] =
+    scalarArray[base + S_COLOR_B] =
       startValues.startColorB[particleIndex] * bMultiplier;
-
-    attributes.colorR.needsUpdate = true;
-    attributes.colorG.needsUpdate = true;
-    attributes.colorB.needsUpdate = true;
   }
 
   if (lifetimeValues.rotationOverLifetime) {
-    attributes.rotation.array[particleIndex] +=
+    scalarArray[base + S_ROTATION] +=
       lifetimeValues.rotationOverLifetime[particleIndex] * delta * 0.02;
-    attributes.rotation.needsUpdate = true;
   }
 
   if (noise.isActive) {
@@ -234,15 +239,12 @@ export const applyModifiers = ({
     positionArr[positionIndex] += noiseOnPosition * noisePower * positionAmount;
 
     if (rotationAmount !== 0) {
-      attributes.rotation.array[particleIndex] +=
+      scalarArray[base + S_ROTATION] +=
         noiseOnPosition * noisePower * rotationAmount;
-      attributes.rotation.needsUpdate = true;
     }
 
     if (sizeAmount !== 0) {
-      attributes.size.array[particleIndex] +=
-        noiseOnPosition * noisePower * sizeAmount;
-      attributes.size.needsUpdate = true;
+      scalarArray[base + S_SIZE] += noiseOnPosition * noisePower * sizeAmount;
     }
 
     noiseInput.set(noisePosition, noisePosition, 0);
@@ -261,7 +263,7 @@ export const applyModifiers = ({
   // Sync packed quaternion vec4 from scalar rotation for mesh particles.
   // This runs after noise so the quaternion reflects the final rotation value.
   if (attributes.quat) {
-    const rotZ = attributes.rotation.array[particleIndex];
+    const rotZ = scalarArray[base + S_ROTATION];
     const halfZ = rotZ * 0.5;
     const qi = particleIndex * 4;
     attributes.quat.array[qi] = 0;

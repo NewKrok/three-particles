@@ -5,10 +5,10 @@ import { ParticleSystem } from '../js/effects/three-particles/types.js';
 
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = ps.instance as THREE.Points;
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -77,8 +77,8 @@ describe('Velocity Over Lifetime - Linear', () => {
     const attrs = getAttributes(ps);
     // Particles should have moved in x direction
     let hasPositiveX = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
         const posX = attrs.position.array[i * 3];
         if (posX !== 0) hasPositiveX = true;
       }

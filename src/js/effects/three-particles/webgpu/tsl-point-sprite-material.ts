@@ -130,9 +130,7 @@ export function createPointSpriteTSLMaterial(
 
     // Circle discard (inscribed circle in point quad)
     const dist = length(rotatedUV.sub(center));
-    If(dist.greaterThan(0.5), () => {
-      Discard();
-    });
+    Discard(dist.greaterThan(0.5));
 
     // Compute sprite-sheet UV
     const uvPoint = vec2(
@@ -145,17 +143,17 @@ export function createPointSpriteTSLMaterial(
     outColor.assign(outColor.mul(texColor));
 
     // Background color discard
-    If(u.uDiscardBg.greaterThan(0.5), () => {
-      const bgDiff = vec4(
-        texColor.x.sub(u.uBgColor.x),
-        texColor.y.sub(u.uBgColor.y),
-        texColor.z.sub(u.uBgColor.z),
-        float(0.0)
-      );
-      If(abs(length(bgDiff.xyz)).lessThan(u.uBgTolerance), () => {
-        Discard();
-      });
-    });
+    const bgDiff = vec4(
+      texColor.x.sub(u.uBgColor.x),
+      texColor.y.sub(u.uBgColor.y),
+      texColor.z.sub(u.uBgColor.z),
+      float(0.0)
+    );
+    Discard(
+      u.uDiscardBg
+        .greaterThan(0.5)
+        .and(abs(length(bgDiff.xyz)).lessThan(u.uBgTolerance))
+    );
 
     // Soft particles
     If(u.uSoftEnabled.greaterThan(0.5), () => {
@@ -168,10 +166,8 @@ export function createPointSpriteTSLMaterial(
       const depthDiff = sceneDepthLinear.sub(vViewZ);
       const softFade = smoothstep(float(0.0), u.uSoftIntensity, depthDiff);
       outColor.assign(vec4(outColor.xyz, outColor.w.mul(softFade)));
-      If(outColor.w.lessThan(0.001), () => {
-        Discard();
-      });
     });
+    Discard(outColor.w.lessThan(0.001));
 
     return outColor;
   })();

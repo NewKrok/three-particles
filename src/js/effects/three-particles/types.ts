@@ -1640,6 +1640,10 @@ export type ParticleSystemInstance = {
   particleSystem: THREE.Points | THREE.Mesh;
   wrapper?: Gyroscope;
   mappedAttributes: MappedAttributes;
+  /** Shared interleaved Float32Array backing all scalar per-particle attributes. */
+  scalarArray: Float32Array;
+  /** The InterleavedBuffer (or InstancedInterleavedBuffer) for scalar attributes. */
+  scalarInterleavedBuffer: THREE.InterleavedBuffer;
   elapsedUniform: { value: number };
   generalData: GeneralData;
   onUpdate: (data: {

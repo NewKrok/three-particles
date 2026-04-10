@@ -1,4 +1,13 @@
 import * as THREE from 'three';
+import {
+  SCALAR_STRIDE,
+  S_SIZE,
+  S_ROTATION,
+  S_COLOR_R,
+  S_COLOR_G,
+  S_COLOR_B,
+  S_COLOR_A,
+} from '../js/effects/three-particles/three-particles-constants.js';
 import { LifeTimeCurve } from '../js/effects/three-particles/three-particles-enums.js';
 import { applyModifiers } from '../js/effects/three-particles/three-particles-modifiers.js';
 import {
@@ -9,18 +18,15 @@ import {
 
 describe('applyModifiers', () => {
   let attributes: THREE.NormalBufferAttributes;
+  let scalarArray: Float32Array;
   let normalizedConfig: NormalizedParticleSystemConfig;
 
   beforeEach(() => {
     attributes = {
       position: { array: new Float32Array(3), needsUpdate: false },
-      rotation: { array: new Float32Array(1), needsUpdate: false },
-      size: { array: new Float32Array(1), needsUpdate: false },
-      colorA: { array: new Float32Array(1), needsUpdate: false },
-      colorR: { array: new Float32Array(1), needsUpdate: false },
-      colorG: { array: new Float32Array(1), needsUpdate: false },
-      colorB: { array: new Float32Array(1), needsUpdate: false },
     } as unknown as THREE.NormalBufferAttributes;
+
+    scalarArray = new Float32Array(SCALAR_STRIDE);
 
     normalizedConfig = {
       opacityOverLifetime: {
@@ -78,6 +84,7 @@ describe('applyModifiers', () => {
       } as GeneralData,
       normalizedConfig,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -113,6 +120,7 @@ describe('applyModifiers', () => {
       } as GeneralData,
       normalizedConfig,
       attributes: attributes as any,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -141,6 +149,7 @@ describe('applyModifiers', () => {
       } as GeneralData,
       normalizedConfig,
       attributes: attributes as any,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -182,6 +191,7 @@ describe('applyModifiers', () => {
       } as GeneralData,
       normalizedConfig,
       attributes: _attributes as any,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -227,6 +237,7 @@ describe('applyModifiers', () => {
       } as GeneralData,
       normalizedConfig,
       attributes: attributes as any,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -255,15 +266,13 @@ describe('applyModifiers', () => {
       } as unknown as GeneralData,
       normalizedConfig,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
-    expect(attributes.colorA.array[0]).toBe(1.5);
-    expect(attributes.colorA.needsUpdate).toBe(true);
-
-    expect(attributes.size.array[0]).toBe(2);
-    expect(attributes.size.needsUpdate).toBe(true);
+    expect(scalarArray[S_COLOR_A]).toBe(1.5);
+    expect(scalarArray[S_SIZE]).toBe(2);
   });
 
   test('applies noise to attributes', () => {
@@ -286,6 +295,7 @@ describe('applyModifiers', () => {
       } as GeneralData,
       normalizedConfig,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -295,11 +305,8 @@ describe('applyModifiers', () => {
     );
     expect(attributes.position.needsUpdate).toBe(true);
 
-    expect(attributes.rotation.array).toEqual(new Float32Array([0.0375]));
-    expect(attributes.rotation.needsUpdate).toBe(true);
-
-    expect(attributes.size.array).toEqual(new Float32Array([0.15]));
-    expect(attributes.size.needsUpdate).toBe(true);
+    expect(scalarArray[S_ROTATION]).toBeCloseTo(0.0375);
+    expect(scalarArray[S_SIZE]).toBeCloseTo(0.15);
   });
 
   test('applies noise to position with offset', () => {
@@ -323,6 +330,7 @@ describe('applyModifiers', () => {
       } as GeneralData,
       normalizedConfig,
       attributes,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
@@ -334,10 +342,7 @@ describe('applyModifiers', () => {
   });
 
   test('should update rotation with rotationOverLifetime', () => {
-    const _attributes = {
-      ...attributes,
-      rotation: { array: new Float32Array([0]), needsUpdate: false },
-    };
+    scalarArray[S_ROTATION] = 0;
 
     const lifetimeValues = {
       rotationOverLifetime: [5],
@@ -353,25 +358,18 @@ describe('applyModifiers', () => {
         orbitalVelocityData: undefined,
       } as unknown as GeneralData,
       normalizedConfig,
-      attributes: _attributes as any,
+      attributes: attributes as any,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
-    expect(_attributes.rotation.array[0]).toBeCloseTo(5 * 1 * 0.02, 5);
-    expect(_attributes.rotation.needsUpdate).toBe(true);
+    expect(scalarArray[S_ROTATION]).toBeCloseTo(5 * 1 * 0.02, 5);
   });
 
   test('applies colorOverLifetime curve modifiers when active', () => {
     normalizedConfig.colorOverLifetime.isActive = true;
 
-    const _attributes = {
-      ...attributes,
-      colorR: { array: new Float32Array([1]), needsUpdate: false },
-      colorG: { array: new Float32Array([1]), needsUpdate: false },
-      colorB: { array: new Float32Array([1]), needsUpdate: false },
-    };
-
     applyModifiers({
       delta: 1,
       generalData: {
@@ -385,30 +383,22 @@ describe('applyModifiers', () => {
         linearVelocityData: undefined,
       } as unknown as GeneralData,
       normalizedConfig,
-      attributes: _attributes as any,
+      attributes: attributes as any,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
-    expect(_attributes.colorR.array[0]).toBeCloseTo(1.0 * 0.5, 5);
-    expect(_attributes.colorR.needsUpdate).toBe(true);
-
-    expect(_attributes.colorG.array[0]).toBeCloseTo(0.8 * 0.75, 5);
-    expect(_attributes.colorG.needsUpdate).toBe(true);
-
-    expect(_attributes.colorB.array[0]).toBeCloseTo(0.6 * 0.25, 5);
-    expect(_attributes.colorB.needsUpdate).toBe(true);
+    expect(scalarArray[S_COLOR_R]).toBeCloseTo(1.0 * 0.5, 5);
+    expect(scalarArray[S_COLOR_G]).toBeCloseTo(0.8 * 0.75, 5);
+    expect(scalarArray[S_COLOR_B]).toBeCloseTo(0.6 * 0.25, 5);
   });
 
   test('does not apply colorOverLifetime when inactive', () => {
     normalizedConfig.colorOverLifetime.isActive = false;
-
-    const _attributes = {
-      ...attributes,
-      colorR: { array: new Float32Array([1]), needsUpdate: false },
-      colorG: { array: new Float32Array([0.5]), needsUpdate: false },
-      colorB: { array: new Float32Array([0.25]), needsUpdate: false },
-    };
+    scalarArray[S_COLOR_R] = 1;
+    scalarArray[S_COLOR_G] = 0.5;
+    scalarArray[S_COLOR_B] = 0.25;
 
     applyModifiers({
       delta: 1,
@@ -423,18 +413,14 @@ describe('applyModifiers', () => {
         linearVelocityData: undefined,
       } as unknown as GeneralData,
       normalizedConfig,
-      attributes: _attributes as any,
+      attributes: attributes as any,
+      scalarArray,
       particleLifetimePercentage: 0.5,
       particleIndex: 0,
     });
 
-    expect(_attributes.colorR.array[0]).toBe(1);
-    expect(_attributes.colorR.needsUpdate).toBe(false);
-
-    expect(_attributes.colorG.array[0]).toBe(0.5);
-    expect(_attributes.colorG.needsUpdate).toBe(false);
-
-    expect(_attributes.colorB.array[0]).toBe(0.25);
-    expect(_attributes.colorB.needsUpdate).toBe(false);
+    expect(scalarArray[S_COLOR_R]).toBe(1);
+    expect(scalarArray[S_COLOR_G]).toBe(0.5);
+    expect(scalarArray[S_COLOR_B]).toBe(0.25);
   });
 });

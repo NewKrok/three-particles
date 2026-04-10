@@ -12,10 +12,10 @@ import { ParticleSystem } from '../js/effects/three-particles/types.js';
 
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = ps.instance as THREE.Points;
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -338,9 +338,9 @@ describe('Particle lifecycle details', () => {
 
     step(100);
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
-        expect(attrs.lifetime.array[i]).toBeGreaterThanOrEqual(0);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
+        expect(attrs.lifetime.getX(i)).toBeGreaterThanOrEqual(0);
       }
     }
 
@@ -358,8 +358,8 @@ describe('Particle lifecycle details', () => {
 
     const attrs = getAttributes(ps);
     let foundPositiveLifetime = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i] && attrs.lifetime.array[i] > 0) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i) && attrs.lifetime.getX(i) > 0) {
         foundPositiveLifetime = true;
         break;
       }
@@ -571,9 +571,9 @@ describe('Texture sheet animation lifecycle', () => {
 
     step(100);
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
-        expect(attrs.startFrame.array[i]).toBe(5);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
+        expect(attrs.startFrame.getX(i)).toBe(5);
         break;
       }
     }
@@ -596,11 +596,11 @@ describe('Texture sheet animation lifecycle', () => {
     step(100);
     const attrs = getAttributes(ps);
     const frames = new Set<number>();
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
-        expect(attrs.startFrame.array[i]).toBeGreaterThanOrEqual(0);
-        expect(attrs.startFrame.array[i]).toBeLessThanOrEqual(15);
-        frames.add(Math.round(attrs.startFrame.array[i]));
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
+        expect(attrs.startFrame.getX(i)).toBeGreaterThanOrEqual(0);
+        expect(attrs.startFrame.getX(i)).toBeLessThanOrEqual(15);
+        frames.add(Math.round(attrs.startFrame.getX(i)));
       }
     }
 
@@ -620,9 +620,9 @@ describe('Texture sheet animation lifecycle', () => {
 
     step(100);
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
-        expect(attrs.startFrame.array[i]).toBe(0);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
+        expect(attrs.startFrame.getX(i)).toBe(0);
         break;
       }
     }
@@ -645,14 +645,14 @@ describe('Color lifecycle', () => {
 
     step(100);
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
-        expect(attrs.colorR.array[i]).toBeGreaterThanOrEqual(0.2);
-        expect(attrs.colorR.array[i]).toBeLessThanOrEqual(0.8);
-        expect(attrs.colorG.array[i]).toBeGreaterThanOrEqual(0.3);
-        expect(attrs.colorG.array[i]).toBeLessThanOrEqual(0.9);
-        expect(attrs.colorB.array[i]).toBeGreaterThanOrEqual(0.4);
-        expect(attrs.colorB.array[i]).toBeLessThanOrEqual(1.0);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
+        expect(attrs.colorR.getX(i)).toBeGreaterThanOrEqual(0.2);
+        expect(attrs.colorR.getX(i)).toBeLessThanOrEqual(0.8);
+        expect(attrs.colorG.getX(i)).toBeGreaterThanOrEqual(0.3);
+        expect(attrs.colorG.getX(i)).toBeLessThanOrEqual(0.9);
+        expect(attrs.colorB.getX(i)).toBeGreaterThanOrEqual(0.4);
+        expect(attrs.colorB.getX(i)).toBeLessThanOrEqual(1.0);
         break;
       }
     }
@@ -672,9 +672,9 @@ describe('Color lifecycle', () => {
     step(100);
 
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (!attrs.isActive.array[i]) {
-        expect(attrs.colorA.array[i]).toBe(0);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (!attrs.isActive.getX(i)) {
+        expect(attrs.colorA.getX(i)).toBe(0);
       }
     }
 
