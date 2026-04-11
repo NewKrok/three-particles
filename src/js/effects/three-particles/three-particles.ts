@@ -168,6 +168,7 @@ export const registerTSLMaterialFactory = (
 
 // Pre-allocated objects for updateParticleSystemInstance to avoid GC pressure
 const _subEmitterPosition = new THREE.Vector3();
+const _shadowOrbitalEuler = new THREE.Euler(0, 0, 0, 'XYZ');
 const _lastWorldPositionSnapshot = new THREE.Vector3();
 // Force field local-space conversion helpers (reused across frames)
 const _localForceFieldPos = new THREE.Vector3();
@@ -1358,10 +1359,12 @@ export const createParticleSystem = (
       velocities[particleIndex]
     );
     // GPU compute: position is set via the emit scatter in the compute shader
-    // (writeParticleToModifierBuffers queues it). Do NOT write to the position
-    // storage buffer here — needsUpdate triggers a full CPU→GPU upload that
-    // overwrites GPU-computed positions for all particles.
-    if (!useGPUCompute) {
+    // (writeParticleToModifierBuffers queues it). Do NOT set needsUpdate —
+    // that triggers a full CPU→GPU upload that overwrites GPU-computed
+    // positions for all particles.
+    // However, we still write the CPU-side array so death sub-emitters can
+    // read the particle's approximate position without GPU readback.
+    {
       const positionIndex = particleIndex * 3;
       aPosition.array[positionIndex] =
         position.x + startPositions[particleIndex].x;
@@ -1369,7 +1372,9 @@ export const createParticleSystem = (
         position.y + startPositions[particleIndex].y;
       aPosition.array[positionIndex + 2] =
         position.z + startPositions[particleIndex].z;
-      aPosition.needsUpdate = true;
+      if (!useGPUCompute) {
+        aPosition.needsUpdate = true;
+      }
     }
 
     if (generalData.linearVelocityData) {
@@ -2308,7 +2313,12 @@ const updateParticleSystemInstance = (
     // Signal onBeforeRender to dispatch compute
     props.computeDispatchReady = true;
 
-    // CPU-side death detection (for sub-emitter callbacks + freeList)
+    // CPU-side death detection (for sub-emitter callbacks + freeList).
+    // When death sub-emitters exist we also run a lightweight CPU shadow
+    // simulation (velocity integration, gravity, orbital velocity, force
+    // fields) so that positionArr contains an approximate current position
+    // instead of the stale emission-time value — the GPU buffer is not
+    // readable from the CPU without an async readback.
     for (let index = 0; index < creationTimesLength; index++) {
       const base = index * SCALAR_STRIDE;
       if (scalarArr[base + S_IS_ACTIVE]) {
@@ -2317,6 +2327,63 @@ const updateParticleSystemInstance = (
           if (onParticleDeath)
             onParticleDeath(index, positionArr, velocities[index], now);
           deactivateParticle(index);
+        } else if (onParticleDeath) {
+          // Shadow simulation: keep CPU-side position in sync for sub-emitters.
+          // We intentionally avoid calling applyModifiers() here because it
+          // sets attributes.position.needsUpdate = true, which triggers a full
+          // CPU→GPU upload that overwrites GPU-computed positions for ALL
+          // particles.  Instead we do the minimal physics inline without
+          // touching needsUpdate.
+          const velocity = velocities[index];
+          velocity.x -= gravityVelocity.x * delta;
+          velocity.y -= gravityVelocity.y * delta;
+          velocity.z -= gravityVelocity.z * delta;
+
+          if (hasForceFields) {
+            applyForceFields({
+              particleSystemId: generalData.particleSystemId,
+              forceFields: _localForceFields,
+              velocity,
+              positionArr,
+              positionIndex: index * 3,
+              delta,
+              systemLifetimePercentage:
+                generalData.normalizedLifetimePercentage,
+            });
+          }
+
+          const positionIndex = index * 3;
+          if (simulationSpace === SimulationSpace.WORLD) {
+            positionArr[positionIndex] -= worldPositionChange.x;
+            positionArr[positionIndex + 1] -= worldPositionChange.y;
+            positionArr[positionIndex + 2] -= worldPositionChange.z;
+          }
+          positionArr[positionIndex] += velocity.x * delta;
+          positionArr[positionIndex + 1] += velocity.y * delta;
+          positionArr[positionIndex + 2] += velocity.z * delta;
+
+          // Orbital velocity (mirrors CPU applyModifiers orbital logic)
+          if (generalData.orbitalVelocityData) {
+            const orbData = generalData.orbitalVelocityData[index];
+            const { speed, positionOffset, valueModifiers } = orbData;
+            const pctLife =
+              particleLifetime / scalarArr[base + S_START_LIFETIME];
+
+            positionArr[positionIndex] -= positionOffset.x;
+            positionArr[positionIndex + 1] -= positionOffset.y;
+            positionArr[positionIndex + 2] -= positionOffset.z;
+
+            const sx = valueModifiers.x ? valueModifiers.x(pctLife) : speed.x;
+            const sy = valueModifiers.y ? valueModifiers.y(pctLife) : speed.y;
+            const sz = valueModifiers.z ? valueModifiers.z(pctLife) : speed.z;
+
+            _shadowOrbitalEuler.set(sx * delta, sz * delta, sy * delta);
+            positionOffset.applyEuler(_shadowOrbitalEuler);
+
+            positionArr[positionIndex] += positionOffset.x;
+            positionArr[positionIndex + 1] += positionOffset.y;
+            positionArr[positionIndex + 2] += positionOffset.z;
+          }
         }
       }
     }

@@ -512,155 +512,155 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
       sCurveData.element(initBase.add(3)).assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
     });
     const oiaVec = sOrbitalIsActive.element(i).toVar();
-    __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(oiaVec.w.lessThan(0.5), () => {
-      return;
-    });
-    const pos = sPosition.element(i).xyz.toVar();
-    const vel = sVelocity.element(i).xyz.toVar();
-    const ps = sParticleState.element(i).toVar();
-    const sv = sStartValues.element(i);
-    ps.x;
-    const startLife = sv.x;
-    vel.assign(vel.sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(uGravityVelocity).mul(uDelta)));
-    if (forceFieldNodes) {
-      forceFieldNodes.apply({ pos, vel, delta: uDelta });
-    }
-    __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(uSimSpaceWorld.greaterThan(0.5), () => {
-      pos.assign(pos.sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(uWorldPositionChange)));
-    });
-    pos.assign(pos.add(vel.mul(uDelta)));
-    const lifePct = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__(ps.x.div(startLife), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(1));
-    ps.x.assign(ps.x.add(uDeltaMs));
-    if (flags.linearVelocity) {
-      const lvx = curveMap.linearVelX >= 0 ? lookupCurve({
-        curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.linearVelX),
-        t: lifePct
-      }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
-      const lvy = curveMap.linearVelY >= 0 ? lookupCurve({
-        curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.linearVelY),
-        t: lifePct
-      }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
-      const lvz = curveMap.linearVelZ >= 0 ? lookupCurve({
-        curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.linearVelZ),
-        t: lifePct
-      }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
-      pos.assign(pos.add(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(lvx, lvy, lvz).mul(uDelta)));
-    }
-    if (flags.orbitalVelocity) {
-      const offset = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(oiaVec.x, oiaVec.y, oiaVec.z).toVar();
-      pos.assign(pos.sub(offset));
-      const ovx = curveMap.orbitalVelX >= 0 ? lookupCurve({
-        curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.orbitalVelX),
-        t: lifePct
-      }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
-      const ovy = curveMap.orbitalVelY >= 0 ? lookupCurve({
-        curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.orbitalVelY),
-        t: lifePct
-      }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
-      const ovz = curveMap.orbitalVelZ >= 0 ? lookupCurve({
-        curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.orbitalVelZ),
-        t: lifePct
-      }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
-      const ax = ovx.mul(uDelta);
-      const ay = ovy.mul(uDelta);
-      const az = ovz.mul(uDelta);
-      const cosAx = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__(ax);
-      const sinAx = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__(ax);
-      const ry1 = offset.y.mul(cosAx).sub(offset.z.mul(sinAx));
-      const rz1 = offset.y.mul(sinAx).add(offset.z.mul(cosAx));
-      offset.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(offset.x, ry1, rz1));
-      const cosAz = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__(az);
-      const sinAz = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__(az);
-      const rx2 = offset.x.mul(cosAz).sub(offset.y.mul(sinAz));
-      const ry2 = offset.x.mul(sinAz).add(offset.y.mul(cosAz));
-      offset.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(rx2, ry2, offset.z));
-      const cosAy = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__(ay);
-      const sinAy = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__(ay);
-      const rx3 = offset.x.mul(cosAy).add(offset.z.mul(sinAy));
-      const rz3 = offset.x.negate().mul(sinAy).add(offset.z.mul(cosAy));
-      offset.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(rx3, offset.y, rz3));
-      oiaVec.x.assign(offset.x);
-      oiaVec.y.assign(offset.y);
-      oiaVec.z.assign(offset.z);
-      pos.assign(pos.add(offset));
-    }
-    if (flags.sizeOverLifetime && curveMap.sizeOverLifetime >= 0) {
-      const multiplier = lookupCurve({
-        curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.sizeOverLifetime),
-        t: lifePct
+    __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(oiaVec.w.greaterThanEqual(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0.5)), () => {
+      const pos = sPosition.element(i).xyz.toVar();
+      const vel = sVelocity.element(i).xyz.toVar();
+      const ps = sParticleState.element(i).toVar();
+      const sv = sStartValues.element(i);
+      ps.x;
+      const startLife = sv.x;
+      vel.assign(vel.sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(uGravityVelocity).mul(uDelta)));
+      if (forceFieldNodes) {
+        forceFieldNodes.apply({ pos, vel, delta: uDelta });
+      }
+      __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(uSimSpaceWorld.greaterThan(0.5), () => {
+        pos.assign(pos.sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(uWorldPositionChange)));
       });
-      ps.y.assign(sv.y.mul(multiplier));
-    }
-    if (flags.opacityOverLifetime && curveMap.opacityOverLifetime >= 0) {
-      const multiplier = lookupCurve({
-        curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.opacityOverLifetime),
-        t: lifePct
-      });
-      const col = sColor.element(i).toVar();
-      col.w.assign(sv.z.mul(multiplier));
-      sColor.element(i).assign(col);
-    }
-    if (flags.colorOverLifetime) {
-      const col = sColor.element(i).toVar();
-      const sce = sStartColorsExt.element(i);
-      if (curveMap.colorR >= 0) {
-        const rMul = lookupCurve({
-          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.colorR),
+      pos.assign(pos.add(vel.mul(uDelta)));
+      const lifePct = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__(ps.x.div(startLife), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(1));
+      ps.x.assign(ps.x.add(uDeltaMs));
+      if (flags.linearVelocity) {
+        const lvx = curveMap.linearVelX >= 0 ? lookupCurve({
+          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.linearVelX),
+          t: lifePct
+        }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
+        const lvy = curveMap.linearVelY >= 0 ? lookupCurve({
+          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.linearVelY),
+          t: lifePct
+        }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
+        const lvz = curveMap.linearVelZ >= 0 ? lookupCurve({
+          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.linearVelZ),
+          t: lifePct
+        }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
+        pos.assign(pos.add(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(lvx, lvy, lvz).mul(uDelta)));
+      }
+      if (flags.orbitalVelocity) {
+        const offset = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(oiaVec.x, oiaVec.y, oiaVec.z).toVar();
+        pos.assign(pos.sub(offset));
+        const ovx = curveMap.orbitalVelX >= 0 ? lookupCurve({
+          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.orbitalVelX),
+          t: lifePct
+        }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
+        const ovy = curveMap.orbitalVelY >= 0 ? lookupCurve({
+          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.orbitalVelY),
+          t: lifePct
+        }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
+        const ovz = curveMap.orbitalVelZ >= 0 ? lookupCurve({
+          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.orbitalVelZ),
+          t: lifePct
+        }) : __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0);
+        const ax = ovx.mul(uDelta);
+        const ay = ovz.mul(uDelta);
+        const az = ovy.mul(uDelta);
+        const cosAz = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__(az);
+        const sinAz = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__(az);
+        const zx = offset.x.mul(cosAz).sub(offset.y.mul(sinAz));
+        const zy = offset.x.mul(sinAz).add(offset.y.mul(cosAz));
+        const zz = offset.z;
+        const cosAy = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__(ay);
+        const sinAy = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__(ay);
+        const yx = zx.mul(cosAy).add(zz.mul(sinAy));
+        const yy = zy;
+        const yz = zx.negate().mul(sinAy).add(zz.mul(cosAy));
+        const cosAx = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__(ax);
+        const sinAx = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__(ax);
+        const fx = yx;
+        const fy = yy.mul(cosAx).sub(yz.mul(sinAx));
+        const fz = yy.mul(sinAx).add(yz.mul(cosAx));
+        offset.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(fx, fy, fz));
+        oiaVec.x.assign(offset.x);
+        oiaVec.y.assign(offset.y);
+        oiaVec.z.assign(offset.z);
+        pos.assign(pos.add(offset));
+      }
+      if (flags.sizeOverLifetime && curveMap.sizeOverLifetime >= 0) {
+        const multiplier = lookupCurve({
+          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.sizeOverLifetime),
           t: lifePct
         });
-        col.x.assign(sv.w.mul(rMul));
+        ps.y.assign(sv.y.mul(multiplier));
       }
-      if (curveMap.colorG >= 0) {
-        const gMul = lookupCurve({
-          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.colorG),
+      if (flags.opacityOverLifetime && curveMap.opacityOverLifetime >= 0) {
+        const multiplier = lookupCurve({
+          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.opacityOverLifetime),
           t: lifePct
         });
-        col.y.assign(sce.x.mul(gMul));
+        const col = sColor.element(i).toVar();
+        col.w.assign(sv.z.mul(multiplier));
+        sColor.element(i).assign(col);
       }
-      if (curveMap.colorB >= 0) {
-        const bMul = lookupCurve({
-          curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.colorB),
-          t: lifePct
+      if (flags.colorOverLifetime) {
+        const col = sColor.element(i).toVar();
+        const sce = sStartColorsExt.element(i);
+        if (curveMap.colorR >= 0) {
+          const rMul = lookupCurve({
+            curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.colorR),
+            t: lifePct
+          });
+          col.x.assign(sv.w.mul(rMul));
+        }
+        if (curveMap.colorG >= 0) {
+          const gMul = lookupCurve({
+            curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.colorG),
+            t: lifePct
+          });
+          col.y.assign(sce.x.mul(gMul));
+        }
+        if (curveMap.colorB >= 0) {
+          const bMul = lookupCurve({
+            curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.colorB),
+            t: lifePct
+          });
+          col.z.assign(sce.y.mul(bMul));
+        }
+        sColor.element(i).assign(col);
+      }
+      if (flags.rotationOverLifetime) {
+        const sce = sStartColorsExt.element(i);
+        ps.z.assign(ps.z.add(sce.z.mul(uDelta).mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0.02))));
+      }
+      if (flags.noise) {
+        const sce = sStartColorsExt.element(i);
+        const noisePos = lifePct.add(sce.w).mul(10).mul(uNoiseStrength).mul(uNoiseFrequency);
+        const noiseX = snoise3D({ v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noisePos, __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0)) });
+        const noiseY = snoise3D({
+          v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noisePos, noisePos, __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0))
         });
-        col.z.assign(sce.y.mul(bMul));
+        const noiseZ = snoise3D({
+          v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noisePos, noisePos, noisePos)
+        });
+        pos.assign(
+          pos.add(
+            __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noiseX, noiseY, noiseZ).mul(uNoisePower).mul(uNoisePosAmount)
+          )
+        );
+        __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(uNoiseRotAmount.greaterThan(1e-3), () => {
+          ps.z.assign(ps.z.add(noiseX.mul(uNoisePower).mul(uNoiseRotAmount)));
+        });
+        __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(uNoiseSizeAmount.greaterThan(1e-3), () => {
+          ps.y.assign(ps.y.add(noiseX.mul(uNoisePower).mul(uNoiseSizeAmount)));
+        });
       }
-      sColor.element(i).assign(col);
-    }
-    if (flags.rotationOverLifetime) {
-      const sce = sStartColorsExt.element(i);
-      ps.z.assign(ps.z.add(sce.z.mul(uDelta).mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0.02))));
-    }
-    if (flags.noise) {
-      const sce = sStartColorsExt.element(i);
-      const noisePos = lifePct.add(sce.w).mul(10).mul(uNoiseStrength).mul(uNoiseFrequency);
-      const noiseX = snoise3D({ v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noisePos, __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0)) });
-      const noiseY = snoise3D({
-        v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noisePos, noisePos, __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0))
+      sPosition.element(i).assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(pos, 0));
+      sVelocity.element(i).assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(vel, 0));
+      sParticleState.element(i).assign(ps);
+      sOrbitalIsActive.element(i).assign(oiaVec);
+      __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(ps.x.greaterThan(startLife), () => {
+        const deadOia = sOrbitalIsActive.element(i).toVar();
+        deadOia.w.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
+        sOrbitalIsActive.element(i).assign(deadOia);
+        sColor.element(i).assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(0));
       });
-      const noiseZ = snoise3D({
-        v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noisePos, noisePos, noisePos)
-      });
-      pos.assign(
-        pos.add(
-          __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noiseX, noiseY, noiseZ).mul(uNoisePower).mul(uNoisePosAmount)
-        )
-      );
-      __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(uNoiseRotAmount.greaterThan(1e-3), () => {
-        ps.z.assign(ps.z.add(noiseX.mul(uNoisePower).mul(uNoiseRotAmount)));
-      });
-      __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(uNoiseSizeAmount.greaterThan(1e-3), () => {
-        ps.y.assign(ps.y.add(noiseX.mul(uNoisePower).mul(uNoiseSizeAmount)));
-      });
-    }
-    sPosition.element(i).assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(pos, 0));
-    sVelocity.element(i).assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(vel, 0));
-    sParticleState.element(i).assign(ps);
-    sOrbitalIsActive.element(i).assign(oiaVec);
-    __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(ps.x.greaterThan(startLife), () => {
-      const deadOia = sOrbitalIsActive.element(i).toVar();
-      deadOia.w.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
-      sOrbitalIsActive.element(i).assign(deadOia);
-      sColor.element(i).assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(0));
     });
   });
   const computeNode = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_compute__(computeKernel(), maxParticles);
