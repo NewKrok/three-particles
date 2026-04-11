@@ -10,6 +10,7 @@ import { DataTexture, Vector3 } from 'three';
 import {
   Fn,
   vec2,
+  vec3,
   vec4,
   float,
   uniform,
@@ -208,13 +209,12 @@ export const applyBackgroundDiscard = Fn(
     uBgTolerance,
   }: Record<string, ShaderNodeObject<Node>>) => {
     If(uDiscardBg.greaterThan(0.5), () => {
-      const diff = vec4(
+      const diff = vec3(
         texColor.x.sub(uBgColor.x),
         texColor.y.sub(uBgColor.y),
-        texColor.z.sub(uBgColor.z),
-        float(0.0)
+        texColor.z.sub(uBgColor.z)
       );
-      If(abs(length(diff.xyz)).lessThan(uBgTolerance), () => {
+      If(abs(length(diff)).lessThan(uBgTolerance), () => {
         Discard();
       });
     });

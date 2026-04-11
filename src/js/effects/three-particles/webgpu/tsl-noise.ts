@@ -12,6 +12,7 @@
  */
 import {
   Fn,
+  vec2,
   vec3,
   vec4,
   float,
@@ -129,13 +130,20 @@ export const snoise3D: ReturnType<typeof Fn> = Fn(
     // Corner z-components: iz, iz+i1.z, iz+i2.z, iz+1
     const p0_yz = permute({
       x: permute({
-        x: vec4(iw.z, iw.z.add(i1.z), iw.z.add(i2.z), iw.z.add(1.0)),
-      }).add(vec4(iw.y, iw.y.add(i1.y), iw.y.add(i2.y), iw.y.add(1.0))),
+        x: vec4(
+          vec2(iw.z, iw.z.add(i1.z)),
+          vec2(iw.z.add(i2.z), iw.z.add(1.0))
+        ),
+      }).add(
+        vec4(vec2(iw.y, iw.y.add(i1.y)), vec2(iw.y.add(i2.y), iw.y.add(1.0)))
+      ),
     });
 
     // Final hash: mix in x-components
     const p = permute({
-      x: p0_yz.add(vec4(iw.x, iw.x.add(i1.x), iw.x.add(i2.x), iw.x.add(1.0))),
+      x: p0_yz.add(
+        vec4(vec2(iw.x, iw.x.add(i1.x)), vec2(iw.x.add(i2.x), iw.x.add(1.0)))
+      ),
     });
 
     // ── Step 5: Convert hash to gradient directions ───────────────────────────
@@ -174,7 +182,7 @@ export const snoise3D: ReturnType<typeof Fn> = Fn(
 
     // Normalise gradients using the Taylor inverse-sqrt approximation
     const norm = taylorInvSqrt({
-      r: vec4(dot(g0, g0), dot(g1, g1), dot(g2, g2), dot(g3, g3)),
+      r: vec4(vec2(dot(g0, g0), dot(g1, g1)), vec2(dot(g2, g2), dot(g3, g3))),
     });
     g0.assign(g0.mul(norm.x));
     g1.assign(g1.mul(norm.y));
@@ -185,10 +193,8 @@ export const snoise3D: ReturnType<typeof Fn> = Fn(
     // Falloff: m = max(0, 0.5 - |x|²)⁴  (C² continuity)
     const m = max(
       vec4(
-        float(0.5).sub(dot(x0, x0)),
-        float(0.5).sub(dot(x1, x1)),
-        float(0.5).sub(dot(x2, x2)),
-        float(0.5).sub(dot(x3, x3))
+        vec2(float(0.5).sub(dot(x0, x0)), float(0.5).sub(dot(x1, x1))),
+        vec2(float(0.5).sub(dot(x2, x2)), float(0.5).sub(dot(x3, x3)))
       ),
       float(0.0)
     ).toVar();
@@ -197,7 +203,10 @@ export const snoise3D: ReturnType<typeof Fn> = Fn(
     const m4 = m2.mul(m2).toVar();
 
     // Dot the gradients with the un-skewed displacement vectors
-    const gdot = vec4(dot(g0, x0), dot(g1, x1), dot(g2, x2), dot(g3, x3));
+    const gdot = vec4(
+      vec2(dot(g0, x0), dot(g1, x1)),
+      vec2(dot(g2, x2), dot(g3, x3))
+    );
 
     // Accumulate: sum(m4 * gdot), then scale to [-1, 1]
     // The scale factor 42.0 is the classical Gustavson normalisation constant

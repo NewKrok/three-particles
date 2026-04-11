@@ -116,7 +116,8 @@ type TSLMaterialFactory = {
       blending: THREE.Blending;
       depthTest: boolean;
       depthWrite: boolean;
-    }
+    },
+    gpuCompute?: boolean
   ) => THREE.Material;
   createTSLTrailMaterial: (
     trailUniforms: Record<string, { value: unknown }>,
@@ -127,6 +128,16 @@ type TSLMaterialFactory = {
       depthWrite: boolean;
     }
   ) => THREE.Material;
+  // GPU compute functions — use opaque types to avoid pulling WebGPU/TSL
+  // types into the DTS output.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createComputePipeline?: (...args: any[]) => any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  writeParticleToModifierBuffers?: (...args: any[]) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  deactivateParticleInModifierBuffers?: (...args: any[]) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  encodeForceFieldsForGPU?: (...args: any[]) => Float32Array;
 };
 
 let _tslMaterialFactory: TSLMaterialFactory | null = null;
@@ -942,13 +953,35 @@ export const createParticleSystem = (
     return ParticleSystemFragmentShader;
   };
 
-  // Determine whether to use TSL materials (WebGPU path)
-  const useTSL = (() => {
-    const backend = normalizedConfig.simulationBackend;
-    if (backend === SimulationBackend.CPU) return false;
-    // GPU or AUTO: use TSL if factory is registered
-    return _tslMaterialFactory !== null;
-  })();
+  // Determine whether to use TSL materials (WebGPU path).
+  // TSL is used whenever the factory is registered — regardless of simulationBackend.
+  // This ensures WebGPURenderer always gets NodeMaterial (not GLSL ShaderMaterial).
+  const useTSL = _tslMaterialFactory !== null;
+
+  // Determine whether to use GPU compute for simulation.
+  // GPU compute requires: TSL active + not trail + backend != CPU + compute factory registered.
+  const useGPUCompute =
+    useTSL &&
+    !useTrail &&
+    normalizedConfig.simulationBackend !== SimulationBackend.CPU &&
+    !!_tslMaterialFactory?.createComputePipeline &&
+    !!_tslMaterialFactory.writeParticleToModifierBuffers &&
+    !!_tslMaterialFactory.deactivateParticleInModifierBuffers;
+
+  // Create GPU compute pipeline when active
+  type GPUComputePipeline =
+    import('./webgpu/compute-modifiers.js').ModifierComputePipeline;
+  let gpuPipeline: GPUComputePipeline | null = null;
+
+  if (useGPUCompute) {
+    gpuPipeline = _tslMaterialFactory!.createComputePipeline!(
+      maxParticles,
+      useInstancedAttributes,
+      normalizedConfig,
+      generalData.particleSystemId,
+      normalizedForceFields.length
+    );
+  }
 
   const rendererConfig = {
     transparent: renderer.transparent,
@@ -961,7 +994,8 @@ export const createParticleSystem = (
     ? _tslMaterialFactory!.createTSLParticleMaterial(
         renderer.rendererType ?? RendererType.POINTS,
         sharedUniforms,
-        rendererConfig
+        rendererConfig,
+        useGPUCompute
       )
     : new THREE.ShaderMaterial({
         uniforms: sharedUniforms,
@@ -1020,19 +1054,9 @@ export const createParticleSystem = (
       velocities[i]
     );
 
-  // Per-particle (or per-instance) position offsets
-  const positionArray = new Float32Array(maxParticles * 3);
-  for (let i = 0; i < maxParticles; i++) {
-    positionArray[i * 3] = startPositions[i].x;
-    positionArray[i * 3 + 1] = startPositions[i].y;
-    positionArray[i * 3 + 2] = startPositions[i].z;
-  }
-  const positionAttribute = useInstancedAttributes
-    ? new THREE.InstancedBufferAttribute(positionArray, 3)
-    : new THREE.BufferAttribute(positionArray, 3);
-  geometry.setAttribute(posAttr, positionAttribute);
-
-  // Create interleaved buffer for all scalar per-particle attributes
+  // Create interleaved buffer for all scalar per-particle attributes.
+  // In GPU compute mode this is kept for CPU death detection reads only
+  // (not set as geometry attributes — storage buffers are used instead).
   const scalarArray = new Float32Array(maxParticles * SCALAR_STRIDE);
 
   // Pre-fill initial values
@@ -1064,62 +1088,95 @@ export const createParticleSystem = (
     scalarArray[base + S_COLOR_A] = 0;
   }
 
+  // Always create the interleaved buffer (needed for CPU death detection
+  // and the CPU rendering path)
   const scalarInterleavedBuffer = useInstancedAttributes
     ? new THREE.InstancedInterleavedBuffer(scalarArray, SCALAR_STRIDE)
     : new THREE.InterleavedBuffer(scalarArray, SCALAR_STRIDE);
 
-  geometry.setAttribute(
-    attr('isActive'),
-    new THREE.InterleavedBufferAttribute(
-      scalarInterleavedBuffer,
-      1,
-      S_IS_ACTIVE
-    )
-  );
-  geometry.setAttribute(
-    attr('lifetime'),
-    new THREE.InterleavedBufferAttribute(scalarInterleavedBuffer, 1, S_LIFETIME)
-  );
-  geometry.setAttribute(
-    attr('startLifetime'),
-    new THREE.InterleavedBufferAttribute(
-      scalarInterleavedBuffer,
-      1,
-      S_START_LIFETIME
-    )
-  );
-  geometry.setAttribute(
-    attr('startFrame'),
-    new THREE.InterleavedBufferAttribute(
-      scalarInterleavedBuffer,
-      1,
-      S_START_FRAME
-    )
-  );
-  geometry.setAttribute(
-    attr('size'),
-    new THREE.InterleavedBufferAttribute(scalarInterleavedBuffer, 1, S_SIZE)
-  );
-  geometry.setAttribute(
-    attr('rotation'),
-    new THREE.InterleavedBufferAttribute(scalarInterleavedBuffer, 1, S_ROTATION)
-  );
-  geometry.setAttribute(
-    attr('colorR'),
-    new THREE.InterleavedBufferAttribute(scalarInterleavedBuffer, 1, S_COLOR_R)
-  );
-  geometry.setAttribute(
-    attr('colorG'),
-    new THREE.InterleavedBufferAttribute(scalarInterleavedBuffer, 1, S_COLOR_G)
-  );
-  geometry.setAttribute(
-    attr('colorB'),
-    new THREE.InterleavedBufferAttribute(scalarInterleavedBuffer, 1, S_COLOR_B)
-  );
-  geometry.setAttribute(
-    attr('colorA'),
-    new THREE.InterleavedBufferAttribute(scalarInterleavedBuffer, 1, S_COLOR_A)
-  );
+  if (useGPUCompute && gpuPipeline) {
+    // ── GPU Compute Path: use storage buffers as geometry attributes ──
+    // StorageBufferAttribute extends BufferAttribute, so these work as
+    // geometry attributes read by the TSL material.
+    // GPU path: 5 geometry attributes total (under 8 vertex buffer limit)
+    //   1. base quad position (for instanced/mesh)
+    //   2. particle position (vec3)
+    //   3. color (vec4: R,G,B,A)
+    //   4. particleState (vec4: lifetime, size, rotation, startFrame)
+    //   5. startValues (vec4: startLifetime, startSize, startOpacity, startColorR)
+    const gpuBuf = gpuPipeline.buffers;
+    geometry.setAttribute(posAttr, gpuBuf.position);
+    geometry.setAttribute(attr('color'), gpuBuf.color);
+    geometry.setAttribute(attr('particleState'), gpuBuf.particleState);
+    geometry.setAttribute(attr('startValues'), gpuBuf.startValues);
+  } else {
+    // ── CPU Path: position + interleaved scalar attributes ──
+    const positionArray = new Float32Array(maxParticles * 3);
+    for (let i = 0; i < maxParticles; i++) {
+      positionArray[i * 3] = startPositions[i].x;
+      positionArray[i * 3 + 1] = startPositions[i].y;
+      positionArray[i * 3 + 2] = startPositions[i].z;
+    }
+    const positionAttribute = useInstancedAttributes
+      ? new THREE.InstancedBufferAttribute(positionArray, 3)
+      : new THREE.BufferAttribute(positionArray, 3);
+    geometry.setAttribute(posAttr, positionAttribute);
+
+    geometry.setAttribute(
+      attr('isActive'),
+      new THREE.InterleavedBufferAttribute(
+        scalarInterleavedBuffer,
+        1,
+        S_IS_ACTIVE
+      )
+    );
+    geometry.setAttribute(
+      attr('lifetime'),
+      new THREE.InterleavedBufferAttribute(
+        scalarInterleavedBuffer,
+        1,
+        S_LIFETIME
+      )
+    );
+    geometry.setAttribute(
+      attr('startLifetime'),
+      new THREE.InterleavedBufferAttribute(
+        scalarInterleavedBuffer,
+        1,
+        S_START_LIFETIME
+      )
+    );
+    geometry.setAttribute(
+      attr('startFrame'),
+      new THREE.InterleavedBufferAttribute(
+        scalarInterleavedBuffer,
+        1,
+        S_START_FRAME
+      )
+    );
+    geometry.setAttribute(
+      attr('size'),
+      new THREE.InterleavedBufferAttribute(scalarInterleavedBuffer, 1, S_SIZE)
+    );
+    geometry.setAttribute(
+      attr('rotation'),
+      new THREE.InterleavedBufferAttribute(
+        scalarInterleavedBuffer,
+        1,
+        S_ROTATION
+      )
+    );
+    // Packed RGBA color as single vec4 (R/G/B/A are contiguous in the
+    // interleaved buffer at offsets 6,7,8,9 — read as a vec4 from offset 6)
+    geometry.setAttribute(
+      attr('color'),
+      new THREE.InterleavedBufferAttribute(
+        scalarInterleavedBuffer,
+        4,
+        S_COLOR_R
+      )
+    );
+  }
 
   // Packed quaternion vec4 attribute for 3D mesh rotation (only for MESH renderer)
   if (useMesh) {
@@ -1137,10 +1194,7 @@ export const createParticleSystem = (
   // Resolve per-particle attribute accessors (instanced/mesh uses prefixed names)
   const a = geometry.attributes;
   const aIsActive = a[attr('isActive')];
-  const aColorR = a[attr('colorR')];
-  const aColorG = a[attr('colorG')];
-  const aColorB = a[attr('colorB')];
-  const aColorA = a[attr('colorA')];
+  const aColor = a[attr('color')];
   const aStartFrame = a[attr('startFrame')];
   const aStartLifetime = a[attr('startLifetime')];
   const aSize = a[attr('size')];
@@ -1153,7 +1207,14 @@ export const createParticleSystem = (
     const base = particleIndex * SCALAR_STRIDE;
     scalarArray[base + S_IS_ACTIVE] = 0;
     scalarArray[base + S_COLOR_A] = 0;
-    scalarInterleavedBuffer.needsUpdate = true;
+    if (useGPUCompute && gpuPipeline) {
+      _tslMaterialFactory!.deactivateParticleInModifierBuffers!(
+        gpuPipeline.buffers,
+        particleIndex
+      );
+    } else {
+      scalarInterleavedBuffer.needsUpdate = true;
+    }
     freeList.push(particleIndex);
   };
 
@@ -1281,7 +1342,9 @@ export const createParticleSystem = (
       startPositions[particleIndex],
       velocities[particleIndex]
     );
-    const positionIndex = Math.floor(particleIndex * 3);
+    // GPU compute uses vec4 position (stride 4), CPU uses vec3 (stride 3)
+    const posStride = useGPUCompute ? 4 : 3;
+    const positionIndex = particleIndex * posStride;
     aPosition.array[positionIndex] =
       position.x + startPositions[particleIndex].x;
     aPosition.array[positionIndex + 1] =
@@ -1348,17 +1411,63 @@ export const createParticleSystem = (
     }
 
     scalarArray[base + S_LIFETIME] = 0;
-    scalarInterleavedBuffer.needsUpdate = true;
 
-    applyModifiers({
-      delta: 0,
-      generalData,
-      normalizedConfig,
-      attributes: mappedAttributes,
-      scalarArray,
-      particleLifetimePercentage: 0,
-      particleIndex,
-    });
+    if (useGPUCompute && gpuPipeline) {
+      // Write all particle data to GPU storage buffers
+      _tslMaterialFactory!.writeParticleToModifierBuffers!(
+        gpuPipeline.buffers,
+        particleIndex,
+        {
+          position: {
+            x: position.x + startPositions[particleIndex].x,
+            y: position.y + startPositions[particleIndex].y,
+            z: position.z + startPositions[particleIndex].z,
+          },
+          velocity: {
+            x: velocities[particleIndex].x,
+            y: velocities[particleIndex].y,
+            z: velocities[particleIndex].z,
+          },
+          startLifetime: scalarArray[base + S_START_LIFETIME],
+          colorA: scalarArray[base + S_COLOR_A],
+          size: scalarArray[base + S_SIZE],
+          rotation: scalarArray[base + S_ROTATION],
+          colorR: scalarArray[base + S_COLOR_R],
+          colorG: scalarArray[base + S_COLOR_G],
+          colorB: scalarArray[base + S_COLOR_B],
+          startSize: generalData.startValues.startSize[particleIndex],
+          startOpacity: generalData.startValues.startOpacity[particleIndex],
+          startColorR: generalData.startValues.startColorR[particleIndex],
+          startColorG: generalData.startValues.startColorG[particleIndex],
+          startColorB: generalData.startValues.startColorB[particleIndex],
+          rotationSpeed: generalData.lifetimeValues.rotationOverLifetime
+            ? generalData.lifetimeValues.rotationOverLifetime[particleIndex]
+            : 0,
+          noiseOffset: generalData.noise.offsets
+            ? generalData.noise.offsets[particleIndex]
+            : 0,
+          startFrame: scalarArray[base + S_START_FRAME],
+          orbitalOffset: {
+            x: startPositions[particleIndex].x,
+            y: startPositions[particleIndex].y,
+            z: startPositions[particleIndex].z,
+          },
+        }
+      );
+      // Modifiers run on GPU — no CPU applyModifiers needed
+    } else {
+      scalarInterleavedBuffer.needsUpdate = true;
+
+      applyModifiers({
+        delta: 0,
+        generalData,
+        normalizedConfig,
+        attributes: mappedAttributes,
+        scalarArray,
+        particleLifetimePercentage: 0,
+        particleIndex,
+      });
+    }
   };
 
   // Sub-emitter setup
@@ -1637,7 +1746,12 @@ export const createParticleSystem = (
       ? new THREE.Mesh(geometry, material)
       : new THREE.Points(geometry, material);
 
-  if (useInstancing || softParticlesEnabled) {
+  // Late-bound ref so onBeforeRender can access instanceData (assigned later).
+  const _instanceRef: { current: ParticleSystemInstance | null } = {
+    current: null,
+  };
+
+  if (useInstancing || softParticlesEnabled || useGPUCompute) {
     particleSystem.onBeforeRender = (
       glRenderer: THREE.WebGLRenderer,
       _scene: THREE.Scene,
@@ -1658,6 +1772,8 @@ export const createParticleSystem = (
           perspCam.far
         );
       }
+      // Note: GPU compute dispatch is done by the caller via
+      // renderer.compute(system.computeNode) before renderer.render().
     };
   }
 
@@ -1684,10 +1800,7 @@ export const createParticleSystem = (
     startFrame: aStartFrame,
     size: aSize,
     rotation: aRotation,
-    colorR: aColorR,
-    colorG: aColorG,
-    colorB: aColorB,
-    colorA: aColorA,
+    color: aColor,
     ...(useMesh ? { quat: aQuat } : {}),
   };
 
@@ -1773,7 +1886,9 @@ export const createParticleSystem = (
     activateParticle,
     onParticleDeath,
     onParticleBirth,
-    useGPUCompute: false,
+    useGPUCompute: useGPUCompute && gpuPipeline !== null,
+    computePipeline: gpuPipeline ?? undefined,
+    computeDispatchReady: false,
     ...(useTrail
       ? {
           trailMesh,
@@ -1801,6 +1916,7 @@ export const createParticleSystem = (
   };
 
   createdParticleSystems.push(instanceData);
+  _instanceRef.current = instanceData;
 
   const resumeEmitter = () => (generalData.isEnabled = true);
   const pauseEmitter = () => (generalData.isEnabled = false);
@@ -1880,6 +1996,7 @@ export const createParticleSystem = (
     dispose,
     update,
     updateConfig,
+    computeNode: gpuPipeline?.computeNode ?? null,
   };
 };
 
@@ -2088,15 +2205,18 @@ const updateParticleSystemInstance = (
   const creationTimesLength = creationTimes.length;
 
   // ── GPU Compute Path ──────────────────────────────────────────────────
-  // When GPU compute is active, the per-particle physics (gravity, velocity,
-  // position, lifetime) runs on the GPU. CPU still handles:
-  //   - Death detection for sub-emitter callbacks
-  //   - Emission (particle activation)
-  //   - Modifiers (Phase 3 will move these to GPU too)
+  // When GPU compute is active, all per-particle physics AND modifiers
+  // (gravity, velocity, position, lifetime, size/opacity/color/rotation
+  // over lifetime, noise, orbital velocity, force fields) run on the GPU
+  // in a single compute dispatch. CPU still handles:
+  //   - Death detection for sub-emitter callbacks + freeList management
+  //   - Emission (particle activation, writing initial data to GPU buffers)
   if (useGPUCompute && computePipeline) {
-    const cp =
-      computePipeline as import('./webgpu/compute-particle-update.js').ParticleComputePipeline;
-    // Update per-frame compute uniforms
+    type ModifierComputePipeline =
+      import('./webgpu/compute-modifiers.js').ModifierComputePipeline;
+    const cp = computePipeline as ModifierComputePipeline;
+
+    // Core physics uniforms
     (cp.uniforms.delta as unknown as { value: number }).value = delta;
     (cp.uniforms.deltaMs as unknown as { value: number }).value = delta * 1000;
     const gv = cp.uniforms.gravityVelocity as unknown as {
@@ -2114,7 +2234,41 @@ const updateParticleSystemInstance = (
     (cp.uniforms.simulationSpaceWorld as unknown as { value: number }).value =
       simulationSpace === SimulationSpace.WORLD ? 1 : 0;
 
-    // CPU-side death detection (for sub-emitter callbacks)
+    // Noise uniforms
+    const noiseData = generalData.noise;
+    (cp.uniforms.noiseStrength as unknown as { value: number }).value =
+      noiseData.strength;
+    (cp.uniforms.noisePower as unknown as { value: number }).value =
+      noiseData.noisePower;
+    (cp.uniforms.noisePositionAmount as unknown as { value: number }).value =
+      noiseData.positionAmount;
+    (cp.uniforms.noiseRotationAmount as unknown as { value: number }).value =
+      noiseData.rotationAmount;
+    (cp.uniforms.noiseSizeAmount as unknown as { value: number }).value =
+      noiseData.sizeAmount;
+
+    // Force field buffer update
+    if (
+      cp.forceFieldNodes &&
+      hasForceFields &&
+      _tslMaterialFactory?.encodeForceFieldsForGPU
+    ) {
+      const encodedFF = _tslMaterialFactory.encodeForceFieldsForGPU(
+        _localForceFields,
+        generalData.particleSystemId,
+        generalData.normalizedLifetimePercentage
+      );
+      const ffArr = cp.forceFieldNodes.buffer.array as Float32Array;
+      ffArr.set(encodedFF);
+      cp.forceFieldNodes.buffer.needsUpdate = true;
+      (cp.forceFieldNodes.countUniform as unknown as { value: number }).value =
+        normalizedForceFields.length;
+    }
+
+    // Signal onBeforeRender to dispatch compute
+    props.computeDispatchReady = true;
+
+    // CPU-side death detection (for sub-emitter callbacks + freeList)
     for (let index = 0; index < creationTimesLength; index++) {
       const base = index * SCALAR_STRIDE;
       if (scalarArr[base + S_IS_ACTIVE]) {
@@ -2126,11 +2280,6 @@ const updateParticleSystemInstance = (
         }
       }
     }
-
-    // Note: renderer.compute(cp.computeNode) is called from the
-    // ParticleSystem.update() wrapper, not here, because we need
-    // access to the renderer reference which is not available in
-    // the internal update function.
   } else {
     // ── CPU Path ────────────────────────────────────────────────────────
 

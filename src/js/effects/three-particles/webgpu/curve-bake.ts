@@ -13,6 +13,7 @@
  */
 
 import {
+  calculateValue,
   getCurveFunctionFromConfig,
   isLifeTimeCurve,
 } from '../three-particles-utils.js';
@@ -141,6 +142,30 @@ function bakeCurveIntoBuffer(
   return writeOffset + CURVE_RESOLUTION;
 }
 
+/**
+ * Bakes a velocity axis value (constant, random, or curve) into the buffer.
+ * Constants and random ranges are baked as flat curves using their mid-point.
+ */
+function bakeVelocityAxisIntoBuffer(
+  buffer: Float32Array,
+  writeOffset: number,
+  particleSystemId: number,
+  value:
+    | import('../types.js').Constant
+    | import('../types.js').RandomBetweenTwoConstants
+    | LifetimeCurve
+): number {
+  if (isLifeTimeCurve(value)) {
+    return bakeCurveIntoBuffer(buffer, writeOffset, particleSystemId, value);
+  }
+  // Constant or RandomBetweenTwoConstants — bake as flat curve using mid-point
+  const constantValue = calculateValue(particleSystemId, value, 0.5);
+  for (let i = 0; i < CURVE_RESOLUTION; i++) {
+    buffer[writeOffset + i] = constantValue;
+  }
+  return writeOffset + CURVE_RESOLUTION;
+}
+
 // ─── Particle System Curve Baking ─────────────────────────────────────────────
 
 /**
@@ -192,25 +217,34 @@ export function bakeParticleSystemCurves(
   const hasOpacityOverLifetime = opacityOverLifetime.isActive;
   const hasColorOverLifetime = colorOverLifetime.isActive;
 
+  // For velocity axes, bake BOTH curves AND constant/random values.
+  // Constants/randoms are baked as flat curves using calculateValue (mid-point).
+  const isVelActive = velocityOverLifetime.isActive;
   const hasLinearVelX =
-    velocityOverLifetime.isActive &&
-    isLifeTimeCurve(velocityOverLifetime.linear.x ?? 0);
+    isVelActive &&
+    velocityOverLifetime.linear.x !== undefined &&
+    velocityOverLifetime.linear.x !== 0;
   const hasLinearVelY =
-    velocityOverLifetime.isActive &&
-    isLifeTimeCurve(velocityOverLifetime.linear.y ?? 0);
+    isVelActive &&
+    velocityOverLifetime.linear.y !== undefined &&
+    velocityOverLifetime.linear.y !== 0;
   const hasLinearVelZ =
-    velocityOverLifetime.isActive &&
-    isLifeTimeCurve(velocityOverLifetime.linear.z ?? 0);
+    isVelActive &&
+    velocityOverLifetime.linear.z !== undefined &&
+    velocityOverLifetime.linear.z !== 0;
 
   const hasOrbitalVelX =
-    velocityOverLifetime.isActive &&
-    isLifeTimeCurve(velocityOverLifetime.orbital.x ?? 0);
+    isVelActive &&
+    velocityOverLifetime.orbital.x !== undefined &&
+    velocityOverLifetime.orbital.x !== 0;
   const hasOrbitalVelY =
-    velocityOverLifetime.isActive &&
-    isLifeTimeCurve(velocityOverLifetime.orbital.y ?? 0);
+    isVelActive &&
+    velocityOverLifetime.orbital.y !== undefined &&
+    velocityOverLifetime.orbital.y !== 0;
   const hasOrbitalVelZ =
-    velocityOverLifetime.isActive &&
-    isLifeTimeCurve(velocityOverLifetime.orbital.z ?? 0);
+    isVelActive &&
+    velocityOverLifetime.orbital.z !== undefined &&
+    velocityOverLifetime.orbital.z !== 0;
 
   if (hasSizeOverLifetime) curveCount++;
   if (hasOpacityOverLifetime) curveCount++;
@@ -290,61 +324,61 @@ export function bakeParticleSystemCurves(
 
   if (hasLinearVelX) {
     linearVelXIdx = nextIndex++;
-    writeOffset = bakeCurveIntoBuffer(
+    writeOffset = bakeVelocityAxisIntoBuffer(
       data,
       writeOffset,
       particleSystemId,
-      velocityOverLifetime.linear.x as LifetimeCurve
+      velocityOverLifetime.linear.x!
     );
   }
 
   if (hasLinearVelY) {
     linearVelYIdx = nextIndex++;
-    writeOffset = bakeCurveIntoBuffer(
+    writeOffset = bakeVelocityAxisIntoBuffer(
       data,
       writeOffset,
       particleSystemId,
-      velocityOverLifetime.linear.y as LifetimeCurve
+      velocityOverLifetime.linear.y!
     );
   }
 
   if (hasLinearVelZ) {
     linearVelZIdx = nextIndex++;
-    writeOffset = bakeCurveIntoBuffer(
+    writeOffset = bakeVelocityAxisIntoBuffer(
       data,
       writeOffset,
       particleSystemId,
-      velocityOverLifetime.linear.z as LifetimeCurve
+      velocityOverLifetime.linear.z!
     );
   }
 
   if (hasOrbitalVelX) {
     orbitalVelXIdx = nextIndex++;
-    writeOffset = bakeCurveIntoBuffer(
+    writeOffset = bakeVelocityAxisIntoBuffer(
       data,
       writeOffset,
       particleSystemId,
-      velocityOverLifetime.orbital.x as LifetimeCurve
+      velocityOverLifetime.orbital.x!
     );
   }
 
   if (hasOrbitalVelY) {
     orbitalVelYIdx = nextIndex++;
-    writeOffset = bakeCurveIntoBuffer(
+    writeOffset = bakeVelocityAxisIntoBuffer(
       data,
       writeOffset,
       particleSystemId,
-      velocityOverLifetime.orbital.y as LifetimeCurve
+      velocityOverLifetime.orbital.y!
     );
   }
 
   if (hasOrbitalVelZ) {
     orbitalVelZIdx = nextIndex++;
-    writeOffset = bakeCurveIntoBuffer(
+    writeOffset = bakeVelocityAxisIntoBuffer(
       data,
       writeOffset,
       particleSystemId,
-      velocityOverLifetime.orbital.z as LifetimeCurve
+      velocityOverLifetime.orbital.z!
     );
   }
 

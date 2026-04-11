@@ -92,7 +92,8 @@ export function createMeshParticleTSLMaterial(
     blending: THREE.Blending;
     depthTest: boolean;
     depthWrite: boolean;
-  }
+  },
+  gpuCompute = false
 ): MeshBasicNodeMaterial {
   const u = createParticleUniforms(sharedUniforms);
 
@@ -102,18 +103,17 @@ export function createMeshParticleTSLMaterial(
   const aInstanceOffset = attribute('instanceOffset');
   /** Particle orientation as a unit quaternion (vec4: x, y, z, w). */
   const aInstanceQuat = attribute('instanceQuat');
-  /** Uniform scale applied after quaternion rotation. */
-  const aInstanceSize = attribute('instanceSize');
+  /** Packed RGBA color (vec4). */
+  const aColor = attribute('instanceColor');
 
-  // Per-particle appearance
-  const aColorR = attribute('instanceColorR');
-  const aColorG = attribute('instanceColorG');
-  const aColorB = attribute('instanceColorB');
-  const aColorA = attribute('instanceColorA');
-  const aLifetime = attribute('instanceLifetime');
-  const aStartLifetime = attribute('instanceStartLifetime');
-  const aRotation = attribute('instanceRotation');
-  const aStartFrame = attribute('instanceStartFrame');
+  // GPU compute uses packed vec4 buffers; CPU uses individual attributes
+  const aParticleState = gpuCompute ? attribute('instanceParticleState') : null;
+  const aStartValues = gpuCompute ? attribute('instanceStartValues') : null;
+  const aSize = gpuCompute ? null : attribute('instanceSize');
+  const aLifetime = gpuCompute ? null : attribute('instanceLifetime');
+  const aStartLifetime = gpuCompute ? null : attribute('instanceStartLifetime');
+  const aRotation = gpuCompute ? null : attribute('instanceRotation');
+  const aStartFrame = gpuCompute ? null : attribute('instanceStartFrame');
 
   // ── Varyings ───────────────────────────────────────────────────────────────
 
@@ -138,23 +138,31 @@ export function createMeshParticleTSLMaterial(
    */
   const vertexSetup = Fn(() => {
     // Populate varyings
-    vColor.assign(vec4(aColorR, aColorG, aColorB, aColorA));
-    vLifetime.assign(aLifetime);
-    vStartLifetime.assign(aStartLifetime);
-    vStartFrame.assign(aStartFrame);
-    vRotation.assign(aRotation);
+    vColor.assign(aColor.toVar());
+    if (gpuCompute) {
+      vLifetime.assign(aParticleState!.x);
+      vStartLifetime.assign(aStartValues!.x);
+      vStartFrame.assign(aParticleState!.w);
+      vRotation.assign(aParticleState!.z);
+    } else {
+      vLifetime.assign(aLifetime!);
+      vStartLifetime.assign(aStartLifetime!);
+      vStartFrame.assign(aStartFrame!);
+      vRotation.assign(aRotation!);
+    }
 
     // 1. Rotate mesh vertex position by instance quaternion
     const rotatedPos = applyQuaternion({
-      v: vec3(positionLocal),
-      q: vec4(aInstanceQuat),
+      v: positionLocal,
+      q: aInstanceQuat,
     });
 
     // 2. Scale by particle size
-    const scaledPos = rotatedPos.mul(aInstanceSize);
+    const scaledPos = rotatedPos.mul(gpuCompute ? aParticleState!.y : aSize!);
 
     // 3. Translate to particle world position
-    const worldPos = scaledPos.add(vec3(aInstanceOffset));
+    // Use .xyz to handle vec3→vec4 padding by WebGPU storage buffer alignment
+    const worldPos = scaledPos.add(aInstanceOffset.xyz);
 
     // Compute model-view position for depth and normal
     const mvPos = modelViewMatrix.mul(vec4(worldPos, 1.0));
@@ -162,8 +170,8 @@ export function createMeshParticleTSLMaterial(
 
     // Transform normal: rotate by quaternion then into view space
     const rotatedNormal = applyQuaternion({
-      v: vec3(normalLocal),
-      q: vec4(aInstanceQuat),
+      v: normalLocal,
+      q: aInstanceQuat,
     });
     const mvNormal = modelViewMatrix.mul(vec4(rotatedNormal, 0.0)).xyz;
     vNormal.assign(mvNormal.normalize());
@@ -175,7 +183,7 @@ export function createMeshParticleTSLMaterial(
   // ── Fragment stage ─────────────────────────────────────────────────────────
 
   const fragmentColor = Fn(() => {
-    const outColor = vec4(vColor).toVar();
+    const outColor = vColor.toVar();
 
     // Use mesh UVs as the base for texture sampling
     const uvPoint = vec2(uv()).toVar();
@@ -218,16 +226,15 @@ export function createMeshParticleTSLMaterial(
     outColor.assign(outColor.mul(texColor));
 
     // Background color discard
-    const bgDiff = vec4(
+    const bgDiff = vec3(
       texColor.x.sub(u.uBgColor.x),
       texColor.y.sub(u.uBgColor.y),
-      texColor.z.sub(u.uBgColor.z),
-      float(0.0)
+      texColor.z.sub(u.uBgColor.z)
     );
     Discard(
       u.uDiscardBg
         .greaterThan(0.5)
-        .and(abs(length(bgDiff.xyz)).lessThan(u.uBgTolerance))
+        .and(abs(length(bgDiff)).lessThan(u.uBgTolerance))
     );
 
     // Simple directional lighting from camera direction (+Z in view space).

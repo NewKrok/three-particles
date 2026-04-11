@@ -75,30 +75,35 @@ export type ModifierUniforms = {
 };
 
 /** Storage buffers for the modifier compute pipeline. */
+/**
+ * GPU storage buffers for the modifier compute pipeline.
+ *
+ * Packed into 8 bindings to stay within the WebGPU per-stage limit:
+ *   1. position (vec3) — render + compute
+ *   2. velocity (vec3) — compute-only
+ *   3. color (vec4: R,G,B,A) — render + compute
+ *   4. particleState (vec4: lifetime, size, rotation, startFrame) — render + compute
+ *   5. startValues (vec4: startLifetime, startSize, startOpacity, startColorR) — compute + render(.x)
+ *   6. startColorsExt (vec4: startColorG, startColorB, rotationSpeed, noiseOffset) — compute-only
+ *   7. orbitalIsActive (vec4: offsetX, offsetY, offsetZ, isActive) — compute-only
+ *   8. curveData (float[]) — compute-only
+ */
 export type ModifierStorageBuffers = {
-  // Core physics (from Phase 2)
+  /** Particle position (vec3). Render attribute + compute. */
   position: StorageBufferAttribute | StorageInstancedBufferAttribute;
+  /** Particle velocity (vec3). Compute-only. */
   velocity: StorageBufferAttribute;
-  lifetime: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  startLifetime: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  isActive: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  colorA: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  // Modifier-specific
-  size: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  rotation: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  colorR: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  colorG: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  colorB: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  startSize: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  startOpacity: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  startColorR: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  startColorG: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  startColorB: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  rotationSpeed: StorageBufferAttribute | StorageInstancedBufferAttribute;
-  noiseOffset: StorageBufferAttribute;
-  // Orbital velocity persistent offsets (vec3 per particle)
-  orbitalOffset: StorageBufferAttribute;
-  // Curve data (all curves packed sequentially, 256 floats each)
+  /** Packed RGBA color (vec4). Render attribute + compute. */
+  color: StorageBufferAttribute | StorageInstancedBufferAttribute;
+  /** Packed (lifetime, size, rotation, startFrame). Render attribute + compute. */
+  particleState: StorageBufferAttribute | StorageInstancedBufferAttribute;
+  /** Packed (startLifetime, startSize, startOpacity, startColorR). Compute + render(.x for startLifetime). */
+  startValues: StorageBufferAttribute | StorageInstancedBufferAttribute;
+  /** Packed (startColorG, startColorB, rotationSpeed, noiseOffset). Compute-only. */
+  startColorsExt: StorageBufferAttribute;
+  /** Packed (orbitalOffset.x, .y, .z, isActive). Compute-only. */
+  orbitalIsActive: StorageBufferAttribute;
+  /** Baked curve data (float[]). Compute-only, read-only. */
   curveData: StorageBufferAttribute;
 };
 
@@ -107,6 +112,10 @@ export type ModifierComputePipeline = {
   computeNode: ReturnType<typeof compute>;
   uniforms: ModifierUniforms;
   buffers: ModifierStorageBuffers;
+  forceFieldNodes: {
+    buffer: StorageBufferAttribute;
+    countUniform: ShaderNodeObject<Node>;
+  } | null;
 };
 
 // ─── Storage Buffer Creation ─────────────────────────────────────────────────
@@ -125,36 +134,150 @@ export function createModifierStorageBuffers(
     : StorageBufferAttribute;
 
   return {
-    // Core physics
-    position: new Cls(new Float32Array(maxParticles * 3), 3),
-    velocity: new StorageBufferAttribute(new Float32Array(maxParticles * 3), 3),
-    lifetime: new Cls(new Float32Array(maxParticles), 1),
-    startLifetime: new Cls(new Float32Array(maxParticles), 1),
-    isActive: new Cls(new Float32Array(maxParticles), 1),
-    colorA: new Cls(new Float32Array(maxParticles), 1),
-    // Modifier attributes
-    size: new Cls(new Float32Array(maxParticles), 1),
-    rotation: new Cls(new Float32Array(maxParticles), 1),
-    colorR: new Cls(new Float32Array(maxParticles), 1),
-    colorG: new Cls(new Float32Array(maxParticles), 1),
-    colorB: new Cls(new Float32Array(maxParticles), 1),
-    startSize: new Cls(new Float32Array(maxParticles), 1),
-    startOpacity: new Cls(new Float32Array(maxParticles), 1),
-    startColorR: new Cls(new Float32Array(maxParticles), 1),
-    startColorG: new Cls(new Float32Array(maxParticles), 1),
-    startColorB: new Cls(new Float32Array(maxParticles), 1),
-    rotationSpeed: new Cls(new Float32Array(maxParticles), 1),
-    noiseOffset: new StorageBufferAttribute(new Float32Array(maxParticles), 1),
-    orbitalOffset: new StorageBufferAttribute(
-      new Float32Array(maxParticles * 3),
-      3
+    // Position and velocity use vec4 (w=padding) to avoid WebGPU vec3→vec4
+    // storage buffer alignment conversion that breaks itemSize-based type resolution.
+    position: new Cls(new Float32Array(maxParticles * 4), 4),
+    velocity: new StorageBufferAttribute(new Float32Array(maxParticles * 4), 4),
+    color: new Cls(new Float32Array(maxParticles * 4), 4),
+    // (lifetime, size, rotation, startFrame)
+    particleState: new Cls(new Float32Array(maxParticles * 4), 4),
+    // (startLifetime, startSize, startOpacity, startColorR)
+    startValues: new Cls(new Float32Array(maxParticles * 4), 4),
+    // (startColorG, startColorB, rotationSpeed, noiseOffset)
+    startColorsExt: new StorageBufferAttribute(
+      new Float32Array(maxParticles * 4),
+      4
     ),
-    // Curve data — read-only on GPU
+    // (orbitalOffset.x, .y, .z, isActive)
+    orbitalIsActive: new StorageBufferAttribute(
+      new Float32Array(maxParticles * 4),
+      4
+    ),
     curveData: new StorageBufferAttribute(
       curveData.length > 0 ? curveData : new Float32Array(1),
       1
     ),
   };
+}
+
+// ─── CPU → GPU Sync Helpers ─────────────────────────────────────────────────
+
+/**
+ * Writes a newly emitted particle's data into all modifier storage buffers.
+ *
+ * Called from CPU emission code when a particle is activated. Writes all
+ * per-particle state that the GPU compute shader will read/modify.
+ */
+export function writeParticleToModifierBuffers(
+  buffers: ModifierStorageBuffers,
+  index: number,
+  data: {
+    position: { x: number; y: number; z: number };
+    velocity: { x: number; y: number; z: number };
+    startLifetime: number;
+    colorA: number;
+    size: number;
+    rotation: number;
+    colorR: number;
+    colorG: number;
+    colorB: number;
+    startSize: number;
+    startOpacity: number;
+    startColorR: number;
+    startColorG: number;
+    startColorB: number;
+    startFrame: number;
+    rotationSpeed: number;
+    noiseOffset: number;
+    orbitalOffset: { x: number; y: number; z: number };
+  }
+): void {
+  const i4 = index * 4;
+
+  // position (vec4, w=padding)
+  const posArr = buffers.position.array as Float32Array;
+  posArr[i4] = data.position.x;
+  posArr[i4 + 1] = data.position.y;
+  posArr[i4 + 2] = data.position.z;
+  posArr[i4 + 3] = 0;
+
+  // velocity (vec4, w=padding)
+  const velArr = buffers.velocity.array as Float32Array;
+  velArr[i4] = data.velocity.x;
+  velArr[i4 + 1] = data.velocity.y;
+  velArr[i4 + 2] = data.velocity.z;
+  velArr[i4 + 3] = 0;
+
+  // color (vec4: R, G, B, A)
+  const colorArr = buffers.color.array as Float32Array;
+  colorArr[i4] = data.colorR;
+  colorArr[i4 + 1] = data.colorG;
+  colorArr[i4 + 2] = data.colorB;
+  colorArr[i4 + 3] = data.colorA;
+
+  // particleState (vec4: lifetime, size, rotation, startFrame)
+  const psArr = buffers.particleState.array as Float32Array;
+  psArr[i4] = 0; // lifetime starts at 0
+  psArr[i4 + 1] = data.size;
+  psArr[i4 + 2] = data.rotation;
+  psArr[i4 + 3] = data.startFrame;
+
+  // startValues (vec4: startLifetime, startSize, startOpacity, startColorR)
+  const svArr = buffers.startValues.array as Float32Array;
+  svArr[i4] = data.startLifetime;
+  svArr[i4 + 1] = data.startSize;
+  svArr[i4 + 2] = data.startOpacity;
+  svArr[i4 + 3] = data.startColorR;
+
+  // startColorsExt (vec4: startColorG, startColorB, rotationSpeed, noiseOffset)
+  const sceArr = buffers.startColorsExt.array as Float32Array;
+  sceArr[i4] = data.startColorG;
+  sceArr[i4 + 1] = data.startColorB;
+  sceArr[i4 + 2] = data.rotationSpeed;
+  sceArr[i4 + 3] = data.noiseOffset;
+
+  // orbitalIsActive (vec4: offsetX, offsetY, offsetZ, isActive)
+  const oiaArr = buffers.orbitalIsActive.array as Float32Array;
+  oiaArr[i4] = data.orbitalOffset.x;
+  oiaArr[i4 + 1] = data.orbitalOffset.y;
+  oiaArr[i4 + 2] = data.orbitalOffset.z;
+  oiaArr[i4 + 3] = 1; // isActive = 1
+
+  // Only mark compute-input (CPU-written, GPU-read-only) buffers for upload.
+  // Do NOT mark compute-output buffers (position, velocity, color, particleState,
+  // orbitalIsActive) — those are written by the GPU compute shader, and
+  // needsUpdate would cause the render pass to overwrite GPU results with
+  // stale CPU data.
+  buffers.startValues.needsUpdate = true;
+  buffers.startColorsExt.needsUpdate = true;
+  // velocity is compute-written but also needs initial CPU data on emit
+  buffers.velocity.needsUpdate = true;
+  // orbitalIsActive.w (isActive) and .xyz (orbital offset) need CPU upload on emit
+  buffers.orbitalIsActive.needsUpdate = true;
+  // position needs CPU data for newly emitted particles
+  buffers.position.needsUpdate = true;
+  // particleState needs CPU data for newly emitted particles (lifetime=0, size, rotation)
+  buffers.particleState.needsUpdate = true;
+  // color needs CPU data for newly emitted particles
+  buffers.color.needsUpdate = true;
+}
+
+/**
+ * Deactivates a particle in the modifier storage buffers.
+ *
+ * Called from CPU death detection when a particle's lifetime expires.
+ */
+export function deactivateParticleInModifierBuffers(
+  buffers: ModifierStorageBuffers,
+  index: number
+): void {
+  const i4 = index * 4;
+  // isActive is orbitalIsActive.w
+  (buffers.orbitalIsActive.array as Float32Array)[i4 + 3] = 0;
+  // Zero color alpha
+  (buffers.color.array as Float32Array)[i4 + 3] = 0;
+  buffers.orbitalIsActive.needsUpdate = true;
+  buffers.color.needsUpdate = true;
 }
 
 // ─── Curve Lookup Helper ─────────────────────────────────────────────────────
@@ -224,27 +347,23 @@ export function createModifierComputeUpdate(
   const uNoiseRotAmount = uniform(float(0));
   const uNoiseSizeAmount = uniform(float(0));
 
-  // ── Storage buffer nodes ──
+  // ── Storage buffer nodes (8 bindings, matching WebGPU per-stage limit) ──
 
-  const sPosition = storage(buffers.position, 'vec3', maxParticles);
-  const sVelocity = storage(buffers.velocity, 'vec3', maxParticles);
-  const sLifetime = storage(buffers.lifetime, 'float', maxParticles);
-  const sStartLifetime = storage(buffers.startLifetime, 'float', maxParticles);
-  const sIsActive = storage(buffers.isActive, 'float', maxParticles);
-  const sColorA = storage(buffers.colorA, 'float', maxParticles);
-  const sSize = storage(buffers.size, 'float', maxParticles);
-  const sRotation = storage(buffers.rotation, 'float', maxParticles);
-  const sColorR = storage(buffers.colorR, 'float', maxParticles);
-  const sColorG = storage(buffers.colorG, 'float', maxParticles);
-  const sColorB = storage(buffers.colorB, 'float', maxParticles);
-  const sStartSize = storage(buffers.startSize, 'float', maxParticles);
-  const sStartOpacity = storage(buffers.startOpacity, 'float', maxParticles);
-  const sStartColorR = storage(buffers.startColorR, 'float', maxParticles);
-  const sStartColorG = storage(buffers.startColorG, 'float', maxParticles);
-  const sStartColorB = storage(buffers.startColorB, 'float', maxParticles);
-  const sRotationSpeed = storage(buffers.rotationSpeed, 'float', maxParticles);
-  const sNoiseOffset = storage(buffers.noiseOffset, 'float', maxParticles);
-  const sOrbitalOffset = storage(buffers.orbitalOffset, 'vec3', maxParticles);
+  const sPosition = storage(buffers.position, 'vec4', maxParticles);
+  const sVelocity = storage(buffers.velocity, 'vec4', maxParticles);
+  const sColor = storage(buffers.color, 'vec4', maxParticles);
+  // particleState: (lifetime, size, rotation, startFrame)
+  const sParticleState = storage(buffers.particleState, 'vec4', maxParticles);
+  // startValues: (startLifetime, startSize, startOpacity, startColorR)
+  const sStartValues = storage(buffers.startValues, 'vec4', maxParticles);
+  // startColorsExt: (startColorG, startColorB, rotationSpeed, noiseOffset)
+  const sStartColorsExt = storage(buffers.startColorsExt, 'vec4', maxParticles);
+  // orbitalIsActive: (offsetX, offsetY, offsetZ, isActive)
+  const sOrbitalIsActive = storage(
+    buffers.orbitalIsActive,
+    'vec4',
+    maxParticles
+  );
   const sCurveData = storage(
     buffers.curveData,
     'float',
@@ -254,27 +373,40 @@ export function createModifierComputeUpdate(
   const lookupCurve = createCurveLookup(sCurveData);
 
   // ── Compute kernel ──
+  //
+  // Packed field mapping:
+  //   particleState: x=lifetime, y=size, z=rotation, w=startFrame
+  //   startValues: x=startLifetime, y=startSize, z=startOpacity, w=startColorR
+  //   startColorsExt: x=startColorG, y=startColorB, z=rotationSpeed, w=noiseOffset
+  //   orbitalIsActive: xyz=orbitalOffset, w=isActive
 
   const computeKernel = Fn(() => {
     const i = instanceIndex;
 
-    const active = sIsActive.element(i);
-    If(active.lessThan(0.5), () => {
+    // Read orbitalIsActive to check isActive (w component)
+    const oiaVec = sOrbitalIsActive.element(i).toVar();
+    If(oiaVec.w.lessThan(0.5), () => {
       return;
     });
 
-    // Read current state
-    const pos = sPosition.element(i).toVar();
-    const vel = sVelocity.element(i).toVar();
-    const life = sLifetime.element(i).toVar();
-    const startLife = sStartLifetime.element(i);
+    // Read packed state
+    // Position/velocity stored as vec4 (w=padding) for WebGPU alignment;
+    // operate on .xyz only.
+    const pos = sPosition.element(i).xyz.toVar();
+    const vel = sVelocity.element(i).xyz.toVar();
+    const ps = sParticleState.element(i).toVar();
+    const sv = sStartValues.element(i);
 
-    // === CORE PHYSICS (same as Phase 2) ===
+    // Aliases for readability
+    const life = ps.x; // lifetime
+    const startLife = sv.x; // startLifetime
+
+    // === CORE PHYSICS ===
 
     // Gravity
     vel.assign(vel.sub(vec3(uGravityVelocity).mul(uDelta)));
 
-    // Force fields (applied after gravity, before position integration)
+    // Force fields
     if (forceFieldNodes) {
       forceFieldNodes.apply({ pos, vel, delta: uDelta });
     }
@@ -288,10 +420,10 @@ export function createModifierComputeUpdate(
     pos.assign(pos.add(vel.mul(uDelta)));
 
     // Lifetime update
-    life.assign(life.add(uDeltaMs));
+    ps.x.assign(ps.x.add(uDeltaMs));
 
     // Lifetime percentage for modifiers
-    const lifePct = tslMin(life.div(startLife), float(1.0));
+    const lifePct = tslMin(ps.x.div(startLife), float(1.0));
 
     // === MODIFIERS ===
 
@@ -323,11 +455,9 @@ export function createModifierComputeUpdate(
 
     // 2. Orbital Velocity
     if (flags.orbitalVelocity) {
-      const offset = sOrbitalOffset.element(i).toVar();
-      // Translate to emission origin
+      const offset = vec3(oiaVec.x, oiaVec.y, oiaVec.z).toVar();
       pos.assign(pos.sub(offset));
 
-      // Get angular speeds (from curves or constant)
       const ovx =
         curveMap.orbitalVelX >= 0
           ? lookupCurve({
@@ -350,104 +480,104 @@ export function createModifierComputeUpdate(
             })
           : float(0.0);
 
-      // Apply Euler rotation (simplified: sequential axis rotations)
       const ax = ovx.mul(uDelta);
       const ay = ovy.mul(uDelta);
       const az = ovz.mul(uDelta);
 
-      // Rotate around X axis
+      // Rotate around X
       const cosAx = cos(ax);
       const sinAx = sin(ax);
       const ry1 = offset.y.mul(cosAx).sub(offset.z.mul(sinAx));
       const rz1 = offset.y.mul(sinAx).add(offset.z.mul(cosAx));
       offset.assign(vec3(offset.x, ry1, rz1));
 
-      // Rotate around Z axis (mapped from Y in the CPU code)
+      // Rotate around Z
       const cosAz = cos(az);
       const sinAz = sin(az);
       const rx2 = offset.x.mul(cosAz).sub(offset.y.mul(sinAz));
       const ry2 = offset.x.mul(sinAz).add(offset.y.mul(cosAz));
       offset.assign(vec3(rx2, ry2, offset.z));
 
-      // Rotate around Y axis (mapped from Z in the CPU code)
+      // Rotate around Y
       const cosAy = cos(ay);
       const sinAy = sin(ay);
       const rx3 = offset.x.mul(cosAy).add(offset.z.mul(sinAy));
       const rz3 = offset.x.negate().mul(sinAy).add(offset.z.mul(cosAy));
       offset.assign(vec3(rx3, offset.y, rz3));
 
-      // Write back offset and translate back
-      sOrbitalOffset.element(i).assign(offset);
+      // Write back orbital offset (xyz), keep isActive (w)
+      oiaVec.x.assign(offset.x);
+      oiaVec.y.assign(offset.y);
+      oiaVec.z.assign(offset.z);
       pos.assign(pos.add(offset));
     }
 
-    // 3. Size Over Lifetime
+    // 3. Size Over Lifetime (ps.y = size, sv.y = startSize)
     if (flags.sizeOverLifetime && curveMap.sizeOverLifetime >= 0) {
       const multiplier = lookupCurve({
         curveIndex: float(curveMap.sizeOverLifetime),
         t: lifePct,
       });
-      sSize.element(i).assign(sStartSize.element(i).mul(multiplier));
+      ps.y.assign(sv.y.mul(multiplier));
     }
 
-    // 4. Opacity Over Lifetime
+    // 4. Opacity Over Lifetime (sv.z = startOpacity)
     if (flags.opacityOverLifetime && curveMap.opacityOverLifetime >= 0) {
       const multiplier = lookupCurve({
         curveIndex: float(curveMap.opacityOverLifetime),
         t: lifePct,
       });
-      sColorA.element(i).assign(sStartOpacity.element(i).mul(multiplier));
+      const col = sColor.element(i).toVar();
+      col.w.assign(sv.z.mul(multiplier));
+      sColor.element(i).assign(col);
     }
 
     // 5. Color Over Lifetime
+    //    sv.w = startColorR, startColorsExt.x = startColorG, .y = startColorB
     if (flags.colorOverLifetime) {
+      const col = sColor.element(i).toVar();
+      const sce = sStartColorsExt.element(i);
       if (curveMap.colorR >= 0) {
         const rMul = lookupCurve({
           curveIndex: float(curveMap.colorR),
           t: lifePct,
         });
-        sColorR.element(i).assign(sStartColorR.element(i).mul(rMul));
+        col.x.assign(sv.w.mul(rMul));
       }
       if (curveMap.colorG >= 0) {
         const gMul = lookupCurve({
           curveIndex: float(curveMap.colorG),
           t: lifePct,
         });
-        sColorG.element(i).assign(sStartColorG.element(i).mul(gMul));
+        col.y.assign(sce.x.mul(gMul));
       }
       if (curveMap.colorB >= 0) {
         const bMul = lookupCurve({
           curveIndex: float(curveMap.colorB),
           t: lifePct,
         });
-        sColorB.element(i).assign(sStartColorB.element(i).mul(bMul));
+        col.z.assign(sce.y.mul(bMul));
       }
+      sColor.element(i).assign(col);
     }
 
-    // 6. Rotation Over Lifetime
+    // 6. Rotation Over Lifetime (startColorsExt.z = rotationSpeed, ps.z = rotation)
     if (flags.rotationOverLifetime) {
-      const rotSpeed = sRotationSpeed.element(i);
-      sRotation
-        .element(i)
-        .assign(
-          sRotation.element(i).add(rotSpeed.mul(uDelta).mul(float(0.02)))
-        );
+      const sce = sStartColorsExt.element(i);
+      ps.z.assign(ps.z.add(sce.z.mul(uDelta).mul(float(0.02))));
     }
 
-    // 7. Noise
+    // 7. Noise (startColorsExt.w = noiseOffset)
     if (flags.noise) {
-      const noisePos = lifePct
-        .add(sNoiseOffset.element(i))
-        .mul(10.0)
-        .mul(uNoiseStrength);
+      const sce = sStartColorsExt.element(i);
+      const noisePos = lifePct.add(sce.w).mul(10.0).mul(uNoiseStrength);
 
-      // Sample noise at 3 different configurations (matching CPU)
-      const noiseX = snoise3D({ position: vec3(noisePos, float(0), float(0)) });
+      const noiseX = snoise3D({ v: vec3(noisePos, float(0), float(0)) });
       const noiseY = snoise3D({
-        position: vec3(noisePos, noisePos, float(0)),
+        v: vec3(noisePos, noisePos, float(0)),
       });
       const noiseZ = snoise3D({
-        position: vec3(noisePos, noisePos, noisePos),
+        v: vec3(noisePos, noisePos, noisePos),
       });
 
       // Apply to position
@@ -457,41 +587,35 @@ export function createModifierComputeUpdate(
         )
       );
 
-      // Apply to rotation (uses noiseX)
+      // Apply to rotation (ps.z)
       If(uNoiseRotAmount.greaterThan(0.001), () => {
-        sRotation
-          .element(i)
-          .assign(
-            sRotation
-              .element(i)
-              .add(noiseX.mul(uNoisePower).mul(uNoiseRotAmount))
-          );
+        ps.z.assign(ps.z.add(noiseX.mul(uNoisePower).mul(uNoiseRotAmount)));
       });
 
-      // Apply to size (uses noiseX)
+      // Apply to size (ps.y)
       If(uNoiseSizeAmount.greaterThan(0.001), () => {
-        sSize
-          .element(i)
-          .assign(
-            sSize.element(i).add(noiseX.mul(uNoisePower).mul(uNoiseSizeAmount))
-          );
+        ps.y.assign(ps.y.add(noiseX.mul(uNoisePower).mul(uNoiseSizeAmount)));
       });
     }
 
     // === WRITE BACK ===
 
-    sPosition.element(i).assign(pos);
-    sVelocity.element(i).assign(vel);
-    sLifetime.element(i).assign(life);
+    sPosition.element(i).assign(vec4(pos, 0));
+    sVelocity.element(i).assign(vec4(vel, 0));
+    sParticleState.element(i).assign(ps);
+    sOrbitalIsActive.element(i).assign(oiaVec);
 
     // Death check
-    If(life.greaterThan(startLife), () => {
-      sIsActive.element(i).assign(float(0));
-      sColorA.element(i).assign(float(0));
+    If(ps.x.greaterThan(startLife), () => {
+      // Set isActive = 0 and zero color
+      const deadOia = sOrbitalIsActive.element(i).toVar();
+      deadOia.w.assign(float(0));
+      sOrbitalIsActive.element(i).assign(deadOia);
+      sColor.element(i).assign(vec4(0));
     });
   });
 
-  const computeNode = compute(computeKernel, maxParticles);
+  const computeNode = compute(computeKernel(), maxParticles);
 
   return {
     computeNode,

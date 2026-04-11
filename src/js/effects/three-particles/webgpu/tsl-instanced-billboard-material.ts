@@ -22,6 +22,7 @@ import {
   Fn,
   attribute,
   vec2,
+  vec3,
   vec4,
   float,
   uniform,
@@ -94,7 +95,8 @@ export function createInstancedBillboardTSLMaterial(
     blending: THREE.Blending;
     depthTest: boolean;
     depthWrite: boolean;
-  }
+  },
+  gpuCompute = false
 ): MeshBasicNodeMaterial {
   const u = createParticleUniforms(sharedUniforms);
 
@@ -123,18 +125,18 @@ export function createInstancedBillboardTSLMaterial(
 
   /** Particle world-space centre (vec3). */
   const aInstanceOffset = attribute('instanceOffset');
-  /** Uniform size scalar. */
-  const aInstanceSize = attribute('instanceSize');
+  /** Packed RGBA color (vec4). */
+  const aColor = attribute('instanceColor');
 
-  // Per-particle appearance
-  const aColorR = attribute('instanceColorR');
-  const aColorG = attribute('instanceColorG');
-  const aColorB = attribute('instanceColorB');
-  const aColorA = attribute('instanceColorA');
-  const aLifetime = attribute('instanceLifetime');
-  const aStartLifetime = attribute('instanceStartLifetime');
-  const aRotation = attribute('instanceRotation');
-  const aStartFrame = attribute('instanceStartFrame');
+  // GPU compute uses packed vec4 buffers; CPU uses individual attributes
+  const aParticleState = gpuCompute ? attribute('instanceParticleState') : null;
+  const aStartValues = gpuCompute ? attribute('instanceStartValues') : null;
+  // CPU fallback: individual attributes
+  const aSize = gpuCompute ? null : attribute('instanceSize');
+  const aLifetime = gpuCompute ? null : attribute('instanceLifetime');
+  const aStartLifetime = gpuCompute ? null : attribute('instanceStartLifetime');
+  const aRotation = gpuCompute ? null : attribute('instanceRotation');
+  const aStartFrame = gpuCompute ? null : attribute('instanceStartFrame');
 
   // ── Varyings ───────────────────────────────────────────────────────────────
 
@@ -175,11 +177,19 @@ export function createInstancedBillboardTSLMaterial(
    */
   const vertexNode = Fn((): ShaderNodeObject<Node> => {
     // Populate varyings
-    vColor.assign(vec4(aColorR, aColorG, aColorB, aColorA));
-    vLifetime.assign(aLifetime);
-    vStartLifetime.assign(aStartLifetime);
-    vRotation.assign(aRotation);
-    vStartFrame.assign(aStartFrame);
+    vColor.assign(aColor.toVar());
+    if (gpuCompute) {
+      // particleState: x=lifetime, y=size, z=rotation, w=startFrame
+      vLifetime.assign(aParticleState!.x);
+      vStartLifetime.assign(aStartValues!.x);
+      vRotation.assign(aParticleState!.z);
+      vStartFrame.assign(aParticleState!.w);
+    } else {
+      vLifetime.assign(aLifetime!);
+      vStartLifetime.assign(aStartLifetime!);
+      vRotation.assign(aRotation!);
+      vStartFrame.assign(aStartFrame!);
+    }
 
     // UV: quad vertex ranges from -0.5..0.5; remap to 0..1 and flip Y so the
     // top-left of the texture corresponds to the top-left of the billboard.
@@ -189,7 +199,10 @@ export function createInstancedBillboardTSLMaterial(
     vUv.assign(vec2(positionLocal.x.add(0.5), float(0.5).sub(positionLocal.y)));
 
     // Transform the particle world position into view space
-    const mvPosition = modelViewMatrix.mul(vec4(aInstanceOffset, 1.0)).toVar();
+    // Use .xyz to handle vec3→vec4 padding by WebGPU storage buffer alignment
+    const mvPosition = modelViewMatrix
+      .mul(vec4(aInstanceOffset.xyz, 1.0))
+      .toVar();
 
     // Match POINTS renderer pixel size:
     //   gl_PointSize = instanceSize * 100.0 / distance
@@ -198,7 +211,8 @@ export function createInstancedBillboardTSLMaterial(
     //                     / (projectionMatrix[1][1] * viewportHeight * 0.5)
     // projectionMatrix[1][1] == cameraProjectionMatrix.element(1).element(1)
     const dist = length(mvPosition.xyz);
-    const pointSizePx = aInstanceSize.mul(100.0).div(dist);
+    const sizeVal = gpuCompute ? aParticleState!.y : aSize!;
+    const pointSizePx = sizeVal.mul(100.0).div(dist);
     const projY = cameraProjectionMatrix.element(1).element(1);
     const perspectiveSize = pointSizePx
       .mul(mvPosition.z.negate())
@@ -228,7 +242,7 @@ export function createInstancedBillboardTSLMaterial(
    * 6. Soft-particle depth fade.
    */
   const fragmentColor = Fn((): ShaderNodeObject<Node> => {
-    const outColor = vec4(vColor).toVar();
+    const outColor = vColor.toVar();
 
     // Rotate vUv around (0.5, 0.5) to match the POINTS renderer behaviour
     const center = vec2(0.5, 0.5);
@@ -277,16 +291,15 @@ export function createInstancedBillboardTSLMaterial(
     outColor.assign(outColor.mul(texColor));
 
     // Background colour discard
-    const bgDiff = vec4(
+    const bgDiff = vec3(
       texColor.x.sub(u.uBgColor.x),
       texColor.y.sub(u.uBgColor.y),
-      texColor.z.sub(u.uBgColor.z),
-      float(0.0)
+      texColor.z.sub(u.uBgColor.z)
     );
     Discard(
       u.uDiscardBg
         .greaterThan(0.5)
-        .and(abs(length(bgDiff.xyz)).lessThan(u.uBgTolerance))
+        .and(abs(length(bgDiff)).lessThan(u.uBgTolerance))
     );
 
     // Soft particles — fade out fragments close to opaque scene geometry

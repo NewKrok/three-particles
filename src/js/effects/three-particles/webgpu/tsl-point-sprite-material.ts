@@ -8,6 +8,7 @@ import {
   Fn,
   attribute,
   vec2,
+  vec3,
   vec4,
   float,
   modelViewMatrix,
@@ -58,10 +59,7 @@ export function createPointSpriteTSLMaterial(
 
   // Read per-particle attributes
   const aSize = attribute('size');
-  const aColorR = attribute('colorR');
-  const aColorG = attribute('colorG');
-  const aColorB = attribute('colorB');
-  const aColorA = attribute('colorA');
+  const aColor = attribute('color');
   const aLifetime = attribute('lifetime');
   const aStartLifetime = attribute('startLifetime');
   const aRotation = attribute('rotation');
@@ -83,7 +81,7 @@ export function createPointSpriteTSLMaterial(
 
   // Assign varyings in vertex
   const vertexSetup = Fn(() => {
-    vColor.assign(vec4(aColorR, aColorG, aColorB, aColorA));
+    vColor.assign(aColor.toVar());
     vLifetime.assign(aLifetime);
     vStartLifetime.assign(aStartLifetime);
     vRotation.assign(aRotation);
@@ -96,7 +94,7 @@ export function createPointSpriteTSLMaterial(
 
   const fragmentColor = Fn(() => {
     // Start with per-particle color
-    const outColor = vec4(vColor).toVar();
+    const outColor = vColor.toVar();
 
     // Compute frame index (texture sheet animation)
     const totalFrames = u.uTiles.x.mul(u.uTiles.y);
@@ -143,16 +141,15 @@ export function createPointSpriteTSLMaterial(
     outColor.assign(outColor.mul(texColor));
 
     // Background color discard
-    const bgDiff = vec4(
+    const bgDiff = vec3(
       texColor.x.sub(u.uBgColor.x),
       texColor.y.sub(u.uBgColor.y),
-      texColor.z.sub(u.uBgColor.z),
-      float(0.0)
+      texColor.z.sub(u.uBgColor.z)
     );
     Discard(
       u.uDiscardBg
         .greaterThan(0.5)
-        .and(abs(length(bgDiff.xyz)).lessThan(u.uBgTolerance))
+        .and(abs(length(bgDiff)).lessThan(u.uBgTolerance))
     );
 
     // Soft particles

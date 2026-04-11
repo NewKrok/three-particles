@@ -647,12 +647,12 @@ describe('Color lifecycle', () => {
     const attrs = getAttributes(ps);
     for (let i = 0; i < attrs.isActive.count; i++) {
       if (attrs.isActive.getX(i)) {
-        expect(attrs.colorR.getX(i)).toBeGreaterThanOrEqual(0.2);
-        expect(attrs.colorR.getX(i)).toBeLessThanOrEqual(0.8);
-        expect(attrs.colorG.getX(i)).toBeGreaterThanOrEqual(0.3);
-        expect(attrs.colorG.getX(i)).toBeLessThanOrEqual(0.9);
-        expect(attrs.colorB.getX(i)).toBeGreaterThanOrEqual(0.4);
-        expect(attrs.colorB.getX(i)).toBeLessThanOrEqual(1.0);
+        expect(attrs.color.getX(i)).toBeGreaterThanOrEqual(0.2);
+        expect(attrs.color.getX(i)).toBeLessThanOrEqual(0.8);
+        expect(attrs.color.getY(i)).toBeGreaterThanOrEqual(0.3);
+        expect(attrs.color.getY(i)).toBeLessThanOrEqual(0.9);
+        expect(attrs.color.getZ(i)).toBeGreaterThanOrEqual(0.4);
+        expect(attrs.color.getZ(i)).toBeLessThanOrEqual(1.0);
         break;
       }
     }
@@ -674,7 +674,7 @@ describe('Color lifecycle', () => {
     const attrs = getAttributes(ps);
     for (let i = 0; i < attrs.isActive.count; i++) {
       if (!attrs.isActive.getX(i)) {
-        expect(attrs.colorA.getX(i)).toBe(0);
+        expect(attrs.color.getW(i)).toBe(0);
       }
     }
 

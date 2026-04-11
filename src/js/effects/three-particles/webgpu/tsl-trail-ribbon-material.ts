@@ -241,7 +241,7 @@ export function createTrailRibbonTSLMaterial(
   //   4. Background color discard.
 
   const colorNode = Fn((): ShaderNodeObject<Node> => {
-    const outColor = vec4(vColor).toVar();
+    const outColor = vColor.toVar();
 
     // Soft edge fade: vUv.x runs [0, 1] across the ribbon width.
     // edgeDist = 1 − |2·x − 1| peaks at 0.5 (centre) and is 0 at edges.

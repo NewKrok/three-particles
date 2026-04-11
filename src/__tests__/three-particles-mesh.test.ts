@@ -127,10 +127,7 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
         'instanceStartLifetime',
         'instanceSize',
         'instanceRotation',
-        'instanceColorR',
-        'instanceColorG',
-        'instanceColorB',
-        'instanceColorA',
+        'instanceColor',
         'instanceStartFrame',
       ];
 
@@ -440,15 +437,15 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       step(500, 300);
 
       const geom = getGeometry(ps);
-      const alphaAttr = geom.getAttribute('instanceColorA');
+      const alphaAttr = geom.getAttribute('instanceColor');
       const isActiveA = geom.getAttribute('instanceIsActive');
 
       let hasModifiedAlpha = false;
       for (let i = 0; i < 20; i++) {
         if (
           isActiveA.getX(i) &&
-          alphaAttr.getX(i) > 0 &&
-          alphaAttr.getX(i) < 1
+          alphaAttr.getW(i) > 0 &&
+          alphaAttr.getW(i) < 1
         ) {
           hasModifiedAlpha = true;
           break;
@@ -501,7 +498,7 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       step(800, 600);
 
       const geom = getGeometry(ps);
-      const colorRAttr = geom.getAttribute('instanceColorR');
+      const colorRAttr = geom.getAttribute('instanceColor');
       const isActiveB = geom.getAttribute('instanceIsActive');
 
       let hasModifiedColor = false;

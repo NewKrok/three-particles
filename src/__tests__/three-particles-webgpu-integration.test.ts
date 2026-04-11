@@ -57,7 +57,7 @@ describe('TSL material branching', () => {
     ps.dispose();
   });
 
-  it('uses GLSL ShaderMaterial when simulationBackend is CPU even with factory', () => {
+  it('uses TSL material when simulationBackend is CPU with factory (for WebGPU renderer compat)', () => {
     const mockFactory = {
       createTSLParticleMaterial: jest.fn(() => new THREE.ShaderMaterial()),
       createTSLTrailMaterial: jest.fn(() => new THREE.ShaderMaterial()),
@@ -67,7 +67,9 @@ describe('TSL material branching', () => {
     const ps = createTestSystem({
       simulationBackend: SimulationBackend.CPU,
     });
-    expect(mockFactory.createTSLParticleMaterial).not.toHaveBeenCalled();
+    // TSL is always used when factory is registered (for WebGPURenderer compat),
+    // but GPU compute is NOT used when backend is CPU.
+    expect(mockFactory.createTSLParticleMaterial).toHaveBeenCalled();
     ps.dispose();
 
     // Clean up: re-register with null-ish to reset (use a trick)

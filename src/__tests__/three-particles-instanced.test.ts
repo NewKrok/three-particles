@@ -105,10 +105,7 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
         'instanceStartLifetime',
         'instanceSize',
         'instanceRotation',
-        'instanceColorR',
-        'instanceColorG',
-        'instanceColorB',
-        'instanceColorA',
+        'instanceColor',
         'instanceStartFrame',
       ];
 
@@ -276,7 +273,7 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       step(800, 600);
 
       const geom = getGeometry(ps);
-      const alphaAttr = geom.getAttribute('instanceColorA');
+      const alphaAttr = geom.getAttribute('instanceColor');
       const isActiveAttr2 = geom.getAttribute('instanceIsActive');
 
       // Active particles should have reduced alpha (< 1 since they've aged)
@@ -284,8 +281,8 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       for (let i = 0; i < 20; i++) {
         if (
           isActiveAttr2.getX(i) &&
-          alphaAttr.getX(i) < 1 &&
-          alphaAttr.getX(i) > 0
+          alphaAttr.getW(i) < 1 &&
+          alphaAttr.getW(i) > 0
         ) {
           hasReducedAlpha = true;
           break;
@@ -480,7 +477,7 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       step(800, 600);
 
       const geom = getGeometry(ps);
-      const rAttr = geom.getAttribute('instanceColorR');
+      const rAttr = geom.getAttribute('instanceColor');
       const isActiveAttr2 = geom.getAttribute('instanceIsActive');
 
       let hasReducedColor = false;

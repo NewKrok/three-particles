@@ -22,12 +22,21 @@ try {
     const adapter = await navigator.gpu.requestAdapter();
     if (adapter) {
       if (version === "local" && particleModule.registerTSLMaterialFactory) {
-        const { createTSLParticleMaterial, createTSLTrailMaterial } = await import(
-          "./three-particles-webgpu.esm.js"
-        );
+        const {
+          createTSLParticleMaterial,
+          createTSLTrailMaterial,
+          createComputePipeline,
+          writeParticleToModifierBuffers,
+          deactivateParticleInModifierBuffers,
+          encodeForceFieldsForGPU,
+        } = await import("./three-particles-webgpu.esm.js");
         particleModule.registerTSLMaterialFactory({
           createTSLParticleMaterial,
           createTSLTrailMaterial,
+          createComputePipeline,
+          writeParticleToModifierBuffers,
+          deactivateParticleInModifierBuffers,
+          encodeForceFieldsForGPU,
         });
       }
       webgpuAvailable = true;
@@ -277,6 +286,11 @@ class LiveDemo {
       this.particleSystem.update(cycleData);
     } else {
       updateParticleSystems(cycleData);
+    }
+
+    // GPU compute dispatch (must run before render, not inside onBeforeRender)
+    if (this.particleSystem.computeNode) {
+      this.renderer.compute(this.particleSystem.computeNode);
     }
 
     // Soft particles: render depth pass first

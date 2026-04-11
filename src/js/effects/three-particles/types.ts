@@ -1628,10 +1628,8 @@ export type MappedAttributes = {
   startFrame: AnyBufferAttribute;
   size: AnyBufferAttribute;
   rotation: AnyBufferAttribute;
-  colorR: AnyBufferAttribute;
-  colorG: AnyBufferAttribute;
-  colorB: AnyBufferAttribute;
-  colorA: AnyBufferAttribute;
+  /** Packed RGBA color (vec4). */
+  color: AnyBufferAttribute;
   /** Packed quaternion vec4 for 3D mesh rotation (only present for RendererType.MESH). */
   quat?: AnyBufferAttribute;
 };
@@ -1722,14 +1720,17 @@ export type ParticleSystemInstance = {
     twistPrevention: boolean;
     ribbonId?: number;
   };
-  /** GPU compute pipeline for WebGPU simulation (Phase 2+). */
+  /** GPU compute pipeline for WebGPU simulation. Opaque type to avoid pulling TSL types into DTS. */
   computePipeline?: {
     computeNode: unknown;
-    uniforms: unknown;
-    buffers: unknown;
+    uniforms: Record<string, unknown>;
+    buffers: Record<string, unknown>;
+    forceFieldNodes: { buffer: unknown; countUniform: unknown } | null;
   };
   /** Whether this system uses GPU compute for simulation. */
   useGPUCompute?: boolean;
+  /** Flag set by update loop, consumed by onBeforeRender to dispatch compute. */
+  computeDispatchReady?: boolean;
 };
 
 /**
@@ -1758,6 +1759,8 @@ export type ParticleSystem = {
   pauseEmitter: () => void;
   dispose: () => void;
   update: (cycleData: CycleData) => void;
+  /** GPU compute node for WebGPU dispatch. Call `renderer.compute(computeNode)` before `renderer.render()`. Null when CPU simulation. */
+  computeNode: unknown | null;
   /**
    * Updates the particle system configuration at runtime without recreating the system.
    *

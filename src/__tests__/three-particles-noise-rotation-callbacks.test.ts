@@ -409,8 +409,8 @@ describe('Opacity Over Lifetime', () => {
     for (let i = 0; i < attrs.isActive.count; i++) {
       if (attrs.isActive.getX(i)) {
         // Opacity should be between 0 and 1
-        expect(attrs.colorA.getX(i)).toBeGreaterThanOrEqual(0);
-        expect(attrs.colorA.getX(i)).toBeLessThanOrEqual(1);
+        expect(attrs.color.getW(i)).toBeGreaterThanOrEqual(0);
+        expect(attrs.color.getW(i)).toBeLessThanOrEqual(1);
       }
     }
 
@@ -495,7 +495,7 @@ describe('Color Over Lifetime', () => {
     for (let i = 0; i < attrs.isActive.count; i++) {
       if (attrs.isActive.getX(i)) {
         // Color should remain at start value when colorOverLifetime is inactive
-        expect(attrs.colorR.getX(i)).toBeCloseTo(1, 1);
+        expect(attrs.color.getX(i)).toBeCloseTo(1, 1);
         break;
       }
     }

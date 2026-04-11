@@ -187,10 +187,7 @@ describe('createParticleSystem', () => {
     expect(attrs.startLifetime).toBeDefined();
     expect(attrs.rotation).toBeDefined();
     expect(attrs.size).toBeDefined();
-    expect(attrs.colorR).toBeDefined();
-    expect(attrs.colorG).toBeDefined();
-    expect(attrs.colorB).toBeDefined();
-    expect(attrs.colorA).toBeDefined();
+    expect(attrs.color).toBeDefined();
     expect(attrs.startFrame).toBeDefined();
 
     ps.dispose();
@@ -637,9 +634,9 @@ describe('Particle activation and color', () => {
     let foundColoredParticle = false;
     for (let i = 0; i < attrs.isActive.count; i++) {
       if (attrs.isActive.getX(i)) {
-        expect(attrs.colorR.getX(i)).toBeCloseTo(1);
-        expect(attrs.colorG.getX(i)).toBeCloseTo(0);
-        expect(attrs.colorB.getX(i)).toBeCloseTo(0);
+        expect(attrs.color.getX(i)).toBeCloseTo(1);
+        expect(attrs.color.getY(i)).toBeCloseTo(0);
+        expect(attrs.color.getZ(i)).toBeCloseTo(0);
         foundColoredParticle = true;
         break;
       }
@@ -662,8 +659,8 @@ describe('Particle activation and color', () => {
     const attrs = getAttributes(ps);
     for (let i = 0; i < attrs.isActive.count; i++) {
       if (attrs.isActive.getX(i)) {
-        expect(attrs.colorR.getX(i)).toBeGreaterThanOrEqual(0);
-        expect(attrs.colorR.getX(i)).toBeLessThanOrEqual(1);
+        expect(attrs.color.getX(i)).toBeGreaterThanOrEqual(0);
+        expect(attrs.color.getX(i)).toBeLessThanOrEqual(1);
         break;
       }
     }
@@ -684,7 +681,7 @@ describe('Particle activation and color', () => {
     const attrs = getAttributes(ps);
     for (let i = 0; i < attrs.isActive.count; i++) {
       if (!attrs.isActive.getX(i)) {
-        expect(attrs.colorA.getX(i)).toBe(0);
+        expect(attrs.color.getW(i)).toBe(0);
       }
     }
 

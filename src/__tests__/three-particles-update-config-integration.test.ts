@@ -240,15 +240,14 @@ describe('integration — updateConfig color changes on new particles', () => {
     // Emit white particles
     step(100);
     const attrs = getAttributes(ps);
-    const colorRAttr = attrs.colorR;
-    const colorGAttr = attrs.colorG;
+    const colorAttr = attrs.color;
     const isActiveAttr = attrs.isActive;
 
     // Verify initial particles are white (R=1, G=1)
     for (let i = 0; i < isActiveAttr.count; i++) {
       if (isActiveAttr.getX(i)) {
-        expect(colorRAttr.getX(i)).toBeCloseTo(1, 1);
-        expect(colorGAttr.getX(i)).toBeCloseTo(1, 1);
+        expect(colorAttr.getX(i)).toBeCloseTo(1, 1);
+        expect(colorAttr.getY(i)).toBeCloseTo(1, 1);
       }
     }
 
@@ -268,7 +267,7 @@ describe('integration — updateConfig color changes on new particles', () => {
     let hasRedParticle = false;
     for (let i = 0; i < isActiveAttr.count; i++) {
       if (isActiveAttr.getX(i)) {
-        if (colorRAttr.getX(i) > 0.9 && colorGAttr.getX(i) < 0.1) {
+        if (colorAttr.getX(i) > 0.9 && colorAttr.getY(i) < 0.1) {
           hasRedParticle = true;
           break;
         }
@@ -549,12 +548,12 @@ describe('integration — updateConfig startColor with value verification', () =
     step(100);
     const attrs = getAttributes(ps);
     const isActiveAttr = attrs.isActive;
-    const colorGAttr = attrs.colorG;
+    const colorAttr = attrs.color;
 
     // Verify all active particles are white (G=1)
     for (let i = 0; i < isActiveAttr.count; i++) {
       if (isActiveAttr.getX(i)) {
-        expect(colorGAttr.getX(i)).toBeCloseTo(1, 1);
+        expect(colorAttr.getY(i)).toBeCloseTo(1, 1);
       }
     }
 
@@ -576,7 +575,7 @@ describe('integration — updateConfig startColor with value verification', () =
     for (let i = 0; i < isActiveAttr.count; i++) {
       if (isActiveAttr.getX(i)) {
         activeCount++;
-        if (colorGAttr.getX(i) > 0.01) allRed = false;
+        if (colorAttr.getY(i) > 0.01) allRed = false;
       }
     }
     expect(activeCount).toBeGreaterThan(0);
