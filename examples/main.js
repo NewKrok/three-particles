@@ -121,12 +121,12 @@ const MESH_GEOMETRIES = {
 function prepareConfig(config, textureId, meshType, forceGPU = false) {
   const prepared = JSON.parse(JSON.stringify(config));
   delete prepared._editorData;
-  // When GPU backend is not selected, force CPU so the example uses GLSL
-  // ShaderMaterial. When GPU is active, force POINTS → INSTANCED because
-  // WebGPU does not support point primitives.
   if (!forceGPU) {
     prepared.simulationBackend = "CPU";
-  } else {
+  }
+  // WebGPU does not support variable-size point primitives (pointUV / gl_PointCoord),
+  // so always force POINTS → INSTANCED when WebGPURenderer is in use.
+  if (webgpuAvailable) {
     const rt = prepared.renderer?.rendererType;
     if (!rt || rt === "POINTS") {
       prepared.renderer = prepared.renderer || {};
@@ -238,6 +238,9 @@ class LiveDemo {
     });
     await this.renderer.init();
     if (this.disposed) { this.renderer.dispose(); return; }
+    // Particle shaders output raw sRGB values (textures are not linearised).
+    // Disable the output pass sRGB conversion to avoid double-gamma encoding.
+    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -259,7 +262,9 @@ class LiveDemo {
     const useGPU = webgpuAvailable && this.backend === "GPU";
     const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType, useGPU);
     config.renderer = config.renderer || {};
-    if (!useGPU && !isTrailExample(this.data) && !isMeshExample(this.data)) {
+    // Only override renderer type when NOT on WebGPU (prepareConfig already
+    // forces POINTS → INSTANCED for WebGPU since point primitives are unsupported).
+    if (!webgpuAvailable && !isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
     if (this.softParticlesSetup) {
@@ -455,6 +460,7 @@ class ExpandedDemo {
     });
     await this.renderer.init();
     if (this.disposed) { this.renderer.dispose(); return; }
+    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -476,7 +482,7 @@ class ExpandedDemo {
     const useGPU = webgpuAvailable && this.backend === "GPU";
     const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType, useGPU);
     config.renderer = config.renderer || {};
-    if (!useGPU && !isTrailExample(this.data) && !isMeshExample(this.data)) {
+    if (!webgpuAvailable && !isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
     if (this.softParticlesSetup) {

@@ -419,11 +419,12 @@ export function createModifierComputeUpdate(
     // Velocity integration
     pos.assign(pos.add(vel.mul(uDelta)));
 
+    // Lifetime percentage for modifiers (computed before lifetime update
+    // to match the CPU path, which reads lifetime before incrementing it)
+    const lifePct = tslMin(ps.x.div(startLife), float(1.0));
+
     // Lifetime update
     ps.x.assign(ps.x.add(uDeltaMs));
-
-    // Lifetime percentage for modifiers
-    const lifePct = tslMin(ps.x.div(startLife), float(1.0));
 
     // === MODIFIERS ===
 

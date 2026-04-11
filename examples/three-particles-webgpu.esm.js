@@ -445,8 +445,8 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
       pos.assign(pos.sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(uWorldPositionChange)));
     });
     pos.assign(pos.add(vel.mul(uDelta)));
-    ps.x.assign(ps.x.add(uDeltaMs));
     const lifePct = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__(ps.x.div(startLife), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(1));
+    ps.x.assign(ps.x.add(uDeltaMs));
     if (flags.linearVelocity) {
       const lvx = curveMap.linearVelX >= 0 ? lookupCurve({
         curveIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(curveMap.linearVelX),
