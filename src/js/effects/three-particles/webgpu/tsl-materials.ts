@@ -147,7 +147,8 @@ export function createComputePipeline(
   const buffers = createModifierStorageBuffers(
     maxParticles,
     instanced,
-    bakedCurves.data
+    bakedCurves.data,
+    flags.forceFields
   );
 
   return createModifierComputeUpdate(

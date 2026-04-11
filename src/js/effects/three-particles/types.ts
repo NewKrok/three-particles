@@ -1726,7 +1726,7 @@ export type ParticleSystemInstance = {
     computeNode: unknown;
     uniforms: Record<string, unknown>;
     buffers: Record<string, unknown>;
-    forceFieldNodes: { buffer: unknown; countUniform: unknown } | null;
+    forceFieldInfo: { offset: number; countUniform: unknown } | null;
   };
   /** Whether this system uses GPU compute for simulation. */
   useGPUCompute?: boolean;

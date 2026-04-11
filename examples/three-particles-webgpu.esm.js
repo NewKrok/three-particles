@@ -1,5 +1,5 @@
 import { DataTexture as __WEBPACK_EXTERNAL_MODULE_three_DataTexture__, DoubleSide as __WEBPACK_EXTERNAL_MODULE_three_DoubleSide__, MathUtils as __WEBPACK_EXTERNAL_MODULE_three_MathUtils__, Vector3 as __WEBPACK_EXTERNAL_MODULE_three_Vector3__ } from "three";
-import { Discard as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__, Fn as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__, If as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__, Loop as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Loop__, abs as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__, attribute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_attribute__, cameraPosition as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraPosition__, cameraProjectionMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__, cameraViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraViewMatrix__, compute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_compute__, cos as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__, cross as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cross__, dot as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__, float as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__, floor as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__, fract as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_fract__, instanceIndex as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__, length as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_length__, max as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_max__, min as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__, mix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mix__, mod as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mod__, modelViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__, normalLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalLocal__, normalize as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalize__, pointUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_pointUV__, positionLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__, round as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_round__, screenUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_screenUV__, sin as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__, smoothstep as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_smoothstep__, step as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_step__, storage as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_storage__, texture as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_texture__, uniform as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__, uv as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uv__, varyingProperty as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__, vec2 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__, vec3 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__, vec4 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__ } from "three/tsl";
+import { Continue as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Continue__, Discard as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__, Fn as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__, If as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__, Loop as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Loop__, abs as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__, attribute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_attribute__, cameraPosition as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraPosition__, cameraProjectionMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__, cameraViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraViewMatrix__, compute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_compute__, cos as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__, cross as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cross__, dot as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__, float as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__, floor as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__, fract as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_fract__, instanceIndex as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__, length as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_length__, max as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_max__, min as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__, mix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mix__, mod as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mod__, modelViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__, normalLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalLocal__, normalize as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalize__, pointUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_pointUV__, positionLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__, round as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_round__, screenUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_screenUV__, sin as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__, smoothstep as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_smoothstep__, step as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_step__, storage as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_storage__, texture as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_texture__, uniform as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__, uv as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uv__, varyingProperty as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__, vec2 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__, vec3 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__, vec4 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__ } from "three/tsl";
 import { MeshBasicNodeMaterial as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_MeshBasicNodeMaterial__, PointsNodeMaterial as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_PointsNodeMaterial__, StorageBufferAttribute as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageBufferAttribute__, StorageInstancedBufferAttribute as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageInstancedBufferAttribute__ } from "three/webgpu";
 /******/ // The require scope
 /******/ var __webpack_require__ = {};
@@ -113,9 +113,10 @@ var calculateValue = (particleSystemId, value, time = 0) => {
 };
 var FIELD_STRIDE = 12;
 var MAX_FORCE_FIELDS = 16;
+var FORCE_FIELD_DATA_SIZE = MAX_FORCE_FIELDS * FIELD_STRIDE;
 var GPU_INFINITY = 1e10;
 function encodeForceFieldsForGPU(forceFields, particleSystemId, systemLifetimePercentage) {
-  const data = new Float32Array(MAX_FORCE_FIELDS * FIELD_STRIDE);
+  const data = new Float32Array(FORCE_FIELD_DATA_SIZE);
   const count = Math.min(forceFields.length, MAX_FORCE_FIELDS);
   for (let i = 0; i < count; i++) {
     const ff = forceFields[i];
@@ -142,15 +143,10 @@ function encodeForceFieldsForGPU(forceFields, particleSystemId, systemLifetimePe
   }
   return data;
 }
-function createForceFieldComputeNodes(forceFieldCount) {
+function createForceFieldTSL(sCurveData, forceFieldOffset, forceFieldCount) {
   const count = Math.min(forceFieldCount, MAX_FORCE_FIELDS);
-  const bufferSize = MAX_FORCE_FIELDS * FIELD_STRIDE;
-  const forceFieldBuffer = new __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageBufferAttribute__(
-    new Float32Array(bufferSize),
-    1
-  );
-  const sForceFields = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_storage__(forceFieldBuffer, "float", bufferSize);
   const uForceFieldCount = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(count));
+  const ffBase = forceFieldOffset;
   const applyForceFieldsTSL = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(
     ({
       pos,
@@ -158,27 +154,27 @@ function createForceFieldComputeNodes(forceFieldCount) {
       delta
     }) => {
       __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Loop__(uForceFieldCount, ({ i }) => {
-        const base = i.mul(FIELD_STRIDE);
-        const isActive = sForceFields.element(base);
+        const base = i.mul(FIELD_STRIDE).add(ffBase);
+        const isActive = sCurveData.element(base);
         __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(isActive.lessThan(0.5), () => {
-          return;
+          __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Continue__();
         });
-        const fieldType = sForceFields.element(base.add(1));
+        const fieldType = sCurveData.element(base.add(1));
         const fieldPos = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(
-          sForceFields.element(base.add(2)),
-          sForceFields.element(base.add(3)),
-          sForceFields.element(base.add(4))
+          sCurveData.element(base.add(2)),
+          sCurveData.element(base.add(3)),
+          sCurveData.element(base.add(4))
         );
         const fieldDir = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(
-          sForceFields.element(base.add(5)),
-          sForceFields.element(base.add(6)),
-          sForceFields.element(base.add(7))
+          sCurveData.element(base.add(5)),
+          sCurveData.element(base.add(6)),
+          sCurveData.element(base.add(7))
         );
-        const strength = sForceFields.element(base.add(8));
-        const range = sForceFields.element(base.add(9));
-        const falloffType = sForceFields.element(base.add(10));
+        const strength = sCurveData.element(base.add(8));
+        const range = sCurveData.element(base.add(9));
+        const falloffType = sCurveData.element(base.add(10));
         __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(strength.equal(0), () => {
-          return;
+          __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Continue__();
         });
         __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(fieldType.greaterThan(0.5), () => {
           const force = strength.mul(delta);
@@ -207,14 +203,13 @@ function createForceFieldComputeNodes(forceFieldCount) {
           });
         });
       });
-    }
+    },
+    "void"
   );
   return {
-    /** Storage buffer for encoded force field data. Updated each frame via encodeForceFieldsForGPU. */
-    buffer: forceFieldBuffer,
     /** Uniform for the active force field count. */
     countUniform: uForceFieldCount,
-    /** TSL function to call in the compute kernel: applyForceFieldsTSL({ pos, vel, delta }) */
+    /** TSL function to call in the compute kernel: apply({ pos, vel, delta }) */
     apply: applyForceFieldsTSL
   };
 }
@@ -307,10 +302,11 @@ __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(
 
 // src/js/effects/three-particles/webgpu/compute-modifiers.ts
 var INIT_STRIDE = 20;
-function createModifierStorageBuffers(maxParticles, instanced, curveData) {
+function createModifierStorageBuffers(maxParticles, instanced, curveData, hasForceFields = false) {
   const Cls = instanced ? __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageInstancedBufferAttribute__ : __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageBufferAttribute__;
   const curveLen = Math.max(curveData.length, 1);
-  const totalLen = curveLen + maxParticles * INIT_STRIDE;
+  const ffSize = hasForceFields ? FORCE_FIELD_DATA_SIZE : 0;
+  const totalLen = curveLen + maxParticles * INIT_STRIDE + ffSize;
   const combined = new Float32Array(totalLen);
   combined.set(curveData.length > 0 ? curveData : new Float32Array([0]));
   return {
@@ -437,7 +433,6 @@ function createCurveLookup(sCurveData) {
   );
 }
 function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, forceFieldCount = 0) {
-  const forceFieldNodes = flags.forceFields ? createForceFieldComputeNodes(forceFieldCount) : null;
   const uDelta = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
   const uDeltaMs = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
   const uGravityVelocity = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(new __WEBPACK_EXTERNAL_MODULE_three_Vector3__(0, 0, 0));
@@ -467,6 +462,8 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
   );
   const curveLen = Math.max(curveMap.data.length, 1);
   const lookupCurve = createCurveLookup(sCurveData);
+  const forceFieldOffset = curveLen + maxParticles * INIT_STRIDE;
+  const forceFieldNodes = flags.forceFields ? createForceFieldTSL(sCurveData, forceFieldOffset, forceFieldCount) : null;
   const computeKernel = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(() => {
     const i = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__;
     const initBase = i.mul(INIT_STRIDE).add(curveLen);
@@ -684,9 +681,9 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
     },
     buffers,
     curveDataLength: curveLen,
-    /** Force field buffer and count uniform (null if no force fields). */
-    forceFieldNodes: forceFieldNodes ? {
-      buffer: forceFieldNodes.buffer,
+    /** Force field offset and count uniform (null if no force fields). */
+    forceFieldInfo: forceFieldNodes ? {
+      offset: forceFieldOffset,
       countUniform: forceFieldNodes.countUniform
     } : null
   };
@@ -1468,7 +1465,8 @@ function createComputePipeline(maxParticles, instanced, normalizedConfig, partic
   const buffers = createModifierStorageBuffers(
     maxParticles,
     instanced,
-    bakedCurves.data
+    bakedCurves.data,
+    flags.forceFields
   );
   return createModifierComputeUpdate(
     buffers,

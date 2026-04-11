@@ -41,7 +41,10 @@ import {
   StorageInstancedBufferAttribute,
 } from 'three/webgpu';
 
-import { createForceFieldComputeNodes } from './compute-force-fields.js';
+import {
+  createForceFieldTSL,
+  FORCE_FIELD_DATA_SIZE,
+} from './compute-force-fields.js';
 import { snoise3D } from './tsl-noise.js';
 import type { BakedCurveMap } from './curve-bake.js';
 
@@ -156,8 +159,11 @@ export type ModifierComputePipeline = {
   buffers: ModifierStorageBuffers;
   /** Offset into curveData where per-particle init data begins (= baked curve data length). */
   curveDataLength: number;
-  forceFieldNodes: {
-    buffer: StorageBufferAttribute;
+  /** Force field metadata for runtime updates (null if no force fields). */
+  forceFieldInfo: {
+    /** Float offset into curveData where force field data starts. */
+    offset: number;
+    /** Uniform for the active force field count. */
     countUniform: ShaderNodeObject<Node>;
   } | null;
 };
@@ -167,23 +173,31 @@ export type ModifierComputePipeline = {
 /**
  * Creates GPU storage buffers for the full modifier compute pipeline.
  * Extends the Phase 2 buffers with modifier-specific data.
+ *
+ * @param hasForceFields - If true, reserves space for force field data at the
+ *   end of the curveData buffer (after baked curves + per-particle init data).
  */
 export function createModifierStorageBuffers(
   maxParticles: number,
   instanced: boolean,
-  curveData: Float32Array
+  curveData: Float32Array,
+  hasForceFields = false
 ): ModifierStorageBuffers {
   const Cls = instanced
     ? StorageInstancedBufferAttribute
     : StorageBufferAttribute;
 
-  // Per-particle init data is appended to the curveData buffer:
+  // curveData buffer layout:
   //   [0 .. curveLen-1]                             baked curve samples
   //   [curveLen + i*INIT_STRIDE .. +INIT_STRIDE-1]  init data for particle i
+  //   [curveLen + maxP*INIT_STRIDE .. +FF_SIZE-1]   force field data (if enabled)
   //
   // Each particle has a fixed slot — O(1) lookup in the compute shader.
+  // Force field data is appended at the end to stay within the 8 storage
+  // buffer per-stage limit.
   const curveLen = Math.max(curveData.length, 1);
-  const totalLen = curveLen + maxParticles * INIT_STRIDE;
+  const ffSize = hasForceFields ? FORCE_FIELD_DATA_SIZE : 0;
+  const totalLen = curveLen + maxParticles * INIT_STRIDE + ffSize;
   const combined = new Float32Array(totalLen);
   combined.set(curveData.length > 0 ? curveData : new Float32Array([0]));
   // All init flags start at 0 (no init needed)
@@ -438,11 +452,6 @@ export function createModifierComputeUpdate(
   flags: ModifierFlags,
   forceFieldCount = 0
 ): ModifierComputePipeline {
-  // ── Force field nodes (if any) ──
-  const forceFieldNodes = flags.forceFields
-    ? createForceFieldComputeNodes(forceFieldCount)
-    : null;
-
   // ── Per-frame uniforms ──
 
   const uDelta = uniform(float(0));
@@ -474,7 +483,7 @@ export function createModifierComputeUpdate(
     'vec4',
     maxParticles
   );
-  // curveData + per-particle init data tail (single buffer)
+  // curveData + per-particle init data tail + force field data (single buffer)
   const sCurveData = storage(
     buffers.curveData,
     'float',
@@ -485,6 +494,12 @@ export function createModifierComputeUpdate(
   const curveLen = Math.max(curveMap.data.length, 1);
 
   const lookupCurve = createCurveLookup(sCurveData);
+
+  // ── Force field nodes (reads from curveData tail, no extra binding) ──
+  const forceFieldOffset = curveLen + maxParticles * INIT_STRIDE;
+  const forceFieldNodes = flags.forceFields
+    ? createForceFieldTSL(sCurveData, forceFieldOffset, forceFieldCount)
+    : null;
 
   // ── Compute kernel ──
   //
@@ -826,10 +841,10 @@ export function createModifierComputeUpdate(
     },
     buffers,
     curveDataLength: curveLen,
-    /** Force field buffer and count uniform (null if no force fields). */
-    forceFieldNodes: forceFieldNodes
+    /** Force field offset and count uniform (null if no force fields). */
+    forceFieldInfo: forceFieldNodes
       ? {
-          buffer: forceFieldNodes.buffer,
+          offset: forceFieldOffset,
           countUniform: forceFieldNodes.countUniform,
         }
       : null,

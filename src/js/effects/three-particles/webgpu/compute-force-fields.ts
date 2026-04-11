@@ -2,8 +2,11 @@
  * GPU force field computation for particle systems.
  *
  * Encodes force field configurations into a flat Float32Array that can be
- * read by the GPU compute shader. Provides a TSL helper function that
- * iterates over the encoded fields and applies forces to particle velocity.
+ * written into the shared curveData storage buffer (avoiding an extra
+ * storage buffer binding that would exceed the WebGPU per-stage limit of 8).
+ *
+ * Provides a TSL helper function that iterates over the encoded fields
+ * and applies forces to particle velocity.
  *
  * Force field types:
  *   - POINT: radial attract/repel toward a position with distance falloff
@@ -20,17 +23,15 @@ import {
   Fn,
   float,
   vec3,
-  storage,
   uniform,
   If,
   Loop,
+  Continue,
   normalize,
   length,
   type ShaderNodeObject,
   type Node,
 } from 'three/tsl';
-
-import { StorageBufferAttribute } from 'three/webgpu';
 
 import { ForceFieldFalloff, ForceFieldType } from '../three-particles-enums.js';
 import { calculateValue } from '../three-particles-utils.js';
@@ -56,6 +57,9 @@ const FIELD_STRIDE = 12;
 /** Maximum force fields supported per particle system. */
 export const MAX_FORCE_FIELDS = 16;
 
+/** Total floats reserved for force field data in the curveData buffer. */
+export const FORCE_FIELD_DATA_SIZE = MAX_FORCE_FIELDS * FIELD_STRIDE;
+
 /** Sentinel value for "infinite" range on GPU (avoids Infinity in Float32). */
 const GPU_INFINITY = 1e10;
 
@@ -74,7 +78,7 @@ export function encodeForceFieldsForGPU(
   particleSystemId: number,
   systemLifetimePercentage: number
 ): Float32Array {
-  const data = new Float32Array(MAX_FORCE_FIELDS * FIELD_STRIDE);
+  const data = new Float32Array(FORCE_FIELD_DATA_SIZE);
 
   const count = Math.min(forceFields.length, MAX_FORCE_FIELDS);
   for (let i = 0; i < count; i++) {
@@ -109,22 +113,25 @@ export function encodeForceFieldsForGPU(
 // ─── TSL Force Field Application ─────────────────────────────────────────────
 
 /**
- * Creates the TSL nodes and helper function for applying force fields
+ * Creates the TSL uniform and helper function for applying force fields
  * in a GPU compute shader.
  *
+ * Force field data is read from the shared curveData storage buffer at a
+ * fixed offset, avoiding an additional storage buffer binding.
+ *
+ * @param sCurveData - The shared curveData storage node.
+ * @param forceFieldOffset - Float offset into curveData where force field data starts.
  * @param forceFieldCount - Number of active force fields (0 to MAX_FORCE_FIELDS).
- * @returns Object with storage buffer, uniform, and the TSL apply function.
+ * @returns Object with the count uniform and the TSL apply function.
  */
-export function createForceFieldComputeNodes(forceFieldCount: number) {
+export function createForceFieldTSL(
+  sCurveData: ShaderNodeObject<Node>,
+  forceFieldOffset: number,
+  forceFieldCount: number
+) {
   const count = Math.min(forceFieldCount, MAX_FORCE_FIELDS);
-  const bufferSize = MAX_FORCE_FIELDS * FIELD_STRIDE;
-
-  const forceFieldBuffer = new StorageBufferAttribute(
-    new Float32Array(bufferSize),
-    1
-  );
-  const sForceFields = storage(forceFieldBuffer, 'float', bufferSize);
   const uForceFieldCount = uniform(float(count));
+  const ffBase = forceFieldOffset;
 
   /**
    * TSL function that applies all force fields to a particle's velocity.
@@ -144,30 +151,30 @@ export function createForceFieldComputeNodes(forceFieldCount: number) {
       delta: ShaderNodeObject<Node>;
     }) => {
       Loop(uForceFieldCount, ({ i }: { i: ShaderNodeObject<Node> }) => {
-        const base = i.mul(FIELD_STRIDE);
+        const base = i.mul(FIELD_STRIDE).add(ffBase);
 
-        const isActive = sForceFields.element(base);
+        const isActive = sCurveData.element(base);
         If(isActive.lessThan(0.5), () => {
-          return;
+          Continue();
         });
 
-        const fieldType = sForceFields.element(base.add(1));
+        const fieldType = sCurveData.element(base.add(1));
         const fieldPos = vec3(
-          sForceFields.element(base.add(2)),
-          sForceFields.element(base.add(3)),
-          sForceFields.element(base.add(4))
+          sCurveData.element(base.add(2)),
+          sCurveData.element(base.add(3)),
+          sCurveData.element(base.add(4))
         );
         const fieldDir = vec3(
-          sForceFields.element(base.add(5)),
-          sForceFields.element(base.add(6)),
-          sForceFields.element(base.add(7))
+          sCurveData.element(base.add(5)),
+          sCurveData.element(base.add(6)),
+          sCurveData.element(base.add(7))
         );
-        const strength = sForceFields.element(base.add(8));
-        const range = sForceFields.element(base.add(9));
-        const falloffType = sForceFields.element(base.add(10));
+        const strength = sCurveData.element(base.add(8));
+        const range = sCurveData.element(base.add(9));
+        const falloffType = sCurveData.element(base.add(10));
 
         If(strength.equal(0.0), () => {
-          return;
+          Continue();
         });
 
         // DIRECTIONAL force (type == 1)
@@ -213,15 +220,14 @@ export function createForceFieldComputeNodes(forceFieldCount: number) {
           });
         });
       });
-    }
+    },
+    'void'
   );
 
   return {
-    /** Storage buffer for encoded force field data. Updated each frame via encodeForceFieldsForGPU. */
-    buffer: forceFieldBuffer,
     /** Uniform for the active force field count. */
     countUniform: uForceFieldCount,
-    /** TSL function to call in the compute kernel: applyForceFieldsTSL({ pos, vel, delta }) */
+    /** TSL function to call in the compute kernel: apply({ pos, vel, delta }) */
     apply: applyForceFieldsTSL,
   };
 }

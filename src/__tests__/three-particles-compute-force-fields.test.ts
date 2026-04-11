@@ -1,12 +1,15 @@
 import * as THREE from 'three';
+import { storage } from 'three/tsl';
+import { StorageBufferAttribute } from 'three/webgpu';
 import {
   ForceFieldFalloff,
   ForceFieldType,
 } from '../js/effects/three-particles/three-particles-enums.js';
 import {
   encodeForceFieldsForGPU,
-  createForceFieldComputeNodes,
+  createForceFieldTSL,
   MAX_FORCE_FIELDS,
+  FORCE_FIELD_DATA_SIZE,
 } from '../js/effects/three-particles/webgpu/compute-force-fields.js';
 import type { NormalizedForceFieldConfig } from '../js/effects/three-particles/types.js';
 
@@ -150,25 +153,106 @@ describe('encodeForceFieldsForGPU', () => {
   });
 });
 
-// ─── createForceFieldComputeNodes ────────────────────────────────────────────
+// ─── createForceFieldTSL ────────────────────────────────────────────────────
 
-describe('createForceFieldComputeNodes', () => {
-  it('returns buffer, countUniform, and apply function', () => {
-    const nodes = createForceFieldComputeNodes(2);
-    expect(nodes.buffer).toBeDefined();
-    expect(nodes.buffer.array).toHaveLength(MAX_FORCE_FIELDS * FIELD_STRIDE);
+describe('createForceFieldTSL', () => {
+  // Helper to create a mock sCurveData storage node
+  function makeMockCurveData(size: number) {
+    const buf = new StorageBufferAttribute(new Float32Array(size), 1);
+    return storage(buf, 'float', size);
+  }
+
+  it('returns countUniform and apply function', () => {
+    const sCurveData = makeMockCurveData(512);
+    const nodes = createForceFieldTSL(sCurveData, 256, 2);
     expect(nodes.countUniform).toBeDefined();
     expect(typeof nodes.apply).toBe('function');
   });
 
   it('works with 0 force fields', () => {
-    const nodes = createForceFieldComputeNodes(0);
-    expect(nodes.buffer).toBeDefined();
+    const sCurveData = makeMockCurveData(512);
+    const nodes = createForceFieldTSL(sCurveData, 256, 0);
+    expect(nodes.countUniform).toBeDefined();
   });
 
   it('caps count at MAX_FORCE_FIELDS', () => {
-    const nodes = createForceFieldComputeNodes(100);
-    expect(nodes.buffer).toBeDefined();
+    const sCurveData = makeMockCurveData(512);
+    const nodes = createForceFieldTSL(sCurveData, 256, 100);
+    expect(nodes.countUniform).toBeDefined();
+  });
+});
+
+// ─── FORCE_FIELD_DATA_SIZE ──────────────────────────────────────────────────
+
+describe('FORCE_FIELD_DATA_SIZE', () => {
+  it('equals MAX_FORCE_FIELDS * FIELD_STRIDE', () => {
+    expect(FORCE_FIELD_DATA_SIZE).toBe(MAX_FORCE_FIELDS * FIELD_STRIDE);
+  });
+});
+
+// ─── TSL Continue guard + void type regression ─────────────────────────────
+
+describe('TSL force field loop uses Continue() and void type', () => {
+  it('source uses Continue() instead of bare return inside Loop', async () => {
+    // Regression: bare `return` inside a TSL If() callback has no effect on
+    // the generated shader — it just exits the JS arrow function during node
+    // graph construction. The shader must use Continue() to skip inactive or
+    // zero-strength force fields.
+    const fs = await import('fs');
+    const path = await import('path');
+    const src = fs.readFileSync(
+      path.resolve(
+        __dirname,
+        '../js/effects/three-particles/webgpu/compute-force-fields.ts'
+      ),
+      'utf-8'
+    );
+
+    // Verify Continue is imported from three/tsl
+    expect(src).toMatch(
+      /import\s*\{[^}]*\bContinue\b[^}]*\}\s*from\s*'three\/tsl'/
+    );
+
+    // Verify the inactive-field guard uses Continue()
+    expect(src).toContain('If(isActive.lessThan(0.5), () => {');
+    expect(src).toContain('If(strength.equal(0.0), () => {');
+
+    // Verify Continue() is called (not bare return) inside the loop
+    // Extract the applyForceFieldsTSL Fn body
+    const fnBodyStart = src.indexOf('const applyForceFieldsTSL = Fn(');
+    const fnBodyEnd = src.indexOf('return {', fnBodyStart);
+    const fnBody = src.slice(fnBodyStart, fnBodyEnd);
+
+    // There should be Continue() calls, not bare return statements
+    expect(fnBody).toContain('Continue()');
+    // Bare `return;` inside the Loop would be a no-op — ensure it's not present
+    const loopStart = fnBody.indexOf('Loop(');
+    const loopBody = fnBody.slice(loopStart);
+    expect(loopBody).not.toMatch(/\breturn\s*;/);
+
+    // The Fn must declare 'void' return type so the call is added to the
+    // shader stack (without it, the entire force field computation is silently
+    // dropped from the generated shader).
+    expect(fnBody).toMatch(
+      /Fn\(\s*\([^)]*\)\s*=>\s*\{[\s\S]*\},\s*'void'\s*\)/
+    );
+  });
+
+  it('does not create a separate storage buffer (stays within 8-binding limit)', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const src = fs.readFileSync(
+      path.resolve(
+        __dirname,
+        '../js/effects/three-particles/webgpu/compute-force-fields.ts'
+      ),
+      'utf-8'
+    );
+
+    // Must not import StorageBufferAttribute (no separate buffer)
+    expect(src).not.toContain("from 'three/webgpu'");
+    // Must not call storage() (reads from shared sCurveData instead)
+    expect(src).not.toMatch(/\bstorage\s*\(/);
   });
 });
 

@@ -2280,9 +2280,9 @@ const updateParticleSystemInstance = (
     (cp.uniforms.noiseSizeAmount as unknown as { value: number }).value =
       noiseData.sizeAmount;
 
-    // Force field buffer update
+    // Force field buffer update — write encoded data into curveData tail
     if (
-      cp.forceFieldNodes &&
+      cp.forceFieldInfo &&
       hasForceFields &&
       _tslMaterialFactory?.encodeForceFieldsForGPU
     ) {
@@ -2291,10 +2291,10 @@ const updateParticleSystemInstance = (
         generalData.particleSystemId,
         generalData.normalizedLifetimePercentage
       );
-      const ffArr = cp.forceFieldNodes.buffer.array as Float32Array;
-      ffArr.set(encodedFF);
-      cp.forceFieldNodes.buffer.needsUpdate = true;
-      (cp.forceFieldNodes.countUniform as unknown as { value: number }).value =
+      const curveArr = cp.buffers.curveData.array as Float32Array;
+      curveArr.set(encodedFF, cp.forceFieldInfo.offset);
+      cp.buffers.curveData.needsUpdate = true;
+      (cp.forceFieldInfo.countUniform as unknown as { value: number }).value =
         normalizedForceFields.length;
     }
 
