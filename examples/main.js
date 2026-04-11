@@ -197,7 +197,14 @@ function setupSoftParticlesScene(renderer, camera, width, height) {
 
   // Ground plane — positioned so particles visibly intersect it
   const groundGeom = new THREE.PlaneGeometry(40, 40);
-  const groundMat = new THREE.MeshBasicMaterial({ color: 0x444444 });
+  // WebGPURenderer uses LinearSRGBColorSpace output (no sRGB encode on output).
+  // THREE.Color(0x444444) stores sRGB values but the renderer won't apply the
+  // sRGB transfer curve on output, making the plane look darker than intended.
+  // Use setRGB with LinearSRGBColorSpace so the hex values are stored directly
+  // as linear values, preserving the intended visual brightness.
+  const groundColor = new THREE.Color();
+  groundColor.setRGB(0x44 / 0xff, 0x44 / 0xff, 0x44 / 0xff, THREE.LinearSRGBColorSpace);
+  const groundMat = new THREE.MeshBasicMaterial({ color: groundColor });
   const groundMesh = new THREE.Mesh(groundGeom, groundMat);
   groundMesh.rotation.x = -Math.PI / 2;
   groundMesh.position.y = -2.5;
