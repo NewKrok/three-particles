@@ -64,10 +64,6 @@ if (typeof GPUDevice !== "undefined") {
   };
 }
 
-function isWebGPUExample(example) {
-  return example.tags && example.tags.includes("webgpu");
-}
-
 // Texture ID to file mapping
 const TEXTURE_MAP = {
   FLAME: "textures/flame.webp",
@@ -212,6 +208,9 @@ class LiveDemo {
     this.rendererType = rendererType;
     this.backend = backend;
     this.clock = new THREE.Clock();
+    this.frames = 0;
+    this.fpsAccum = 0;
+    this.lastFpsUpdate = 0;
     this.paused = false;
     this.pausedDuration = 0;
     this.pauseStartTime = 0;
@@ -274,6 +273,14 @@ class LiveDemo {
     const system = createParticleSystem(config);
     this.scene.add(system.instance);
     this.particleSystem = system;
+
+    // Update card stats backend label
+    const backendLabel = this.container.querySelector(".card-backend-label");
+    if (backendLabel) {
+      backendLabel.textContent = useGPU ? "GPU" : "CPU";
+      backendLabel.style.color = useGPU ? "#66bb6a" : "#4fc3f7";
+    }
+
     this.animate();
   }
 
@@ -281,6 +288,7 @@ class LiveDemo {
     if (!this.particleSystem) return;
     const delta = this.clock.getDelta();
     const elapsed = this.clock.getElapsedTime();
+    const now = performance.now();
 
     const cycleData = { now: Date.now() - this.pausedDuration, delta, elapsed };
     if (this.particleSystem.update) {
@@ -306,6 +314,19 @@ class LiveDemo {
     }
 
     this.renderer.render(this.scene, this.camera);
+
+    // FPS tracking
+    this.frames++;
+    this.fpsAccum += delta;
+    if (now - this.lastFpsUpdate > 500) {
+      const fps = this.fpsAccum > 0 ? this.frames / this.fpsAccum : 0;
+      const fpsEl = this.container.querySelector(".card-fps");
+      if (fpsEl) fpsEl.textContent = `${fps.toFixed(0)} FPS`;
+      this.frames = 0;
+      this.fpsAccum = 0;
+      this.lastFpsUpdate = now;
+    }
+
     this.animationId = requestAnimationFrame(() => this.animate());
   }
 
@@ -403,7 +424,7 @@ function startDemo(card, exampleData) {
 let expandDemo = null;
 let expandExampleData = null;
 let expandRendererType = "POINTS";
-let expandBackendType = "CPU";
+let expandBackendType = "GPU";
 
 class ExpandedDemo {
   constructor(canvas, exampleData, rendererType = "POINTS", backend = "CPU") {
@@ -616,7 +637,7 @@ function updateExpandPlayPauseBtn(playing) {
   }
 }
 
-function openExpandModal(exampleData, rendererType, backend = "CPU") {
+function openExpandModal(exampleData, rendererType, backend = "GPU") {
   const overlay = document.getElementById("expand-overlay");
   const canvas = document.getElementById("expand-canvas");
   const titleEl = document.getElementById("expand-title");
@@ -627,21 +648,6 @@ function openExpandModal(exampleData, rendererType, backend = "CPU") {
   expandExampleData = exampleData;
   expandRendererType = rendererType;
   expandBackendType = backend;
-
-  const toggle = document.getElementById("expand-renderer-toggle");
-  if (isTrailExample(exampleData)) {
-    toggle.innerHTML = `<span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span>`;
-  } else if (isMeshExample(exampleData)) {
-    toggle.innerHTML = `<span class="trail-badge" title="3D Mesh renderer">MESH</span>`;
-  } else {
-    toggle.innerHTML = `
-      <button data-type="POINTS" title="Point sprites (THREE.Points)">POINTS</button>
-      <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INSTANCED</button>
-    `;
-    toggle.querySelectorAll("button").forEach((b) => {
-      b.classList.toggle("active", b.dataset.type === rendererType);
-    });
-  }
 
   // Backend (GPU/CPU) toggle
   const backendToggle = document.getElementById("expand-backend-toggle");
@@ -672,22 +678,6 @@ document.getElementById("expand-close").addEventListener("click", closeExpandMod
 document.getElementById("expand-overlay").addEventListener("click", (e) => {
   if (e.target === document.getElementById("expand-overlay")) closeExpandModal();
 });
-document.getElementById("expand-renderer-toggle").addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-type]");
-  if (!btn || (expandExampleData && (isTrailExample(expandExampleData) || isMeshExample(expandExampleData)))) return;
-  const type = btn.dataset.type;
-  const toggle = document.getElementById("expand-renderer-toggle");
-  toggle.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
-  btn.classList.add("active");
-  expandRendererType = type;
-  if (expandDemo && expandExampleData) {
-    expandDemo.dispose();
-    const canvas = document.getElementById("expand-canvas");
-    expandDemo = new ExpandedDemo(canvas, expandExampleData, type, expandBackendType);
-    updateExpandPlayPauseBtn(true);
-  }
-});
-
 document.getElementById("expand-backend-toggle").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-backend]");
   if (!btn) return;
@@ -766,6 +756,10 @@ examples.forEach((example) => {
       <div class="stop-hint" style="display:none">
         <span>Click to stop</span>
       </div>
+      <div class="card-stats">
+        <span class="card-fps">-- FPS</span>
+        <span class="card-backend-label"></span>
+      </div>
     </div>
     <div class="card-info">
       <h3>${example.title}</h3>
@@ -775,19 +769,10 @@ examples.forEach((example) => {
       </div>
       <div class="card-controls">
         <div class="card-btns">
-          ${isTrailExample(example)
-            ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span></div>`
-            : isMeshExample(example)
-              ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge" title="3D Mesh renderer">MESH</span></div>`
-              : `<div class="renderer-toggle">
-              <button class="active" data-type="POINTS" title="Point sprites (THREE.Points)">PTS</button>
-              <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INST</button>
-            </div>`
-          }
           ${webgpuAvailable
             ? `<div class="backend-toggle">
-              <button class="${isWebGPUExample(example) ? "" : "active"}" data-backend="CPU" title="CPU simulation (GLSL ShaderMaterial)">CPU</button>
-              <button class="${isWebGPUExample(example) ? "active" : ""}" data-backend="GPU" title="GPU compute simulation (TSL / WebGPU)">GPU</button>
+              <button data-backend="CPU" title="CPU simulation (GLSL ShaderMaterial)">CPU</button>
+              <button class="active" data-backend="GPU" title="GPU compute simulation (TSL / WebGPU)">GPU</button>
             </div>`
             : ""
           }
@@ -832,23 +817,7 @@ examples.forEach((example) => {
   grid.appendChild(card);
 
   cardRendererTypes.set(card, getConfigRendererType(example));
-  cardBackendTypes.set(card, isWebGPUExample(example) ? "GPU" : "CPU");
-
-  if (!isTrailExample(example) && !isMeshExample(example)) {
-    card.querySelector(".renderer-toggle").addEventListener("click", (e) => {
-      e.stopPropagation();
-      const btn = e.target.closest("button[data-type]");
-      if (!btn) return;
-      const type = btn.dataset.type;
-      card.querySelector(".renderer-toggle").querySelectorAll("button").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      cardRendererTypes.set(card, type);
-      if (activeCard === card) {
-        stopActiveDemo();
-        startDemo(card, example);
-      }
-    });
-  }
+  cardBackendTypes.set(card, webgpuAvailable ? "GPU" : "CPU");
 
   const backendToggle = card.querySelector(".backend-toggle");
   if (backendToggle) {

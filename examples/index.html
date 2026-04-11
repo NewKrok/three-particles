@@ -221,26 +221,7 @@
     .error-entry { padding: 6px 0; border-bottom: 1px solid #3a1111; white-space: pre-wrap; word-break: break-all; }
     .error-entry:last-child { border-bottom: none; }
 
-    /* Renderer type toggle */
-    .renderer-toggle {
-      display: inline-flex; align-items: center; border: 1px solid #333; border-radius: 4px;
-      overflow: hidden; font-size: 0.7rem; flex-shrink: 0;
-    }
-    .renderer-toggle button {
-      background: transparent; border: none; color: #888;
-      padding: 4px 8px; cursor: pointer;
-      transition: background 0.2s, color 0.2s;
-      font-size: inherit; font-family: inherit;
-    }
-    .renderer-toggle button.active { background: #1a1a2e; color: #4fc3f7; }
-    .renderer-toggle button:hover:not(.active) { color: #ccc; }
-    .trail-badge {
-      display: inline-flex; align-items: center; justify-content: center;
-      padding: 4px 8px; color: #f7a14f; font-size: inherit; font-family: inherit;
-      letter-spacing: 0.02em; line-height: 1;
-    }
-    .webgpu-badge { color: #66bb6a; }
-    .webgpu-badge.fallback { color: #888; }
+    /* Backend (GPU/CPU) toggle */
     .backend-toggle {
       display: inline-flex; align-items: center; border: 1px solid #333; border-radius: 4px;
       overflow: hidden; font-size: 0.7rem; flex-shrink: 0;
@@ -288,6 +269,14 @@
       border-radius: 8px; overflow: hidden;
     }
     .expand-canvas-wrapper canvas { width: 100%; height: 100%; display: block; }
+    .card-stats {
+      position: absolute; bottom: 8px; left: 8px;
+      display: none; align-items: center; gap: 8px; padding: 4px 8px;
+      background: rgba(0,0,0,0.7); border-radius: 4px;
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.7rem; color: #4fc3f7;
+    }
+    .card.active .card-stats { display: flex; }
+    .card-stats span { white-space: nowrap; }
     .expand-stats {
       position: absolute; top: 12px; left: 12px;
       display: flex; gap: 12px; padding: 6px 12px;
@@ -353,7 +342,6 @@
       <div class="expand-header">
         <h2 id="expand-title"></h2>
         <div class="expand-controls">
-          <div class="renderer-toggle" id="expand-renderer-toggle"></div>
           <div class="backend-toggle" id="expand-backend-toggle"></div>
           <button class="icon-btn" id="expand-playpause-btn" title="Pause">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
