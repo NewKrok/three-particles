@@ -427,9 +427,6 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
   const lookupCurve = createCurveLookup(sCurveData);
   const computeKernel = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(() => {
     const i = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__;
-    const debugPos = sPosition.element(i).xyz.toVar();
-    debugPos.x.addAssign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(1e-3));
-    sPosition.element(i).assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(debugPos, 0));
     const oiaVec = sOrbitalIsActive.element(i).toVar();
     __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(oiaVec.w.lessThan(0.5), () => {
       return;
@@ -1335,12 +1332,6 @@ function createTrailRibbonTSLMaterial(trailUniforms, rendererConfig) {
 
 // src/js/effects/three-particles/webgpu/tsl-materials.ts
 function createTSLParticleMaterial(rendererType, sharedUniforms, rendererConfig, gpuCompute = false) {
-  console.log(
-    "[TSL Factory] createTSLParticleMaterial:",
-    rendererType,
-    "gpuCompute:",
-    gpuCompute
-  );
   switch (rendererType) {
     case "INSTANCED" /* INSTANCED */:
       return createInstancedBillboardTSLMaterial(

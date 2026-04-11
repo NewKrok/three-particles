@@ -241,6 +241,19 @@
     }
     .webgpu-badge { color: #66bb6a; }
     .webgpu-badge.fallback { color: #888; }
+    .backend-toggle {
+      display: inline-flex; align-items: center; border: 1px solid #333; border-radius: 4px;
+      overflow: hidden; font-size: 0.7rem; flex-shrink: 0;
+    }
+    .backend-toggle button {
+      background: transparent; border: none; color: #888;
+      padding: 4px 8px; cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      font-size: inherit; font-family: inherit;
+    }
+    .backend-toggle button.active { background: #1a1a2e; color: #66bb6a; }
+    .backend-toggle button:hover:not(.active) { color: #ccc; }
+    .backend-toggle button:disabled { opacity: 0.35; cursor: default; }
 
     /* Expand modal */
     .expand-overlay {
@@ -341,6 +354,7 @@
         <h2 id="expand-title"></h2>
         <div class="expand-controls">
           <div class="renderer-toggle" id="expand-renderer-toggle"></div>
+          <div class="backend-toggle" id="expand-backend-toggle"></div>
           <button class="icon-btn" id="expand-playpause-btn" title="Pause">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
@@ -367,6 +381,7 @@
         <canvas id="expand-canvas"></canvas>
         <div class="expand-stats" id="expand-stats">
           <span id="expand-renderer-label">POINTS</span>
+          <span id="expand-backend-label"></span>
           <span id="expand-fps">-- FPS</span>
           <span id="expand-frametime">-- ms/tick</span>
           <span id="expand-elapsed">0.0s</span>
