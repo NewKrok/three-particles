@@ -605,6 +605,7 @@ export const createParticleSystem = (
       isActive: false,
       strength: 0,
       noisePower: 0,
+      frequency: 0.5,
       positionAmount: 0,
       rotationAmount: 0,
       sizeAmount: 0,
@@ -820,6 +821,7 @@ export const createParticleSystem = (
     isActive: noise.isActive,
     strength: noise.strength,
     noisePower: 0.15 * noise.strength,
+    frequency: noise.frequency,
     positionAmount: noise.positionAmount,
     rotationAmount: noise.rotationAmount,
     sizeAmount: noise.sizeAmount,
@@ -1354,16 +1356,20 @@ export const createParticleSystem = (
       startPositions[particleIndex],
       velocities[particleIndex]
     );
-    // GPU compute uses vec4 position (stride 4), CPU uses vec3 (stride 3)
-    const posStride = useGPUCompute ? 4 : 3;
-    const positionIndex = particleIndex * posStride;
-    aPosition.array[positionIndex] =
-      position.x + startPositions[particleIndex].x;
-    aPosition.array[positionIndex + 1] =
-      position.y + startPositions[particleIndex].y;
-    aPosition.array[positionIndex + 2] =
-      position.z + startPositions[particleIndex].z;
-    aPosition.needsUpdate = true;
+    // GPU compute: position is set via the emit scatter in the compute shader
+    // (writeParticleToModifierBuffers queues it). Do NOT write to the position
+    // storage buffer here — needsUpdate triggers a full CPU→GPU upload that
+    // overwrites GPU-computed positions for all particles.
+    if (!useGPUCompute) {
+      const positionIndex = particleIndex * 3;
+      aPosition.array[positionIndex] =
+        position.x + startPositions[particleIndex].x;
+      aPosition.array[positionIndex + 1] =
+        position.y + startPositions[particleIndex].y;
+      aPosition.array[positionIndex + 2] =
+        position.z + startPositions[particleIndex].z;
+      aPosition.needsUpdate = true;
+    }
 
     if (generalData.linearVelocityData) {
       generalData.linearVelocityData[particleIndex].speed.set(
@@ -1983,6 +1989,7 @@ export const createParticleSystem = (
         isActive: n.isActive,
         strength: n.strength,
         noisePower: 0.15 * n.strength,
+        frequency: n.frequency,
         positionAmount: n.positionAmount,
         rotationAmount: n.rotationAmount,
         sizeAmount: n.sizeAmount,
@@ -2247,11 +2254,24 @@ const updateParticleSystemInstance = (
       simulationSpace === SimulationSpace.WORLD ? 1 : 0;
 
     // Noise uniforms
+    // GPU simplex noise output is not normalised by FBM's octave accumulator,
+    // so we scale noisePower by the same divisor the CPU FBM applies:
+    //   max = 1; for each octave: amplitude *= persistance; max += amplitude
+    // Default persistance = 0.5.
     const noiseData = generalData.noise;
+    const noiseCfg = normalizedConfig.noise;
+    let fbmMax = 1;
+    let fbmAmp = 1;
+    for (let o = 0; o < noiseCfg.octaves; o++) {
+      fbmAmp *= 0.5; // persistance
+      fbmMax += fbmAmp;
+    }
     (cp.uniforms.noiseStrength as unknown as { value: number }).value =
       noiseData.strength;
     (cp.uniforms.noisePower as unknown as { value: number }).value =
-      noiseData.noisePower;
+      noiseData.noisePower / fbmMax;
+    (cp.uniforms.noiseFrequency as unknown as { value: number }).value =
+      noiseData.frequency;
     (cp.uniforms.noisePositionAmount as unknown as { value: number }).value =
       noiseData.positionAmount;
     (cp.uniforms.noiseRotationAmount as unknown as { value: number }).value =

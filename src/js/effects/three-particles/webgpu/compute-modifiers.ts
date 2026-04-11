@@ -104,6 +104,7 @@ export type ModifierUniforms = {
   // Noise uniforms
   noiseStrength: ShaderNodeObject<Node>;
   noisePower: ShaderNodeObject<Node>;
+  noiseFrequency: ShaderNodeObject<Node>;
   noisePositionAmount: ShaderNodeObject<Node>;
   noiseRotationAmount: ShaderNodeObject<Node>;
   noiseSizeAmount: ShaderNodeObject<Node>;
@@ -421,6 +422,7 @@ export function createModifierComputeUpdate(
   const uSimSpaceWorld = uniform(float(0));
   const uNoiseStrength = uniform(float(0));
   const uNoisePower = uniform(float(0));
+  const uNoiseFrequency = uniform(float(1));
   const uNoisePosAmount = uniform(float(0));
   const uNoiseRotAmount = uniform(float(0));
   const uNoiseSizeAmount = uniform(float(0));
@@ -728,7 +730,12 @@ export function createModifierComputeUpdate(
     // 7. Noise (startColorsExt.w = noiseOffset)
     if (flags.noise) {
       const sce = sStartColorsExt.element(i);
-      const noisePos = lifePct.add(sce.w).mul(10.0).mul(uNoiseStrength);
+      // Match CPU FBM input scaling: FBM internally multiplies by `this._scale = frequency`
+      const noisePos = lifePct
+        .add(sce.w)
+        .mul(10.0)
+        .mul(uNoiseStrength)
+        .mul(uNoiseFrequency);
 
       const noiseX = snoise3D({ v: vec3(noisePos, float(0), float(0)) });
       const noiseY = snoise3D({
@@ -785,6 +792,7 @@ export function createModifierComputeUpdate(
       simulationSpaceWorld: uSimSpaceWorld,
       noiseStrength: uNoiseStrength,
       noisePower: uNoisePower,
+      noiseFrequency: uNoiseFrequency,
       noisePositionAmount: uNoisePosAmount,
       noiseRotationAmount: uNoiseRotAmount,
       noiseSizeAmount: uNoiseSizeAmount,

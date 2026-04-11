@@ -256,13 +256,23 @@ var snoise3D = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(
       )
     });
     const n_ = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0.142857142857142);
-    const ns_x = n_.mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__(p.mul(n_))).sub(n_);
-    const ns_z = n_.sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__(ns_x));
-    const ns_y = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_fract__(p.mul(n_)).sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0.5));
-    const g0 = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(ns_x.x, ns_y.x, ns_z.x).toVar();
-    const g1 = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(ns_x.y, ns_y.y, ns_z.y).toVar();
-    const g2 = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(ns_x.z, ns_y.z, ns_z.z).toVar();
-    const g3 = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(ns_x.w, ns_y.w, ns_z.w).toVar();
+    const j = p.sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(49).mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__(p.mul(n_).mul(n_)))).toVar();
+    const x_ = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__(j.mul(n_)).toVar();
+    const y_ = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__(j.sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(7).mul(x_))).toVar();
+    const NS_X = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0.285714285714286);
+    const NS_Y = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(-0.928571428571429);
+    const gx = x_.mul(NS_X).add(NS_Y);
+    const gy = y_.mul(NS_X).add(NS_Y);
+    const gz = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(1).sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__(gx)).sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__(gy)).toVar();
+    const gz_neg = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_step__(gz, __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(0));
+    const ox = gz_neg.mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__(gx).add(0.5));
+    const oy = gz_neg.mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__(gy).add(0.5));
+    const gx_final = gx.sub(ox);
+    const gy_final = gy.sub(oy);
+    const g0 = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(gx_final.x, gy_final.x, gz.x).toVar();
+    const g1 = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(gx_final.y, gy_final.y, gz.y).toVar();
+    const g2 = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(gx_final.z, gy_final.z, gz.z).toVar();
+    const g3 = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(gx_final.w, gy_final.w, gz.w).toVar();
     const norm = taylorInvSqrt({
       r: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__(g0, g0), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__(g1, g1)), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__(g2, g2), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__(g3, g3)))
     });
@@ -419,6 +429,7 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
   const uSimSpaceWorld = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
   const uNoiseStrength = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
   const uNoisePower = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
+  const uNoiseFrequency = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(1));
   const uNoisePosAmount = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
   const uNoiseRotAmount = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
   const uNoiseSizeAmount = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
@@ -624,7 +635,7 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
     }
     if (flags.noise) {
       const sce = sStartColorsExt.element(i);
-      const noisePos = lifePct.add(sce.w).mul(10).mul(uNoiseStrength);
+      const noisePos = lifePct.add(sce.w).mul(10).mul(uNoiseStrength).mul(uNoiseFrequency);
       const noiseX = snoise3D({ v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noisePos, __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0)) });
       const noiseY = snoise3D({
         v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(noisePos, noisePos, __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0))
@@ -666,6 +677,7 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
       simulationSpaceWorld: uSimSpaceWorld,
       noiseStrength: uNoiseStrength,
       noisePower: uNoisePower,
+      noiseFrequency: uNoiseFrequency,
       noisePositionAmount: uNoisePosAmount,
       noiseRotationAmount: uNoiseRotAmount,
       noiseSizeAmount: uNoiseSizeAmount

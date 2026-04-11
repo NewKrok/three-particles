@@ -17,7 +17,6 @@ import {
   vec4,
   float,
   floor,
-  fract,
   dot,
   step,
   abs,
@@ -147,38 +146,60 @@ export const snoise3D: ReturnType<typeof Fn> = Fn(
     });
 
     // ── Step 5: Convert hash to gradient directions ───────────────────────────
-    // Extract gradient (gx, gy) from each hash using the "ns" mapping:
-    //   n_ = 1/7
-    //   gx_c = fract(p_c * n_) * 2 - 1        ∈ [-1, 1)
-    //   gy_c = fract(floor(p_c * n_) * n_) * 2 - 1
-    //   gz_c = 1 - |gx_c| - |gy_c|             (octahedral)
-    //   if gz_c < 0: gx_c -= sign(gx_c)*0.5, gy_c -= sign(gy_c)*0.5
-    //   (clamp negative gz back to the surface of the octahedron)
+    // Standard Ashima/Gustavson gradient extraction via octahedral mapping.
     //
-    // For TSL we use the simpler Gustavson normalisation:
-    //   n_ = 1/7
-    //   gx = n_ * floor(p * n_)    → coarse x component from upper bits
-    //   ns_x = gx - 1/7            → shift to [-1, ~0.7]
-    //   ns_z = 1/7 - |ns_x|        → z budget
+    // The hash values `p` are in [0, 289). We reduce them to a 7×7 grid
+    // (49 entries) to extract two gradient components (gx, gy), then derive
+    // gz via octahedral projection: gz = 1 - |gx| - |gy|.
+    //
+    // When gz < 0 the gradient lies outside the octahedron's upper hemisphere;
+    // a fold-back correction shifts gx/gy inward so the gradient stays on
+    // the octahedron surface, giving 12 well-distributed directions that
+    // closely approximate the original simplex gradient set.
+    //
+    // Constants (from Ashima `vec3 ns = n_ * D.wyz - D.xzx`):
+    //   ns.x =  2/7  ≈  0.285714   (grid step size)
+    //   ns.y = -13/14 ≈ -0.928571   (grid offset: 1/14 - 1)
+    //   ns.z =  1/7  ≈  0.142857   (used for p mod 49)
 
     const n_ = float(0.142857142857142); // 1/7
 
-    // Per-corner gx values (vec4 — one per corner)
-    const ns_x = n_.mul(floor(p.mul(n_))).sub(n_);
+    // j = p mod 49  — reduces hash to [0, 48]
+    //   p * ns.z * ns.z = p * (1/7)^2 = p / 49
+    const j = p.sub(float(49.0).mul(floor(p.mul(n_).mul(n_)))).toVar();
 
-    // Per-corner gz budget (vec4)
-    const ns_z = n_.sub(abs(ns_x));
+    // x_ = floor(j / 7)  ∈ [0, 6]
+    const x_ = floor(j.mul(n_)).toVar();
+    // y_ = floor(j - 7 * x_)  ∈ [0, 6]
+    const y_ = floor(j.sub(float(7.0).mul(x_))).toVar();
 
-    // Per-corner gy values: derived from the fractional remainder of p * n_.
-    // We reuse the same p vec4 but take the lower bits (fract(p * n_)):
-    //   gy = fract(p * n_) - 0.5   → shifts to [-0.5, 0.5)
-    const ns_y = fract(p.mul(n_)).sub(float(0.5));
+    // Map grid indices to gradient components in approximately [-1, 1]:
+    //   gx = x_ * (2/7) + (-13/14)  ∈ [-0.929, 0.786]
+    //   gy = y_ * (2/7) + (-13/14)  ∈ [-0.929, 0.786]
+    const NS_X = float(0.285714285714286); // 2/7
+    const NS_Y = float(-0.928571428571429); // 1/14 - 1
+
+    const gx = x_.mul(NS_X).add(NS_Y);
+    const gy = y_.mul(NS_X).add(NS_Y);
+
+    // gz = octahedral budget: 1 - |gx| - |gy|
+    const gz = float(1.0).sub(abs(gx)).sub(abs(gy)).toVar();
+
+    // Octahedral fold-back: when gz < 0, shift gx/gy toward the origin
+    //   step(gz, 0) → 1 when gz <= 0, 0 when gz > 0
+    //   correction = (floor(component) + 0.5) when gz <= 0, else 0
+    //   gx -= correction_x, gy -= correction_y
+    const gz_neg = step(gz, vec4(0.0)); // 1 where gz <= 0
+    const ox = gz_neg.mul(floor(gx).add(0.5));
+    const oy = gz_neg.mul(floor(gy).add(0.5));
+    const gx_final = gx.sub(ox);
+    const gy_final = gy.sub(oy);
 
     // Build the four un-normalised gradient vectors
-    const g0 = vec3(ns_x.x, ns_y.x, ns_z.x).toVar();
-    const g1 = vec3(ns_x.y, ns_y.y, ns_z.y).toVar();
-    const g2 = vec3(ns_x.z, ns_y.z, ns_z.z).toVar();
-    const g3 = vec3(ns_x.w, ns_y.w, ns_z.w).toVar();
+    const g0 = vec3(gx_final.x, gy_final.x, gz.x).toVar();
+    const g1 = vec3(gx_final.y, gy_final.y, gz.y).toVar();
+    const g2 = vec3(gx_final.z, gy_final.z, gz.z).toVar();
+    const g3 = vec3(gx_final.w, gy_final.w, gz.w).toVar();
 
     // Normalise gradients using the Taylor inverse-sqrt approximation
     const norm = taylorInvSqrt({

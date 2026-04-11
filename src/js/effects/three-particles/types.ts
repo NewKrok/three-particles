@@ -759,6 +759,7 @@ export type Noise = {
   isActive: boolean;
   strength: number;
   noisePower: number;
+  frequency: number;
   positionAmount: number;
   rotationAmount: number;
   sizeAmount: number;
