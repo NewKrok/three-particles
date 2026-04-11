@@ -1,5 +1,5 @@
 import { DataTexture as __WEBPACK_EXTERNAL_MODULE_three_DataTexture__, DoubleSide as __WEBPACK_EXTERNAL_MODULE_three_DoubleSide__, MathUtils as __WEBPACK_EXTERNAL_MODULE_three_MathUtils__, Vector3 as __WEBPACK_EXTERNAL_MODULE_three_Vector3__ } from "three";
-import { Discard as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__, Fn as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__, If as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__, Loop as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Loop__, abs as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__, attribute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_attribute__, cameraPosition as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraPosition__, cameraProjectionMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__, cameraViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraViewMatrix__, compute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_compute__, cos as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__, cross as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cross__, dot as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__, float as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__, floor as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__, fract as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_fract__, instanceIndex as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__, length as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_length__, max as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_max__, min as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__, mix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mix__, mod as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mod__, modelViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__, normalLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalLocal__, normalize as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalize__, pointUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_pointUV__, positionLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__, round as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_round__, screenUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_screenUV__, sin as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__, smoothstep as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_smoothstep__, step as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_step__, storage as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_storage__, texture as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_texture__, uniform as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__, uv as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uv__, varyingProperty as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__, vec2 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__, vec3 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__, vec4 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__ } from "three/tsl";
+import { Break as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Break__, Discard as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__, Fn as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__, If as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__, Loop as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Loop__, abs as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__, attribute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_attribute__, cameraPosition as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraPosition__, cameraProjectionMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__, cameraViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraViewMatrix__, compute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_compute__, cos as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__, cross as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cross__, dot as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__, float as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__, floor as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__, fract as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_fract__, instanceIndex as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__, int as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_int__, length as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_length__, max as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_max__, min as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__, mix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mix__, mod as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mod__, modelViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__, normalLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalLocal__, normalize as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalize__, pointUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_pointUV__, positionLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__, round as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_round__, screenUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_screenUV__, sin as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__, smoothstep as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_smoothstep__, step as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_step__, storage as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_storage__, texture as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_texture__, uniform as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__, uv as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uv__, varyingProperty as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__, vec2 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__, vec3 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__, vec4 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__ } from "three/tsl";
 import { MeshBasicNodeMaterial as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_MeshBasicNodeMaterial__, PointsNodeMaterial as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_PointsNodeMaterial__, StorageBufferAttribute as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageBufferAttribute__, StorageInstancedBufferAttribute as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageInstancedBufferAttribute__ } from "three/webgpu";
 /******/ // The require scope
 /******/ var __webpack_require__ = {};
@@ -296,8 +296,15 @@ __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(
 );
 
 // src/js/effects/three-particles/webgpu/compute-modifiers.ts
+var MAX_EMITS_PER_FRAME = 128;
+var EMIT_STRIDE = 24;
 function createModifierStorageBuffers(maxParticles, instanced, curveData) {
   const Cls = instanced ? __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageInstancedBufferAttribute__ : __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageBufferAttribute__;
+  const curveLen = Math.max(curveData.length, 1);
+  const totalLen = curveLen + 1 + MAX_EMITS_PER_FRAME * EMIT_STRIDE;
+  const combined = new Float32Array(totalLen);
+  combined.set(curveData.length > 0 ? curveData : new Float32Array([0]));
+  combined[curveLen] = 0;
   return {
     // Position and velocity use vec4 (w=padding) to avoid WebGPU vec3→vec4
     // storage buffer alignment conversion that breaks itemSize-based type resolution.
@@ -318,34 +325,42 @@ function createModifierStorageBuffers(maxParticles, instanced, curveData) {
       new Float32Array(maxParticles * 4),
       4
     ),
-    curveData: new __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageBufferAttribute__(
-      curveData.length > 0 ? curveData : new Float32Array(1),
-      1
-    )
+    // Curve data + emit queue tail (single buffer, 8th binding)
+    curveData: new __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageBufferAttribute__(combined, 1)
   };
 }
+var _emitCounts = /* @__PURE__ */ new WeakMap();
+var _curveDataLengths = /* @__PURE__ */ new WeakMap();
 function writeParticleToModifierBuffers(buffers, index, data) {
+  const count = _emitCounts.get(buffers.curveData) ?? 0;
+  if (count >= MAX_EMITS_PER_FRAME) return;
+  const curveLen = _curveDataLengths.get(buffers.curveData) ?? 0;
+  const arr = buffers.curveData.array;
+  const base = curveLen + 1 + count * EMIT_STRIDE;
+  arr[base] = index;
+  arr[base + 1] = data.position.x;
+  arr[base + 2] = data.position.y;
+  arr[base + 3] = data.position.z;
+  arr[base + 4] = data.velocity.x;
+  arr[base + 5] = data.velocity.y;
+  arr[base + 6] = data.velocity.z;
+  arr[base + 7] = data.startLifetime;
+  arr[base + 8] = data.startSize;
+  arr[base + 9] = data.startOpacity;
+  arr[base + 10] = data.startColorR;
+  arr[base + 11] = data.startColorG;
+  arr[base + 12] = data.startColorB;
+  arr[base + 13] = data.colorA;
+  arr[base + 14] = data.size;
+  arr[base + 15] = data.rotation;
+  arr[base + 16] = data.startFrame;
+  arr[base + 17] = data.rotationSpeed;
+  arr[base + 18] = data.noiseOffset;
+  arr[base + 19] = data.orbitalOffset.x;
+  arr[base + 20] = data.orbitalOffset.y;
+  arr[base + 21] = data.orbitalOffset.z;
+  _emitCounts.set(buffers.curveData, count + 1);
   const i4 = index * 4;
-  const posArr = buffers.position.array;
-  posArr[i4] = data.position.x;
-  posArr[i4 + 1] = data.position.y;
-  posArr[i4 + 2] = data.position.z;
-  posArr[i4 + 3] = 0;
-  const velArr = buffers.velocity.array;
-  velArr[i4] = data.velocity.x;
-  velArr[i4 + 1] = data.velocity.y;
-  velArr[i4 + 2] = data.velocity.z;
-  velArr[i4 + 3] = 0;
-  const colorArr = buffers.color.array;
-  colorArr[i4] = data.colorR;
-  colorArr[i4 + 1] = data.colorG;
-  colorArr[i4 + 2] = data.colorB;
-  colorArr[i4 + 3] = data.colorA;
-  const psArr = buffers.particleState.array;
-  psArr[i4] = 0;
-  psArr[i4 + 1] = data.size;
-  psArr[i4 + 2] = data.rotation;
-  psArr[i4 + 3] = data.startFrame;
   const svArr = buffers.startValues.array;
   svArr[i4] = data.startLifetime;
   svArr[i4 + 1] = data.startSize;
@@ -356,25 +371,24 @@ function writeParticleToModifierBuffers(buffers, index, data) {
   sceArr[i4 + 1] = data.startColorB;
   sceArr[i4 + 2] = data.rotationSpeed;
   sceArr[i4 + 3] = data.noiseOffset;
-  const oiaArr = buffers.orbitalIsActive.array;
-  oiaArr[i4] = data.orbitalOffset.x;
-  oiaArr[i4 + 1] = data.orbitalOffset.y;
-  oiaArr[i4 + 2] = data.orbitalOffset.z;
-  oiaArr[i4 + 3] = 1;
-  buffers.startValues.needsUpdate = true;
-  buffers.startColorsExt.needsUpdate = true;
-  buffers.velocity.needsUpdate = true;
-  buffers.orbitalIsActive.needsUpdate = true;
-  buffers.position.needsUpdate = true;
-  buffers.particleState.needsUpdate = true;
-  buffers.color.needsUpdate = true;
 }
-function deactivateParticleInModifierBuffers(buffers, index) {
-  const i4 = index * 4;
-  buffers.orbitalIsActive.array[i4 + 3] = 0;
-  buffers.color.array[i4 + 3] = 0;
-  buffers.orbitalIsActive.needsUpdate = true;
-  buffers.color.needsUpdate = true;
+function registerCurveDataLength(buffers, curveDataLength) {
+  _curveDataLengths.set(buffers.curveData, curveDataLength);
+}
+function flushEmitQueue(buffers) {
+  const count = _emitCounts.get(buffers.curveData) ?? 0;
+  const curveLen = _curveDataLengths.get(buffers.curveData) ?? 0;
+  const arr = buffers.curveData.array;
+  arr[curveLen] = count;
+  if (count > 0) {
+    buffers.curveData.needsUpdate = true;
+    buffers.startValues.needsUpdate = true;
+    buffers.startColorsExt.needsUpdate = true;
+  }
+  _emitCounts.set(buffers.curveData, 0);
+  return count;
+}
+function deactivateParticleInModifierBuffers(_buffers, _index) {
 }
 var CURVE_RESOLUTION = 256;
 function createCurveLookup(sCurveData) {
@@ -424,9 +438,71 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
     "float",
     buffers.curveData.array.length
   );
+  const curveLen = Math.max(curveMap.data.length, 1);
+  const emitCountIdx = curveLen;
+  const emitQueueStart = curveLen + 1;
   const lookupCurve = createCurveLookup(sCurveData);
   const computeKernel = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(() => {
     const i = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__;
+    const iInt = i.toInt();
+    const emitCount = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_int__(sCurveData.element(emitCountIdx));
+    __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Loop__(
+      { end: emitCount, name: "j", type: "int", condition: "<" },
+      ({ j }) => {
+        const qBase = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_int__(j).mul(EMIT_STRIDE).add(emitQueueStart);
+        const qIdx = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_int__(sCurveData.element(qBase));
+        __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(qIdx.equal(iInt), () => {
+          sPosition.element(i).assign(
+            __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(
+              sCurveData.element(qBase.add(1)),
+              sCurveData.element(qBase.add(2)),
+              sCurveData.element(qBase.add(3)),
+              0
+            )
+          );
+          sVelocity.element(i).assign(
+            __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(
+              sCurveData.element(qBase.add(4)),
+              sCurveData.element(qBase.add(5)),
+              sCurveData.element(qBase.add(6)),
+              0
+            )
+          );
+          sColor.element(i).assign(
+            __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(
+              sCurveData.element(qBase.add(10)),
+              // startColorR
+              sCurveData.element(qBase.add(11)),
+              // startColorG
+              sCurveData.element(qBase.add(12)),
+              // startColorB
+              sCurveData.element(qBase.add(13))
+              // colorA
+            )
+          );
+          sParticleState.element(i).assign(
+            __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(
+              0,
+              sCurveData.element(qBase.add(14)),
+              // size
+              sCurveData.element(qBase.add(15)),
+              // rotation
+              sCurveData.element(qBase.add(16))
+              // startFrame
+            )
+          );
+          sOrbitalIsActive.element(i).assign(
+            __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(
+              sCurveData.element(qBase.add(19)),
+              sCurveData.element(qBase.add(20)),
+              sCurveData.element(qBase.add(21)),
+              1
+            )
+          );
+          __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Break__();
+        });
+      }
+    );
     const oiaVec = sOrbitalIsActive.element(i).toVar();
     __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(oiaVec.w.lessThan(0.5), () => {
       return;
@@ -595,6 +671,7 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
       noiseSizeAmount: uNoiseSizeAmount
     },
     buffers,
+    curveDataLength: curveLen,
     /** Force field buffer and count uniform (null if no force fields). */
     forceFieldNodes: forceFieldNodes ? {
       buffer: forceFieldNodes.buffer,
@@ -1386,4 +1463,4 @@ function createComputePipeline(maxParticles, instanced, normalizedConfig, partic
 
 //# sourceMappingURL=webgpu.js.map
 //# sourceMappingURL=webgpu.js.map
-export { createComputePipeline, createTSLParticleMaterial, createTSLTrailMaterial, deactivateParticleInModifierBuffers, encodeForceFieldsForGPU, writeParticleToModifierBuffers };
+export { createComputePipeline, createTSLParticleMaterial, createTSLTrailMaterial, deactivateParticleInModifierBuffers, encodeForceFieldsForGPU, flushEmitQueue, registerCurveDataLength, writeParticleToModifierBuffers };

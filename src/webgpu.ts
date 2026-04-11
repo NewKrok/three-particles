@@ -7,6 +7,8 @@ export {
 export {
   writeParticleToModifierBuffers,
   deactivateParticleInModifierBuffers,
+  flushEmitQueue,
+  registerCurveDataLength,
 } from './js/effects/three-particles/webgpu/compute-modifiers.js';
 
 export { encodeForceFieldsForGPU } from './js/effects/three-particles/webgpu/compute-force-fields.js';

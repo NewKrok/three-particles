@@ -14,6 +14,14 @@ import {
   type ModifierComputePipeline,
   type ModifierFlags,
 } from './compute-modifiers.js';
+
+// Re-export emit queue helpers so callers can register them via the factory.
+export {
+  writeParticleToModifierBuffers,
+  deactivateParticleInModifierBuffers,
+  flushEmitQueue,
+  registerCurveDataLength,
+} from './compute-modifiers.js';
 import { bakeParticleSystemCurves } from './curve-bake.js';
 import { createInstancedBillboardTSLMaterial } from './tsl-instanced-billboard-material.js';
 import { createMeshParticleTSLMaterial } from './tsl-mesh-particle-material.js';

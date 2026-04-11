@@ -28,6 +28,8 @@ try {
           createComputePipeline,
           writeParticleToModifierBuffers,
           deactivateParticleInModifierBuffers,
+          flushEmitQueue,
+          registerCurveDataLength,
           encodeForceFieldsForGPU,
         } = await import("./three-particles-webgpu.esm.js");
         particleModule.registerTSLMaterialFactory({
@@ -36,6 +38,8 @@ try {
           createComputePipeline,
           writeParticleToModifierBuffers,
           deactivateParticleInModifierBuffers,
+          flushEmitQueue,
+          registerCurveDataLength,
           encodeForceFieldsForGPU,
         });
       }

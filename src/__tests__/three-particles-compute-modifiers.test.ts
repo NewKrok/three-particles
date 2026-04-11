@@ -4,6 +4,9 @@ import {
   createModifierComputeUpdate,
   writeParticleToModifierBuffers,
   deactivateParticleInModifierBuffers,
+  flushEmitQueue,
+  registerCurveDataLength,
+  MAX_EMITS_PER_FRAME,
   type ModifierFlags,
 } from '../js/effects/three-particles/webgpu/compute-modifiers.js';
 import type { BakedCurveMap } from '../js/effects/three-particles/webgpu/curve-bake.js';
@@ -18,6 +21,7 @@ const NO_FLAGS: ModifierFlags = {
   linearVelocity: false,
   orbitalVelocity: false,
   noise: false,
+  forceFields: false,
 };
 
 const EMPTY_CURVE_MAP: BakedCurveMap = {
@@ -36,40 +40,79 @@ const EMPTY_CURVE_MAP: BakedCurveMap = {
   orbitalVelZ: -1,
 };
 
+const SAMPLE_EMIT_DATA = {
+  position: { x: 1, y: 2, z: 3 },
+  velocity: { x: 4, y: 5, z: 6 },
+  startLifetime: 2000,
+  colorA: 0.8,
+  size: 0.5,
+  rotation: 1.2,
+  colorR: 0.9,
+  colorG: 0.7,
+  colorB: 0.3,
+  startSize: 0.5,
+  startOpacity: 0.8,
+  startColorR: 0.9,
+  startColorG: 0.7,
+  startColorB: 0.3,
+  startFrame: 2,
+  rotationSpeed: 0.1,
+  noiseOffset: 42,
+  orbitalOffset: { x: 10, y: 20, z: 30 },
+};
+
+/**
+ * Helper: snapshot the buffer version so we can detect whether needsUpdate
+ * was set (Three.js `needsUpdate = true` increments `.version`).
+ */
+function getVersion(
+  buf: StorageBufferAttribute | { version?: number }
+): number {
+  return (buf as { version?: number }).version ?? 0;
+}
+
+/** Helper to create buffers and register curveDataLength in one call. */
+function createBuffersWithEmitQueue(
+  maxParticles: number,
+  curveData = new Float32Array(0)
+) {
+  const buffers = createModifierStorageBuffers(maxParticles, false, curveData);
+  const curveLen = Math.max(curveData.length, 1);
+  registerCurveDataLength(buffers, curveLen);
+  return { buffers, curveLen };
+}
+
 // ─── createModifierStorageBuffers ────────────────────────────────────────────
 
 describe('createModifierStorageBuffers', () => {
-  it('creates all required buffers', () => {
-    const buffers = createModifierStorageBuffers(
-      50,
-      false,
-      new Float32Array(256)
-    );
+  it('creates all required buffers with emit queue in curveData tail', () => {
+    const curveData = new Float32Array(256);
+    const buffers = createModifierStorageBuffers(50, false, curveData);
 
-    // Packed storage buffers (8 total, matching WebGPU per-stage limit)
     expect(buffers.position).toBeInstanceOf(StorageBufferAttribute);
-    expect(buffers.position.array).toHaveLength(200); // 50 * 4 (vec4 for WebGPU alignment)
-    expect(buffers.velocity.array).toHaveLength(200); // 50 * 4 (vec4 for WebGPU alignment)
-    expect(buffers.color.array).toHaveLength(200); // 50 * 4 (R,G,B,A)
-    // particleState: (lifetime, size, rotation, startFrame)
-    expect(buffers.particleState.array).toHaveLength(200); // 50 * 4
-    // startValues: (startLifetime, startSize, startOpacity, startColorR)
-    expect(buffers.startValues.array).toHaveLength(200); // 50 * 4
-    // startColorsExt: (startColorG, startColorB, rotationSpeed, noiseOffset)
-    expect(buffers.startColorsExt.array).toHaveLength(200); // 50 * 4
-    // orbitalIsActive: (offsetX, offsetY, offsetZ, isActive)
-    expect(buffers.orbitalIsActive.array).toHaveLength(200); // 50 * 4
-    // Curve data
-    expect(buffers.curveData.array).toHaveLength(256);
+    expect(buffers.position.array).toHaveLength(200); // 50 * 4 (vec4)
+    expect(buffers.velocity.array).toHaveLength(200);
+    expect(buffers.color.array).toHaveLength(200);
+    expect(buffers.particleState.array).toHaveLength(200);
+    expect(buffers.startValues.array).toHaveLength(200);
+    expect(buffers.startColorsExt.array).toHaveLength(200);
+    expect(buffers.orbitalIsActive.array).toHaveLength(200);
+    // curveData = original curves + 1 (emit count) + queue entries
+    const expectedLen = 256 + 1 + MAX_EMITS_PER_FRAME * 24;
+    expect(buffers.curveData.array).toHaveLength(expectedLen);
+    // No separate emitQueue buffer
+    expect((buffers as Record<string, unknown>).emitQueue).toBeUndefined();
   });
 
-  it('creates 1-element curveData when empty', () => {
+  it('creates 1-element curveData base when input is empty', () => {
     const buffers = createModifierStorageBuffers(
       10,
       false,
       new Float32Array(0)
     );
-    expect(buffers.curveData.array).toHaveLength(1);
+    // 1 (min curve) + 1 (emit count) + queue
+    const expectedLen = 1 + 1 + MAX_EMITS_PER_FRAME * 24;
+    expect(buffers.curveData.array).toHaveLength(expectedLen);
   });
 });
 
@@ -94,6 +137,7 @@ describe('createModifierComputeUpdate', () => {
     expect(pipeline.uniforms.delta).toBeDefined();
     expect(pipeline.uniforms.noiseStrength).toBeDefined();
     expect(pipeline.buffers).toBe(buffers);
+    expect(pipeline.curveDataLength).toBe(1); // max(0,1) = 1
   });
 
   it('creates pipeline with all modifiers active', () => {
@@ -107,6 +151,7 @@ describe('createModifierComputeUpdate', () => {
       linearVelocity: true,
       orbitalVelocity: true,
       noise: true,
+      forceFields: false,
     };
     const curveMap: BakedCurveMap = {
       data: curveData,
@@ -131,6 +176,7 @@ describe('createModifierComputeUpdate', () => {
       allFlags
     );
     expect(pipeline.computeNode).toBeDefined();
+    expect(pipeline.curveDataLength).toBe(256 * 8);
   });
 
   it('creates pipeline with instanced buffers', () => {
@@ -145,170 +191,172 @@ describe('createModifierComputeUpdate', () => {
   });
 });
 
-// ─── writeParticleToModifierBuffers ─────────────────────────────────────────
+// ─── writeParticleToModifierBuffers (emit queue in curveData tail) ──────────
 
 describe('writeParticleToModifierBuffers', () => {
-  it('writes all particle data into correct packed buffer positions', () => {
-    const buffers = createModifierStorageBuffers(
-      10,
-      false,
-      new Float32Array(0)
-    );
+  it('writes emit data to the curveData tail', () => {
+    const { buffers, curveLen } = createBuffersWithEmitQueue(10);
 
-    writeParticleToModifierBuffers(buffers, 3, {
-      position: { x: 1, y: 2, z: 3 },
-      velocity: { x: 4, y: 5, z: 6 },
-      startLifetime: 2000,
-      colorA: 0.8,
-      size: 0.5,
-      rotation: 1.2,
-      colorR: 0.9,
-      colorG: 0.7,
-      colorB: 0.3,
-      startSize: 0.5,
-      startOpacity: 0.8,
-      startColorR: 0.9,
-      startColorG: 0.7,
-      startColorB: 0.3,
-      startFrame: 2,
-      rotationSpeed: 0.1,
-      noiseOffset: 42,
-      orbitalOffset: { x: 10, y: 20, z: 30 },
-    });
+    writeParticleToModifierBuffers(buffers, 3, SAMPLE_EMIT_DATA);
 
-    // Position and velocity are vec4 (w=padding) for WebGPU alignment
-    const posArr = buffers.position.array as Float32Array;
-    expect(posArr[12]).toBe(1); // index 3 * 4
-    expect(posArr[13]).toBe(2);
-    expect(posArr[14]).toBe(3);
-    expect(posArr[15]).toBe(0); // w padding
-
-    const velArr = buffers.velocity.array as Float32Array;
-    expect(velArr[12]).toBe(4); // index 3 * 4
-    expect(velArr[13]).toBe(5);
-    expect(velArr[14]).toBe(6);
-    expect(velArr[15]).toBe(0); // w padding
-
-    // color (vec4: R, G, B, A) at index 3 * 4 = 12
-    const colorArr = buffers.color.array as Float32Array;
-    expect(colorArr[12]).toBeCloseTo(0.9); // R
-    expect(colorArr[13]).toBeCloseTo(0.7); // G
-    expect(colorArr[14]).toBeCloseTo(0.3); // B
-    expect(colorArr[15]).toBeCloseTo(0.8); // A
-
-    // particleState (vec4: lifetime, size, rotation, startFrame) at index 3 * 4 = 12
-    const psArr = buffers.particleState.array as Float32Array;
-    expect(psArr[12]).toBe(0); // lifetime starts at 0
-    expect(psArr[13]).toBeCloseTo(0.5); // size
-    expect(psArr[14]).toBeCloseTo(1.2); // rotation
-    expect(psArr[15]).toBe(2); // startFrame
-
-    // startValues (vec4: startLifetime, startSize, startOpacity, startColorR) at index 3 * 4 = 12
-    const svArr = buffers.startValues.array as Float32Array;
-    expect(svArr[12]).toBe(2000); // startLifetime
-    expect(svArr[13]).toBeCloseTo(0.5); // startSize
-    expect(svArr[14]).toBeCloseTo(0.8); // startOpacity
-    expect(svArr[15]).toBeCloseTo(0.9); // startColorR
-
-    // startColorsExt (vec4: startColorG, startColorB, rotationSpeed, noiseOffset) at index 3 * 4 = 12
-    const sceArr = buffers.startColorsExt.array as Float32Array;
-    expect(sceArr[12]).toBeCloseTo(0.7); // startColorG
-    expect(sceArr[13]).toBeCloseTo(0.3); // startColorB
-    expect(sceArr[14]).toBeCloseTo(0.1); // rotationSpeed
-    expect(sceArr[15]).toBe(42); // noiseOffset
-
-    // orbitalIsActive (vec4: offsetX, offsetY, offsetZ, isActive) at index 3 * 4 = 12
-    const oiaArr = buffers.orbitalIsActive.array as Float32Array;
-    expect(oiaArr[12]).toBe(10);
-    expect(oiaArr[13]).toBe(20);
-    expect(oiaArr[14]).toBe(30);
-    expect(oiaArr[15]).toBe(1); // isActive
+    // Emit queue starts at curveLen + 1 (skip emit count slot)
+    const arr = buffers.curveData.array as Float32Array;
+    const base = curveLen + 1;
+    expect(arr[base]).toBe(3); // particleIndex
+    expect(arr[base + 1]).toBe(1); // position.x
+    expect(arr[base + 2]).toBe(2); // position.y
+    expect(arr[base + 3]).toBe(3); // position.z
+    expect(arr[base + 4]).toBe(4); // velocity.x
+    expect(arr[base + 7]).toBe(2000); // startLifetime
+    expect(arr[base + 13]).toBeCloseTo(0.8); // colorA
+    expect(arr[base + 19]).toBe(10); // orbitalOffset.x
   });
 
-  it('should match what the TSL material reads for rendering', () => {
-    // Verify the GPU rendering attribute layout matches what the material expects:
-    // - instanceColor (vec4): color buffer -> R, G, B, A
-    // - instanceParticleState (vec4): particleState buffer -> lifetime(.x), size(.y), rotation(.z), startFrame(.w)
-    // - instanceStartValues (vec4): startValues buffer -> startLifetime(.x), ...
-    const buffers = createModifierStorageBuffers(
-      5,
-      true, // instanced
-      new Float32Array(0)
-    );
+  it('writes to CPU-only startValues and startColorsExt buffers', () => {
+    const { buffers } = createBuffersWithEmitQueue(10);
+
+    writeParticleToModifierBuffers(buffers, 3, SAMPLE_EMIT_DATA);
+
+    const svArr = buffers.startValues.array as Float32Array;
+    expect(svArr[12]).toBe(2000); // startLifetime at 3*4
+    expect(svArr[13]).toBeCloseTo(0.5); // startSize
+
+    const sceArr = buffers.startColorsExt.array as Float32Array;
+    expect(sceArr[12]).toBeCloseTo(0.7); // startColorG
+    expect(sceArr[15]).toBe(42); // noiseOffset
+  });
+
+  it('does NOT bump version on compute-output buffers', () => {
+    const { buffers } = createBuffersWithEmitQueue(10);
+
+    const vPos = getVersion(buffers.position);
+    const vVel = getVersion(buffers.velocity);
+    const vCol = getVersion(buffers.color);
+    const vPs = getVersion(buffers.particleState);
+    const vOia = getVersion(buffers.orbitalIsActive);
+
+    writeParticleToModifierBuffers(buffers, 0, SAMPLE_EMIT_DATA);
+
+    expect(getVersion(buffers.position)).toBe(vPos);
+    expect(getVersion(buffers.velocity)).toBe(vVel);
+    expect(getVersion(buffers.color)).toBe(vCol);
+    expect(getVersion(buffers.particleState)).toBe(vPs);
+    expect(getVersion(buffers.orbitalIsActive)).toBe(vOia);
+  });
+
+  it('queues multiple emits in sequence', () => {
+    const { buffers, curveLen } = createBuffersWithEmitQueue(10);
 
     writeParticleToModifierBuffers(buffers, 0, {
-      position: { x: 0, y: 0, z: 0 },
-      velocity: { x: 0, y: 0, z: 0 },
-      startLifetime: 3000,
-      colorA: 1.0,
-      size: 0.08, // GPU Galaxy typical size
-      rotation: 0,
-      colorR: 0.5,
-      colorG: 0.6,
-      colorB: 1.0,
-      startSize: 0.08,
-      startOpacity: 0.85,
-      startColorR: 0.5,
-      startColorG: 0.6,
-      startColorB: 1.0,
-      startFrame: 0,
-      rotationSpeed: 0,
-      noiseOffset: 0,
-      orbitalOffset: { x: 0, y: 0, z: 0 },
+      ...SAMPLE_EMIT_DATA,
+      position: { x: 10, y: 20, z: 30 },
+    });
+    writeParticleToModifierBuffers(buffers, 5, {
+      ...SAMPLE_EMIT_DATA,
+      position: { x: 40, y: 50, z: 60 },
     });
 
-    // The material reads attribute('instanceParticleState').y for size
-    const psArr = buffers.particleState.array as Float32Array;
-    expect(psArr[1]).toBeCloseTo(0.08); // size at .y = index 1
+    const arr = buffers.curveData.array as Float32Array;
+    const qStart = curveLen + 1;
+    // First entry
+    expect(arr[qStart]).toBe(0); // particleIndex
+    expect(arr[qStart + 1]).toBe(10); // position.x
+    // Second entry at stride 24
+    expect(arr[qStart + 24]).toBe(5); // particleIndex
+    expect(arr[qStart + 25]).toBe(40); // position.x
+  });
+});
 
-    // The material reads attribute('instanceStartValues').x for startLifetime
-    const svArr = buffers.startValues.array as Float32Array;
-    expect(svArr[0]).toBe(3000); // startLifetime at .x = index 0
+// ─── flushEmitQueue ─────────────────────────────────────────────────────────
 
-    // The material reads attribute('instanceColor') for RGBA
-    const colorArr = buffers.color.array as Float32Array;
-    expect(colorArr[0]).toBeCloseTo(0.5); // R
-    expect(colorArr[1]).toBeCloseTo(0.6); // G
-    expect(colorArr[2]).toBeCloseTo(1.0); // B
-    expect(colorArr[3]).toBeCloseTo(1.0); // A (opacity)
+describe('flushEmitQueue', () => {
+  it('returns the number of queued emits and resets the counter', () => {
+    const { buffers } = createBuffersWithEmitQueue(10);
+
+    writeParticleToModifierBuffers(buffers, 0, SAMPLE_EMIT_DATA);
+    writeParticleToModifierBuffers(buffers, 1, SAMPLE_EMIT_DATA);
+
+    const count = flushEmitQueue(buffers);
+    expect(count).toBe(2);
+
+    // Second flush should return 0
+    const count2 = flushEmitQueue(buffers);
+    expect(count2).toBe(0);
+  });
+
+  it('writes emit count into curveData and bumps version', () => {
+    const { buffers, curveLen } = createBuffersWithEmitQueue(10);
+
+    const vCd = getVersion(buffers.curveData);
+
+    writeParticleToModifierBuffers(buffers, 0, SAMPLE_EMIT_DATA);
+    writeParticleToModifierBuffers(buffers, 1, SAMPLE_EMIT_DATA);
+    flushEmitQueue(buffers);
+
+    // Emit count written at curveLen index
+    const arr = buffers.curveData.array as Float32Array;
+    expect(arr[curveLen]).toBe(2);
+
+    expect(getVersion(buffers.curveData)).toBeGreaterThan(vCd);
+  });
+
+  it('does not bump version when no emits are queued', () => {
+    const { buffers } = createBuffersWithEmitQueue(10);
+
+    const vCd = getVersion(buffers.curveData);
+
+    flushEmitQueue(buffers);
+
+    expect(getVersion(buffers.curveData)).toBe(vCd);
+  });
+
+  it('does not bump version on compute-output buffers', () => {
+    const { buffers } = createBuffersWithEmitQueue(10);
+
+    const vPos = getVersion(buffers.position);
+    const vVel = getVersion(buffers.velocity);
+    const vCol = getVersion(buffers.color);
+    const vPs = getVersion(buffers.particleState);
+    const vOia = getVersion(buffers.orbitalIsActive);
+
+    writeParticleToModifierBuffers(buffers, 0, SAMPLE_EMIT_DATA);
+    flushEmitQueue(buffers);
+
+    expect(getVersion(buffers.position)).toBe(vPos);
+    expect(getVersion(buffers.velocity)).toBe(vVel);
+    expect(getVersion(buffers.color)).toBe(vCol);
+    expect(getVersion(buffers.particleState)).toBe(vPs);
+    expect(getVersion(buffers.orbitalIsActive)).toBe(vOia);
   });
 });
 
 // ─── deactivateParticleInModifierBuffers ────────────────────────────────────
 
 describe('deactivateParticleInModifierBuffers', () => {
-  it('sets isActive to 0 and zeroes color alpha', () => {
-    const buffers = createModifierStorageBuffers(5, false, new Float32Array(0));
+  it('is a no-op — does not bump version on any buffer', () => {
+    const { buffers } = createBuffersWithEmitQueue(5);
 
-    // First activate particle 2
-    writeParticleToModifierBuffers(buffers, 2, {
-      position: { x: 0, y: 0, z: 0 },
-      velocity: { x: 0, y: 0, z: 0 },
-      startLifetime: 1000,
-      colorA: 1.0,
-      size: 0.5,
-      rotation: 0,
-      colorR: 1,
-      colorG: 1,
-      colorB: 1,
-      startSize: 0.5,
-      startOpacity: 1,
-      startColorR: 1,
-      startColorG: 1,
-      startColorB: 1,
-      startFrame: 0,
-      rotationSpeed: 0,
-      noiseOffset: 0,
-      orbitalOffset: { x: 0, y: 0, z: 0 },
-    });
-
-    const oiaArr = buffers.orbitalIsActive.array as Float32Array;
-    expect(oiaArr[2 * 4 + 3]).toBe(1); // isActive = 1
+    const vOia = getVersion(buffers.orbitalIsActive);
+    const vCol = getVersion(buffers.color);
 
     deactivateParticleInModifierBuffers(buffers, 2);
 
-    expect(oiaArr[2 * 4 + 3]).toBe(0); // isActive = 0
-    const colorArr = buffers.color.array as Float32Array;
-    expect(colorArr[2 * 4 + 3]).toBe(0); // alpha = 0
+    expect(getVersion(buffers.orbitalIsActive)).toBe(vOia);
+    expect(getVersion(buffers.color)).toBe(vCol);
+  });
+});
+
+// ─── Emit queue overflow guard ──────────────────────────────────────────────
+
+describe('emit queue overflow', () => {
+  it('silently drops emits beyond MAX_EMITS_PER_FRAME', () => {
+    const { buffers } = createBuffersWithEmitQueue(MAX_EMITS_PER_FRAME + 10);
+
+    for (let i = 0; i < MAX_EMITS_PER_FRAME + 5; i++) {
+      writeParticleToModifierBuffers(buffers, i, SAMPLE_EMIT_DATA);
+    }
+
+    const count = flushEmitQueue(buffers);
+    expect(count).toBe(MAX_EMITS_PER_FRAME);
   });
 });

@@ -137,6 +137,10 @@ type TSLMaterialFactory = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   deactivateParticleInModifierBuffers?: (...args: any[]) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  flushEmitQueue?: (...args: any[]) => number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  registerCurveDataLength?: (...args: any[]) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   encodeForceFieldsForGPU?: (...args: any[]) => Float32Array;
 };
 
@@ -966,7 +970,8 @@ export const createParticleSystem = (
     normalizedConfig.simulationBackend !== SimulationBackend.CPU &&
     !!_tslMaterialFactory?.createComputePipeline &&
     !!_tslMaterialFactory.writeParticleToModifierBuffers &&
-    !!_tslMaterialFactory.deactivateParticleInModifierBuffers;
+    !!_tslMaterialFactory.deactivateParticleInModifierBuffers &&
+    !!_tslMaterialFactory.flushEmitQueue;
 
   // Create GPU compute pipeline when active
   type GPUComputePipeline =
@@ -981,6 +986,13 @@ export const createParticleSystem = (
       generalData.particleSystemId,
       normalizedForceFields.length
     );
+    // Register the curveDataLength so the emit queue helpers know the offset
+    if (gpuPipeline && _tslMaterialFactory!.registerCurveDataLength) {
+      _tslMaterialFactory!.registerCurveDataLength(
+        gpuPipeline.buffers,
+        gpuPipeline.curveDataLength
+      );
+    }
   }
 
   const rendererConfig = {
@@ -2263,6 +2275,13 @@ const updateParticleSystemInstance = (
       cp.forceFieldNodes.buffer.needsUpdate = true;
       (cp.forceFieldNodes.countUniform as unknown as { value: number }).value =
         normalizedForceFields.length;
+    }
+
+    // Flush emit queue — uploads queued particle data to GPU and sets the
+    // emit count uniform so the compute shader's scatter pass can initialise
+    // newly emitted particles without overwriting existing GPU state.
+    if (_tslMaterialFactory?.flushEmitQueue) {
+      _tslMaterialFactory.flushEmitQueue(cp.buffers);
     }
 
     // Signal onBeforeRender to dispatch compute
