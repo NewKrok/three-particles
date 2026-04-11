@@ -988,7 +988,7 @@ export const createParticleSystem = (
       generalData.particleSystemId,
       normalizedForceFields.length
     );
-    // Register the curveDataLength so the emit queue helpers know the offset
+    // Register the curveDataLength so the init data helpers know the offset.
     if (gpuPipeline && _tslMaterialFactory!.registerCurveDataLength) {
       _tslMaterialFactory!.registerCurveDataLength(
         gpuPipeline.buffers,
@@ -1192,8 +1192,9 @@ export const createParticleSystem = (
     );
   }
 
-  // Packed quaternion vec4 attribute for 3D mesh rotation (only for MESH renderer)
-  if (useMesh) {
+  // Packed quaternion vec4 attribute for 3D mesh rotation (only for MESH renderer,
+  // CPU path only — GPU compute derives quaternion from particleState.z in the shader)
+  if (useMesh && !useGPUCompute) {
     const quatArray = new Float32Array(maxParticles * 4);
     // Initialize to identity quaternion (0, 0, 0, 1)
     for (let i = 0; i < maxParticles; i++) {
@@ -1215,7 +1216,7 @@ export const createParticleSystem = (
   const aRotation = a[attr('rotation')];
   const aLifetime = a[attr('lifetime')];
   const aPosition = a[posAttr];
-  const aQuat = useMesh ? a[attr('quat')] : undefined;
+  const aQuat = useMesh && !useGPUCompute ? a[attr('quat')] : undefined;
 
   const deactivateParticle = (particleIndex: number) => {
     const base = particleIndex * SCALAR_STRIDE;

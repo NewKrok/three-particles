@@ -25,15 +25,12 @@ import {
   instanceIndex,
   uniform,
   If,
-  Loop,
-  Break,
   floor,
   fract,
   mix,
   sin,
   cos,
   min as tslMin,
-  int,
   compute,
   type ShaderNodeObject,
   type Node,
@@ -48,37 +45,39 @@ import { createForceFieldComputeNodes } from './compute-force-fields.js';
 import { snoise3D } from './tsl-noise.js';
 import type { BakedCurveMap } from './curve-bake.js';
 
-// ─── Emit Queue Constants ────────────────────────────────────────────────────
+// ─── Per-Particle Init Data Constants ────────────────────────────────────────
 
 /**
- * Maximum number of particle emits that can be queued in a single frame.
- * Covers large bursts while keeping the buffer small (~12 KB).
- */
-export const MAX_EMITS_PER_FRAME = 128;
-
-/**
- * Number of floats per emit entry in the queue buffer.
+ * Number of floats per particle in the init-data region of the curveData buffer.
  *
- * Layout (24 floats):
- *   0:     particleIndex
- *   1-3:   position (x, y, z)
- *   4-6:   velocity (x, y, z)
- *   7:     startLifetime
- *   8:     startSize
- *   9:     startOpacity
- *   10:    startColorR
- *   11:    startColorG
- *   12:    startColorB
- *   13:    colorA (initial alpha)
- *   14:    size (initial size)
- *   15:    rotation (initial rotation)
- *   16:    startFrame
- *   17:    rotationSpeed
- *   18:    noiseOffset
- *   19-21: orbitalOffset (x, y, z)
- *   22-23: padding
+ * Layout (20 floats = 5 vec4s):
+ *   0:   position.x
+ *   1:   position.y
+ *   2:   position.z
+ *   3:   initFlag (0.0 = no init, 1.0 = needs init)
+ *   4:   velocity.x
+ *   5:   velocity.y
+ *   6:   velocity.z
+ *   7:   (padding)
+ *   8:   color.R
+ *   9:   color.G
+ *   10:  color.B
+ *   11:  color.A
+ *   12:  particleState.x (lifetime = 0)
+ *   13:  particleState.y (size)
+ *   14:  particleState.z (rotation)
+ *   15:  particleState.w (startFrame)
+ *   16:  orbitalOffset.x
+ *   17:  orbitalOffset.y
+ *   18:  orbitalOffset.z
+ *   19:  isActive (= 1.0)
+ *
+ * Each particle has its own fixed slot at `curveLen + particleIndex * INIT_STRIDE`.
+ * The compute shader reads `initFlag` (offset 3) for particle `i`; if 1.0 it
+ * copies the init data into the main buffers.  This is O(1) per particle —
+ * no queue scanning needed.
  */
-const EMIT_STRIDE = 24;
+export const INIT_STRIDE = 20;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,25 +109,26 @@ export type ModifierUniforms = {
   noiseSizeAmount: ShaderNodeObject<Node>;
 };
 
-/** Storage buffers for the modifier compute pipeline. */
 /**
  * GPU storage buffers for the modifier compute pipeline.
  *
  * 8 bindings (within the WebGPU per-stage limit):
- *   1. position (vec3) — render + compute
- *   2. velocity (vec3) — compute-only
+ *   1. position (vec4) — render + compute
+ *   2. velocity (vec4) — compute-only
  *   3. color (vec4: R,G,B,A) — render + compute
  *   4. particleState (vec4: lifetime, size, rotation, startFrame) — render + compute
  *   5. startValues (vec4: startLifetime, startSize, startOpacity, startColorR) — compute + render(.x)
  *   6. startColorsExt (vec4: startColorG, startColorB, rotationSpeed, noiseOffset) — compute-only
  *   7. orbitalIsActive (vec4: offsetX, offsetY, offsetZ, isActive) — compute-only
- *   8. curveData (float[]) — compute-only; also carries the emit queue at the end
+ *   8. curveData (float[]) — compute-only; carries per-particle init data at the end
  *
- * The emit queue is appended to the curveData buffer to avoid exceeding the
- * 8-storage-buffer per-stage limit.  Layout:
- *   [0 .. curveLen-1]           baked curve samples
- *   [curveLen]                  emit count (float, cast to int on GPU)
- *   [curveLen+1 .. ]            emit queue entries (EMIT_STRIDE floats each)
+ * Per-particle init data is appended to the curveData buffer to avoid
+ * exceeding the 8-storage-buffer per-stage limit.  Layout:
+ *   [0 .. curveLen-1]                            baked curve samples
+ *   [curveLen + i*INIT_STRIDE .. +INIT_STRIDE-1] init data for particle i
+ *
+ * The compute shader checks initFlag (offset 3 within each particle's slot)
+ * and copies init data to the main buffers in O(1) per particle.
  */
 export type ModifierStorageBuffers = {
   /** Particle position (vec3). Render attribute + compute. */
@@ -154,7 +154,7 @@ export type ModifierComputePipeline = {
   computeNode: ReturnType<typeof compute>;
   uniforms: ModifierUniforms;
   buffers: ModifierStorageBuffers;
-  /** Offset into curveData where the emit queue begins (= original curve data length). */
+  /** Offset into curveData where per-particle init data begins (= baked curve data length). */
   curveDataLength: number;
   forceFieldNodes: {
     buffer: StorageBufferAttribute;
@@ -177,16 +177,16 @@ export function createModifierStorageBuffers(
     ? StorageInstancedBufferAttribute
     : StorageBufferAttribute;
 
-  // The emit queue is appended to the curveData buffer:
-  //   [0 .. curveLen-1]  baked curve samples
-  //   [curveLen]         emit count (float)
-  //   [curveLen+1 .. ]   emit queue entries
+  // Per-particle init data is appended to the curveData buffer:
+  //   [0 .. curveLen-1]                             baked curve samples
+  //   [curveLen + i*INIT_STRIDE .. +INIT_STRIDE-1]  init data for particle i
+  //
+  // Each particle has a fixed slot — O(1) lookup in the compute shader.
   const curveLen = Math.max(curveData.length, 1);
-  const totalLen = curveLen + 1 + MAX_EMITS_PER_FRAME * EMIT_STRIDE;
+  const totalLen = curveLen + maxParticles * INIT_STRIDE;
   const combined = new Float32Array(totalLen);
   combined.set(curveData.length > 0 ? curveData : new Float32Array([0]));
-  // emit count starts at 0
-  combined[curveLen] = 0;
+  // All init flags start at 0 (no init needed)
 
   return {
     // Position and velocity use vec4 (w=padding) to avoid WebGPU vec3→vec4
@@ -213,21 +213,24 @@ export function createModifierStorageBuffers(
   };
 }
 
-// ─── CPU → GPU Sync Helpers (Emit Queue in curveData tail) ──────────────────
+// ─── CPU → GPU Sync Helpers (per-particle init data in curveData tail) ──────
 
 /** Per-pipeline frame-local emit count, keyed by curveData buffer identity. */
 const _emitCounts = new WeakMap<StorageBufferAttribute, number>();
-/** Per-pipeline stored curveDataLength for emit queue offset. */
+/** Per-pipeline stored curveDataLength for init data offset. */
 const _curveDataLengths = new WeakMap<StorageBufferAttribute, number>();
+/** Particle indices emitted this frame (will be cleared next frame). */
+const _currentEmitIndices = new WeakMap<StorageBufferAttribute, number[]>();
+/** Particle indices from the previous frame whose initFlags must be
+ *  cleared in the CPU array before the next upload. */
+const _pendingClearIndices = new WeakMap<StorageBufferAttribute, number[]>();
 
 /**
- * Queues a newly emitted particle for GPU initialisation.
+ * Writes init data for a newly emitted particle into its per-particle slot
+ * in the curveData buffer tail.
  *
- * Instead of writing directly to GPU-computed storage buffers (which would
- * require a full-buffer upload that overwrites GPU results for all particles),
- * this appends the emit data to the tail of the `curveData` buffer.  The
- * compute shader scatter-copies queue entries into the main buffers before
- * simulation.
+ * The compute shader checks `initFlag` (offset 3 within each particle's slot)
+ * and copies init data into the main storage buffers in O(1) per particle.
  *
  * Also writes to the CPU-only `startValues` and `startColorsExt` arrays (safe
  * to upload because the GPU only reads them).
@@ -256,39 +259,50 @@ export function writeParticleToModifierBuffers(
     orbitalOffset: { x: number; y: number; z: number };
   }
 ): void {
-  // ── Append to emit queue (in curveData tail) ──
-  const count = _emitCounts.get(buffers.curveData) ?? 0;
-  if (count >= MAX_EMITS_PER_FRAME) return; // overflow guard
-
+  // ── Write to per-particle init slot in curveData tail ──
   const curveLen = _curveDataLengths.get(buffers.curveData) ?? 0;
   const arr = buffers.curveData.array as Float32Array;
-  // +1 to skip the emit count slot
-  const base = curveLen + 1 + count * EMIT_STRIDE;
-  arr[base] = index;
-  arr[base + 1] = data.position.x;
-  arr[base + 2] = data.position.y;
-  arr[base + 3] = data.position.z;
+  const base = curveLen + index * INIT_STRIDE;
+
+  // vec4: position.xyz + initFlag
+  arr[base] = data.position.x;
+  arr[base + 1] = data.position.y;
+  arr[base + 2] = data.position.z;
+  arr[base + 3] = 1.0; // initFlag = 1 (needs init)
+  // vec4: velocity.xyz + padding
   arr[base + 4] = data.velocity.x;
   arr[base + 5] = data.velocity.y;
   arr[base + 6] = data.velocity.z;
-  arr[base + 7] = data.startLifetime;
-  arr[base + 8] = data.startSize;
-  arr[base + 9] = data.startOpacity;
-  arr[base + 10] = data.startColorR;
-  arr[base + 11] = data.startColorG;
-  arr[base + 12] = data.startColorB;
-  arr[base + 13] = data.colorA;
-  arr[base + 14] = data.size;
-  arr[base + 15] = data.rotation;
-  arr[base + 16] = data.startFrame;
-  arr[base + 17] = data.rotationSpeed;
-  arr[base + 18] = data.noiseOffset;
-  arr[base + 19] = data.orbitalOffset.x;
-  arr[base + 20] = data.orbitalOffset.y;
-  arr[base + 21] = data.orbitalOffset.z;
-  // 22-23 padding (unused)
+  arr[base + 7] = 0;
+  // vec4: color RGBA
+  arr[base + 8] = data.colorR;
+  arr[base + 9] = data.colorG;
+  arr[base + 10] = data.colorB;
+  arr[base + 11] = data.colorA;
+  // vec4: particleState (lifetime=0, size, rotation, startFrame)
+  arr[base + 12] = 0;
+  arr[base + 13] = data.size;
+  arr[base + 14] = data.rotation;
+  arr[base + 15] = data.startFrame;
+  // vec4: orbitalIsActive (offsetX, offsetY, offsetZ, isActive=1)
+  arr[base + 16] = data.orbitalOffset.x;
+  arr[base + 17] = data.orbitalOffset.y;
+  arr[base + 18] = data.orbitalOffset.z;
+  arr[base + 19] = 1.0;
 
-  _emitCounts.set(buffers.curveData, count + 1);
+  _emitCounts.set(
+    buffers.curveData,
+    (_emitCounts.get(buffers.curveData) ?? 0) + 1
+  );
+
+  // Track this particle's index so its initFlag can be cleared in the CPU
+  // array before the next upload (preventing re-initialization from stale data).
+  let indices = _currentEmitIndices.get(buffers.curveData);
+  if (!indices) {
+    indices = [];
+    _currentEmitIndices.set(buffers.curveData, indices);
+  }
+  indices.push(index);
 
   // ── Write to CPU-only buffers (safe — GPU only reads these) ──
   const i4 = index * 4;
@@ -307,8 +321,8 @@ export function writeParticleToModifierBuffers(
 }
 
 /**
- * Registers the curveDataLength for a buffer so the emit queue helpers know
- * where the queue region starts.  Called once during pipeline creation.
+ * Registers the curveDataLength for a buffer so the init data helpers know
+ * where the per-particle init region starts.  Called once during pipeline creation.
  */
 export function registerCurveDataLength(
   buffers: ModifierStorageBuffers,
@@ -318,7 +332,7 @@ export function registerCurveDataLength(
 }
 
 /**
- * Flushes the emit queue to the GPU and resets the frame-local counter.
+ * Flushes pending init data to the GPU and resets the frame-local counter.
  *
  * Must be called once per frame **before** compute dispatch.
  *
@@ -327,15 +341,31 @@ export function registerCurveDataLength(
 export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
   const count = _emitCounts.get(buffers.curveData) ?? 0;
   const curveLen = _curveDataLengths.get(buffers.curveData) ?? 0;
-
-  // Write the emit count into the curveData array at the designated slot
   const arr = buffers.curveData.array as Float32Array;
-  arr[curveLen] = count;
+
+  // Clear initFlags for particles emitted in the previous frame.
+  // The GPU already cleared these on its copy during the last dispatch,
+  // but the CPU array still has initFlag=1 — a subsequent needsUpdate
+  // upload would re-trigger initialization, causing flicker.
+  const toClear = _pendingClearIndices.get(buffers.curveData);
+  if (toClear && toClear.length > 0) {
+    for (let j = 0; j < toClear.length; j++) {
+      arr[curveLen + toClear[j] * INIT_STRIDE + 3] = 0;
+    }
+    toClear.length = 0;
+  }
 
   if (count > 0) {
     buffers.curveData.needsUpdate = true;
     buffers.startValues.needsUpdate = true;
     buffers.startColorsExt.needsUpdate = true;
+  }
+
+  // Rotate: current frame's emitted indices become next frame's pending clears.
+  const current = _currentEmitIndices.get(buffers.curveData);
+  if (current && current.length > 0) {
+    _pendingClearIndices.set(buffers.curveData, current.slice());
+    current.length = 0;
   }
 
   _emitCounts.set(buffers.curveData, 0);
@@ -444,17 +474,15 @@ export function createModifierComputeUpdate(
     'vec4',
     maxParticles
   );
-  // curveData + emit queue tail (single buffer)
+  // curveData + per-particle init data tail (single buffer)
   const sCurveData = storage(
     buffers.curveData,
     'float',
     buffers.curveData.array.length
   );
 
-  // Emit queue layout constants (compile-time offsets into sCurveData)
+  // Per-particle init data layout constants (compile-time offsets into sCurveData)
   const curveLen = Math.max(curveMap.data.length, 1);
-  const emitCountIdx = curveLen; // index of emit count in sCurveData
-  const emitQueueStart = curveLen + 1; // first emit entry in sCurveData
 
   const lookupCurve = createCurveLookup(sCurveData);
 
@@ -469,78 +497,77 @@ export function createModifierComputeUpdate(
   const computeKernel = Fn(() => {
     const i = instanceIndex;
 
-    // ── Emit scatter: initialise newly emitted particles from the queue ──
-    // The emit queue lives at the tail of sCurveData:
-    //   sCurveData[emitCountIdx]       = emit count (float → int)
-    //   sCurveData[emitQueueStart + j*EMIT_STRIDE + field] = emit data
-    // Scans the (typically tiny) queue to find entries targeting this
-    // particle index. O(N × M) where M = emits/frame (usually 1-10).
-    const iInt = i.toInt();
-    const emitCount = int(sCurveData.element(emitCountIdx));
-    Loop(
-      { end: emitCount, name: 'j', type: 'int', condition: '<' },
-      ({ j }: { j: ShaderNodeObject<Node> }) => {
-        const qBase = int(j).mul(EMIT_STRIDE).add(emitQueueStart);
-        const qIdx = int(sCurveData.element(qBase));
-        If(qIdx.equal(iInt), () => {
-          // Position
-          sPosition
-            .element(i)
-            .assign(
-              vec4(
-                sCurveData.element(qBase.add(1)),
-                sCurveData.element(qBase.add(2)),
-                sCurveData.element(qBase.add(3)),
-                0
-              )
-            );
-          // Velocity
-          sVelocity
-            .element(i)
-            .assign(
-              vec4(
-                sCurveData.element(qBase.add(4)),
-                sCurveData.element(qBase.add(5)),
-                sCurveData.element(qBase.add(6)),
-                0
-              )
-            );
-          // startValues and startColorsExt are CPU-only buffers uploaded via
-          // needsUpdate in flushEmitQueue — no GPU scatter needed for them.
+    // ── Per-particle init: O(1) lookup ──
+    // Each particle has a fixed slot in curveData at:
+    //   base = curveLen + i * INIT_STRIDE
+    // If initFlag (offset 3) is 1.0, copy init data into main buffers.
+    const initBase = i.mul(INIT_STRIDE).add(curveLen);
+    const initFlag = sCurveData.element(initBase.add(3));
+    If(initFlag.greaterThan(0.5), () => {
+      // Position (vec4: xyz + padding)
+      sPosition
+        .element(i)
+        .assign(
+          vec4(
+            sCurveData.element(initBase),
+            sCurveData.element(initBase.add(1)),
+            sCurveData.element(initBase.add(2)),
+            0
+          )
+        );
+      // Velocity (vec4: xyz + padding)
+      sVelocity
+        .element(i)
+        .assign(
+          vec4(
+            sCurveData.element(initBase.add(4)),
+            sCurveData.element(initBase.add(5)),
+            sCurveData.element(initBase.add(6)),
+            0
+          )
+        );
+      // Color (vec4: RGBA)
+      sColor
+        .element(i)
+        .assign(
+          vec4(
+            sCurveData.element(initBase.add(8)),
+            sCurveData.element(initBase.add(9)),
+            sCurveData.element(initBase.add(10)),
+            sCurveData.element(initBase.add(11))
+          )
+        );
+      // particleState (vec4: lifetime=0, size, rotation, startFrame)
+      sParticleState
+        .element(i)
+        .assign(
+          vec4(
+            sCurveData.element(initBase.add(12)),
+            sCurveData.element(initBase.add(13)),
+            sCurveData.element(initBase.add(14)),
+            sCurveData.element(initBase.add(15))
+          )
+        );
+      // orbitalIsActive (vec4: offsetXYZ, isActive=1)
+      sOrbitalIsActive
+        .element(i)
+        .assign(
+          vec4(
+            sCurveData.element(initBase.add(16)),
+            sCurveData.element(initBase.add(17)),
+            sCurveData.element(initBase.add(18)),
+            sCurveData.element(initBase.add(19))
+          )
+        );
+      // startValues and startColorsExt are CPU-only buffers uploaded via
+      // needsUpdate in flushEmitQueue — no GPU scatter needed for them.
 
-          // Color: (R, G, B, A)
-          sColor.element(i).assign(
-            vec4(
-              sCurveData.element(qBase.add(10)), // startColorR
-              sCurveData.element(qBase.add(11)), // startColorG
-              sCurveData.element(qBase.add(12)), // startColorB
-              sCurveData.element(qBase.add(13)) // colorA
-            )
-          );
-          // particleState: (lifetime=0, size, rotation, startFrame)
-          sParticleState.element(i).assign(
-            vec4(
-              0,
-              sCurveData.element(qBase.add(14)), // size
-              sCurveData.element(qBase.add(15)), // rotation
-              sCurveData.element(qBase.add(16)) // startFrame
-            )
-          );
-          // orbitalIsActive: (offsetX, offsetY, offsetZ, isActive=1)
-          sOrbitalIsActive
-            .element(i)
-            .assign(
-              vec4(
-                sCurveData.element(qBase.add(19)),
-                sCurveData.element(qBase.add(20)),
-                sCurveData.element(qBase.add(21)),
-                1.0
-              )
-            );
-          Break();
-        });
-      }
-    );
+      // Clear the init flag so this particle isn't re-initialized next frame.
+      // The CPU array was already uploaded this frame; mutating the GPU copy
+      // here is fine because the CPU will only touch this slot again when
+      // the particle is re-emitted (at which point it writes initFlag=1 again).
+      sCurveData.element(initBase.add(3)).assign(float(0));
+    });
 
     // Read orbitalIsActive to check isActive (w component)
     const oiaVec = sOrbitalIsActive.element(i).toVar();

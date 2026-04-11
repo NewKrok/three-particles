@@ -101,14 +101,14 @@ export function createMeshParticleTSLMaterial(
 
   /** Particle world-space position (vec3). */
   const aInstanceOffset = attribute('instanceOffset');
-  /** Particle orientation as a unit quaternion (vec4: x, y, z, w). */
-  const aInstanceQuat = attribute('instanceQuat');
   /** Packed RGBA color (vec4). */
   const aColor = attribute('instanceColor');
 
   // GPU compute uses packed vec4 buffers; CPU uses individual attributes
   const aParticleState = gpuCompute ? attribute('instanceParticleState') : null;
   const aStartValues = gpuCompute ? attribute('instanceStartValues') : null;
+  /** Particle orientation as a unit quaternion (vec4: x, y, z, w). CPU path only. */
+  const aInstanceQuat = gpuCompute ? null : attribute('instanceQuat');
   const aSize = gpuCompute ? null : attribute('instanceSize');
   const aLifetime = gpuCompute ? null : attribute('instanceLifetime');
   const aStartLifetime = gpuCompute ? null : attribute('instanceStartLifetime');
@@ -151,10 +151,20 @@ export function createMeshParticleTSLMaterial(
       vRotation.assign(aRotation!);
     }
 
+    // Build quaternion: GPU compute derives it from particleState.z (rotation
+    // angle around Z); CPU path reads the pre-computed instanceQuat attribute.
+    let quat: ShaderNodeObject<Node>;
+    if (gpuCompute) {
+      const halfZ = aParticleState!.z.mul(0.5);
+      quat = vec4(0.0, 0.0, sin(halfZ), cos(halfZ));
+    } else {
+      quat = aInstanceQuat!;
+    }
+
     // 1. Rotate mesh vertex position by instance quaternion
     const rotatedPos = applyQuaternion({
       v: positionLocal,
-      q: aInstanceQuat,
+      q: quat,
     });
 
     // 2. Scale by particle size
@@ -171,7 +181,7 @@ export function createMeshParticleTSLMaterial(
     // Transform normal: rotate by quaternion then into view space
     const rotatedNormal = applyQuaternion({
       v: normalLocal,
-      q: aInstanceQuat,
+      q: quat,
     });
     const mvNormal = modelViewMatrix.mul(vec4(rotatedNormal, 0.0)).xyz;
     vNormal.assign(mvNormal.normalize());

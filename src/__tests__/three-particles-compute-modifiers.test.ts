@@ -6,7 +6,7 @@ import {
   deactivateParticleInModifierBuffers,
   flushEmitQueue,
   registerCurveDataLength,
-  MAX_EMITS_PER_FRAME,
+  INIT_STRIDE,
   type ModifierFlags,
 } from '../js/effects/three-particles/webgpu/compute-modifiers.js';
 import type { BakedCurveMap } from '../js/effects/three-particles/webgpu/curve-bake.js';
@@ -72,7 +72,7 @@ function getVersion(
 }
 
 /** Helper to create buffers and register curveDataLength in one call. */
-function createBuffersWithEmitQueue(
+function createBuffersWithInitData(
   maxParticles: number,
   curveData = new Float32Array(0)
 ) {
@@ -85,7 +85,7 @@ function createBuffersWithEmitQueue(
 // ─── createModifierStorageBuffers ────────────────────────────────────────────
 
 describe('createModifierStorageBuffers', () => {
-  it('creates all required buffers with emit queue in curveData tail', () => {
+  it('creates all required buffers with per-particle init data in curveData tail', () => {
     const curveData = new Float32Array(256);
     const buffers = createModifierStorageBuffers(50, false, curveData);
 
@@ -97,8 +97,8 @@ describe('createModifierStorageBuffers', () => {
     expect(buffers.startValues.array).toHaveLength(200);
     expect(buffers.startColorsExt.array).toHaveLength(200);
     expect(buffers.orbitalIsActive.array).toHaveLength(200);
-    // curveData = original curves + 1 (emit count) + queue entries
-    const expectedLen = 256 + 1 + MAX_EMITS_PER_FRAME * 24;
+    // curveData = original curves + per-particle init data (maxParticles * INIT_STRIDE)
+    const expectedLen = 256 + 50 * INIT_STRIDE;
     expect(buffers.curveData.array).toHaveLength(expectedLen);
     // No separate emitQueue buffer
     expect((buffers as Record<string, unknown>).emitQueue).toBeUndefined();
@@ -110,8 +110,8 @@ describe('createModifierStorageBuffers', () => {
       false,
       new Float32Array(0)
     );
-    // 1 (min curve) + 1 (emit count) + queue
-    const expectedLen = 1 + 1 + MAX_EMITS_PER_FRAME * 24;
+    // 1 (min curve) + per-particle init data (10 * INIT_STRIDE)
+    const expectedLen = 1 + 10 * INIT_STRIDE;
     expect(buffers.curveData.array).toHaveLength(expectedLen);
   });
 });
@@ -191,29 +191,40 @@ describe('createModifierComputeUpdate', () => {
   });
 });
 
-// ─── writeParticleToModifierBuffers (emit queue in curveData tail) ──────────
+// ─── writeParticleToModifierBuffers (per-particle init in curveData tail) ────
 
 describe('writeParticleToModifierBuffers', () => {
-  it('writes emit data to the curveData tail', () => {
-    const { buffers, curveLen } = createBuffersWithEmitQueue(10);
+  it('writes init data to the per-particle slot in curveData', () => {
+    const { buffers, curveLen } = createBuffersWithInitData(10);
 
     writeParticleToModifierBuffers(buffers, 3, SAMPLE_EMIT_DATA);
 
-    // Emit queue starts at curveLen + 1 (skip emit count slot)
+    // Particle 3's init slot starts at curveLen + 3 * INIT_STRIDE
     const arr = buffers.curveData.array as Float32Array;
-    const base = curveLen + 1;
-    expect(arr[base]).toBe(3); // particleIndex
-    expect(arr[base + 1]).toBe(1); // position.x
-    expect(arr[base + 2]).toBe(2); // position.y
-    expect(arr[base + 3]).toBe(3); // position.z
+    const base = curveLen + 3 * INIT_STRIDE;
+    expect(arr[base]).toBe(1); // position.x
+    expect(arr[base + 1]).toBe(2); // position.y
+    expect(arr[base + 2]).toBe(3); // position.z
+    expect(arr[base + 3]).toBe(1.0); // initFlag = 1
     expect(arr[base + 4]).toBe(4); // velocity.x
-    expect(arr[base + 7]).toBe(2000); // startLifetime
-    expect(arr[base + 13]).toBeCloseTo(0.8); // colorA
-    expect(arr[base + 19]).toBe(10); // orbitalOffset.x
+    expect(arr[base + 5]).toBe(5); // velocity.y
+    expect(arr[base + 6]).toBe(6); // velocity.z
+    expect(arr[base + 8]).toBeCloseTo(0.9); // colorR
+    expect(arr[base + 9]).toBeCloseTo(0.7); // colorG
+    expect(arr[base + 10]).toBeCloseTo(0.3); // colorB
+    expect(arr[base + 11]).toBeCloseTo(0.8); // colorA
+    expect(arr[base + 12]).toBe(0); // lifetime = 0
+    expect(arr[base + 13]).toBeCloseTo(0.5); // size
+    expect(arr[base + 14]).toBeCloseTo(1.2); // rotation
+    expect(arr[base + 15]).toBe(2); // startFrame
+    expect(arr[base + 16]).toBe(10); // orbitalOffset.x
+    expect(arr[base + 17]).toBe(20); // orbitalOffset.y
+    expect(arr[base + 18]).toBe(30); // orbitalOffset.z
+    expect(arr[base + 19]).toBe(1.0); // isActive = 1
   });
 
   it('writes to CPU-only startValues and startColorsExt buffers', () => {
-    const { buffers } = createBuffersWithEmitQueue(10);
+    const { buffers } = createBuffersWithInitData(10);
 
     writeParticleToModifierBuffers(buffers, 3, SAMPLE_EMIT_DATA);
 
@@ -227,7 +238,7 @@ describe('writeParticleToModifierBuffers', () => {
   });
 
   it('does NOT bump version on compute-output buffers', () => {
-    const { buffers } = createBuffersWithEmitQueue(10);
+    const { buffers } = createBuffersWithInitData(10);
 
     const vPos = getVersion(buffers.position);
     const vVel = getVersion(buffers.velocity);
@@ -244,8 +255,8 @@ describe('writeParticleToModifierBuffers', () => {
     expect(getVersion(buffers.orbitalIsActive)).toBe(vOia);
   });
 
-  it('queues multiple emits in sequence', () => {
-    const { buffers, curveLen } = createBuffersWithEmitQueue(10);
+  it('writes to separate per-particle slots for different indices', () => {
+    const { buffers, curveLen } = createBuffersWithInitData(10);
 
     writeParticleToModifierBuffers(buffers, 0, {
       ...SAMPLE_EMIT_DATA,
@@ -257,13 +268,21 @@ describe('writeParticleToModifierBuffers', () => {
     });
 
     const arr = buffers.curveData.array as Float32Array;
-    const qStart = curveLen + 1;
-    // First entry
-    expect(arr[qStart]).toBe(0); // particleIndex
-    expect(arr[qStart + 1]).toBe(10); // position.x
-    // Second entry at stride 24
-    expect(arr[qStart + 24]).toBe(5); // particleIndex
-    expect(arr[qStart + 25]).toBe(40); // position.x
+    // Particle 0's slot
+    const base0 = curveLen + 0 * INIT_STRIDE;
+    expect(arr[base0]).toBe(10); // position.x
+    expect(arr[base0 + 1]).toBe(20); // position.y
+    expect(arr[base0 + 3]).toBe(1.0); // initFlag
+
+    // Particle 5's slot
+    const base5 = curveLen + 5 * INIT_STRIDE;
+    expect(arr[base5]).toBe(40); // position.x
+    expect(arr[base5 + 1]).toBe(50); // position.y
+    expect(arr[base5 + 3]).toBe(1.0); // initFlag
+
+    // Particle 3 should NOT have initFlag set (wasn't emitted)
+    const base3 = curveLen + 3 * INIT_STRIDE;
+    expect(arr[base3 + 3]).toBe(0); // initFlag = 0
   });
 });
 
@@ -271,7 +290,7 @@ describe('writeParticleToModifierBuffers', () => {
 
 describe('flushEmitQueue', () => {
   it('returns the number of queued emits and resets the counter', () => {
-    const { buffers } = createBuffersWithEmitQueue(10);
+    const { buffers } = createBuffersWithInitData(10);
 
     writeParticleToModifierBuffers(buffers, 0, SAMPLE_EMIT_DATA);
     writeParticleToModifierBuffers(buffers, 1, SAMPLE_EMIT_DATA);
@@ -284,8 +303,8 @@ describe('flushEmitQueue', () => {
     expect(count2).toBe(0);
   });
 
-  it('writes emit count into curveData and bumps version', () => {
-    const { buffers, curveLen } = createBuffersWithEmitQueue(10);
+  it('bumps curveData version when emits are pending', () => {
+    const { buffers } = createBuffersWithInitData(10);
 
     const vCd = getVersion(buffers.curveData);
 
@@ -293,15 +312,11 @@ describe('flushEmitQueue', () => {
     writeParticleToModifierBuffers(buffers, 1, SAMPLE_EMIT_DATA);
     flushEmitQueue(buffers);
 
-    // Emit count written at curveLen index
-    const arr = buffers.curveData.array as Float32Array;
-    expect(arr[curveLen]).toBe(2);
-
     expect(getVersion(buffers.curveData)).toBeGreaterThan(vCd);
   });
 
   it('does not bump version when no emits are queued', () => {
-    const { buffers } = createBuffersWithEmitQueue(10);
+    const { buffers } = createBuffersWithInitData(10);
 
     const vCd = getVersion(buffers.curveData);
 
@@ -311,7 +326,7 @@ describe('flushEmitQueue', () => {
   });
 
   it('does not bump version on compute-output buffers', () => {
-    const { buffers } = createBuffersWithEmitQueue(10);
+    const { buffers } = createBuffersWithInitData(10);
 
     const vPos = getVersion(buffers.position);
     const vVel = getVersion(buffers.velocity);
@@ -328,13 +343,54 @@ describe('flushEmitQueue', () => {
     expect(getVersion(buffers.particleState)).toBe(vPs);
     expect(getVersion(buffers.orbitalIsActive)).toBe(vOia);
   });
+
+  it('clears previous frame initFlags before next upload (prevents flicker)', () => {
+    const { buffers, curveLen } = createBuffersWithInitData(10);
+    const arr = buffers.curveData.array as Float32Array;
+
+    // Frame 1: emit particles 2 and 5
+    writeParticleToModifierBuffers(buffers, 2, SAMPLE_EMIT_DATA);
+    writeParticleToModifierBuffers(buffers, 5, SAMPLE_EMIT_DATA);
+    flushEmitQueue(buffers);
+
+    // After flush, CPU array still has initFlag=1 for particles 2 and 5
+    expect(arr[curveLen + 2 * INIT_STRIDE + 3]).toBe(1.0);
+    expect(arr[curveLen + 5 * INIT_STRIDE + 3]).toBe(1.0);
+
+    // Frame 2: emit particle 7
+    writeParticleToModifierBuffers(buffers, 7, SAMPLE_EMIT_DATA);
+    flushEmitQueue(buffers);
+
+    // The previous frame's initFlags (particles 2 and 5) should now be cleared
+    expect(arr[curveLen + 2 * INIT_STRIDE + 3]).toBe(0);
+    expect(arr[curveLen + 5 * INIT_STRIDE + 3]).toBe(0);
+    // Particle 7 was just emitted — its initFlag is still 1
+    expect(arr[curveLen + 7 * INIT_STRIDE + 3]).toBe(1.0);
+  });
+
+  it('clears initFlags even when no new particles are emitted next frame', () => {
+    const { buffers, curveLen } = createBuffersWithInitData(10);
+    const arr = buffers.curveData.array as Float32Array;
+
+    // Frame 1: emit particle 3
+    writeParticleToModifierBuffers(buffers, 3, SAMPLE_EMIT_DATA);
+    flushEmitQueue(buffers);
+
+    expect(arr[curveLen + 3 * INIT_STRIDE + 3]).toBe(1.0);
+
+    // Frame 2: no new emissions, just flush
+    flushEmitQueue(buffers);
+
+    // Previous frame's initFlag for particle 3 should be cleared
+    expect(arr[curveLen + 3 * INIT_STRIDE + 3]).toBe(0);
+  });
 });
 
 // ─── deactivateParticleInModifierBuffers ────────────────────────────────────
 
 describe('deactivateParticleInModifierBuffers', () => {
   it('is a no-op — does not bump version on any buffer', () => {
-    const { buffers } = createBuffersWithEmitQueue(5);
+    const { buffers } = createBuffersWithInitData(5);
 
     const vOia = getVersion(buffers.orbitalIsActive);
     const vCol = getVersion(buffers.color);
@@ -346,17 +402,32 @@ describe('deactivateParticleInModifierBuffers', () => {
   });
 });
 
-// ─── Emit queue overflow guard ──────────────────────────────────────────────
+// ─── Large burst support ──────────────────────────────────────────────────
 
-describe('emit queue overflow', () => {
-  it('silently drops emits beyond MAX_EMITS_PER_FRAME', () => {
-    const { buffers } = createBuffersWithEmitQueue(MAX_EMITS_PER_FRAME + 10);
+describe('large burst support', () => {
+  it('handles a 75K particle burst without overflow', () => {
+    const maxParticles = 75000;
+    const { buffers, curveLen } = createBuffersWithInitData(maxParticles);
 
-    for (let i = 0; i < MAX_EMITS_PER_FRAME + 5; i++) {
-      writeParticleToModifierBuffers(buffers, i, SAMPLE_EMIT_DATA);
+    // Emit all 75K particles
+    for (let i = 0; i < maxParticles; i++) {
+      writeParticleToModifierBuffers(buffers, i, {
+        ...SAMPLE_EMIT_DATA,
+        position: { x: i, y: i + 1, z: i + 2 },
+      });
     }
 
     const count = flushEmitQueue(buffers);
-    expect(count).toBe(MAX_EMITS_PER_FRAME);
+    expect(count).toBe(maxParticles);
+
+    // Verify first and last particles have correct init data
+    const arr = buffers.curveData.array as Float32Array;
+    const base0 = curveLen + 0 * INIT_STRIDE;
+    expect(arr[base0]).toBe(0); // position.x for particle 0
+    expect(arr[base0 + 3]).toBe(1.0); // initFlag
+
+    const baseLast = curveLen + (maxParticles - 1) * INIT_STRIDE;
+    expect(arr[baseLast]).toBe(maxParticles - 1); // position.x for last particle
+    expect(arr[baseLast + 3]).toBe(1.0); // initFlag
   });
 });
