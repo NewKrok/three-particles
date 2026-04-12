@@ -368,6 +368,22 @@ describe('createParticleSystem', () => {
     ps.dispose();
   });
 
+  it('should handle plain-object tiles from JSON config (not Vector2)', () => {
+    // Simulates what happens when config comes from JSON (e.g. examples-data.js)
+    // where tiles is { x: 5, y: 2 } instead of new THREE.Vector2(5, 2).
+    // deepMerge strips the Vector2 prototype, so the code must reconstruct it.
+    const ps = createParticleSystem({
+      textureSheetAnimation: {
+        tiles: { x: 5, y: 2 } as unknown as THREE.Vector2,
+        timeMode: TimeMode.FPS,
+        fps: 0,
+        startFrame: { min: 0, max: 10 },
+      },
+    });
+    expect(ps.instance).toBeDefined();
+    ps.dispose();
+  });
+
   it('should set up texture sheet animation with random startFrame', () => {
     const ps = createParticleSystem({
       textureSheetAnimation: {

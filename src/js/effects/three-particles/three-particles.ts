@@ -929,7 +929,12 @@ export const createParticleSystem = (
   const sharedUniforms: Record<string, { value: unknown }> = {
     elapsed: { value: 0.0 },
     map: { value: particleMap },
-    tiles: { value: textureSheetAnimation.tiles },
+    tiles: {
+      value: new THREE.Vector2(
+        textureSheetAnimation.tiles?.x ?? 1,
+        textureSheetAnimation.tiles?.y ?? 1
+      ),
+    },
     fps: { value: textureSheetAnimation.fps },
     useFPSForFrameIndex: {
       value: textureSheetAnimation.timeMode === TimeMode.FPS,
