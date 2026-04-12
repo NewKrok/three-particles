@@ -72,7 +72,11 @@ export function createTSLParticleMaterial(
       );
     case RendererType.POINTS:
     default:
-      return createPointSpriteTSLMaterial(sharedUniforms, rendererConfig);
+      return createPointSpriteTSLMaterial(
+        sharedUniforms,
+        rendererConfig,
+        gpuCompute
+      );
   }
 }
 

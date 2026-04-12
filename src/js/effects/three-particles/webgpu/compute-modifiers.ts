@@ -53,7 +53,7 @@ import type { BakedCurveMap } from './curve-bake.js';
 /**
  * Number of floats per particle in the init-data region of the curveData buffer.
  *
- * Layout (20 floats = 5 vec4s):
+ * Layout (28 floats = 7 vec4s):
  *   0:   position.x
  *   1:   position.y
  *   2:   position.z
@@ -74,13 +74,26 @@ import type { BakedCurveMap } from './curve-bake.js';
  *   17:  orbitalOffset.y
  *   18:  orbitalOffset.z
  *   19:  isActive (= 1.0)
+ *   20:  startValues.x (startLifetime)
+ *   21:  startValues.y (startSize)
+ *   22:  startValues.z (startOpacity)
+ *   23:  startValues.w (startColorR)
+ *   24:  startColorsExt.x (startColorG)
+ *   25:  startColorsExt.y (startColorB)
+ *   26:  startColorsExt.z (rotationSpeed)
+ *   27:  startColorsExt.w (noiseOffset)
  *
  * Each particle has its own fixed slot at `curveLen + particleIndex * INIT_STRIDE`.
  * The compute shader reads `initFlag` (offset 3) for particle `i`; if 1.0 it
  * copies the init data into the main buffers.  This is O(1) per particle —
  * no queue scanning needed.
+ *
+ * startValues and startColorsExt are included in the init block (rather than
+ * using full-buffer CPU uploads) to prevent overwriting active particle data
+ * when a particle slot is recycled on the CPU before the GPU has processed
+ * its death check.
  */
-export const INIT_STRIDE = 20;
+export const INIT_STRIDE = 28;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -233,11 +246,8 @@ export function createModifierStorageBuffers(
 const _emitCounts = new WeakMap<StorageBufferAttribute, number>();
 /** Per-pipeline stored curveDataLength for init data offset. */
 const _curveDataLengths = new WeakMap<StorageBufferAttribute, number>();
-/** Particle indices emitted this frame (will be cleared next frame). */
+/** Particle indices emitted this frame. */
 const _currentEmitIndices = new WeakMap<StorageBufferAttribute, number[]>();
-/** Particle indices from the previous frame whose initFlags must be
- *  cleared in the CPU array before the next upload. */
-const _pendingClearIndices = new WeakMap<StorageBufferAttribute, number[]>();
 
 /**
  * Writes init data for a newly emitted particle into its per-particle slot
@@ -303,6 +313,16 @@ export function writeParticleToModifierBuffers(
   arr[base + 17] = data.orbitalOffset.y;
   arr[base + 18] = data.orbitalOffset.z;
   arr[base + 19] = 1.0;
+  // vec4: startValues (startLifetime, startSize, startOpacity, startColorR)
+  arr[base + 20] = data.startLifetime;
+  arr[base + 21] = data.startSize;
+  arr[base + 22] = data.startOpacity;
+  arr[base + 23] = data.startColorR;
+  // vec4: startColorsExt (startColorG, startColorB, rotationSpeed, noiseOffset)
+  arr[base + 24] = data.startColorG;
+  arr[base + 25] = data.startColorB;
+  arr[base + 26] = data.rotationSpeed;
+  arr[base + 27] = data.noiseOffset;
 
   _emitCounts.set(
     buffers.curveData,
@@ -318,7 +338,9 @@ export function writeParticleToModifierBuffers(
   }
   indices.push(index);
 
-  // ── Write to CPU-only buffers (safe — GPU only reads these) ──
+  // ── Write to CPU-side arrays (kept in sync for diagnostics / fallback) ──
+  // These arrays are NOT uploaded to the GPU (no needsUpdate); the compute
+  // shader's init block scatters the values from the curveData init slot.
   const i4 = index * 4;
 
   const svArr = buffers.startValues.array as Float32Array;
@@ -357,31 +379,54 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
   const curveLen = _curveDataLengths.get(buffers.curveData) ?? 0;
   const arr = buffers.curveData.array as Float32Array;
 
-  // Clear initFlags for particles emitted in the previous frame.
-  // The GPU already cleared these on its copy during the last dispatch,
-  // but the CPU array still has initFlag=1 — a subsequent needsUpdate
-  // upload would re-trigger initialization, causing flicker.
-  const toClear = _pendingClearIndices.get(buffers.curveData);
-  if (toClear && toClear.length > 0) {
-    for (let j = 0; j < toClear.length; j++) {
-      arr[curveLen + toClear[j] * INIT_STRIDE + 3] = 0;
-    }
-    toClear.length = 0;
-  }
-
-  if (count > 0) {
-    buffers.curveData.needsUpdate = true;
-    buffers.startValues.needsUpdate = true;
-    buffers.startColorsExt.needsUpdate = true;
-  }
-
-  // Rotate: current frame's emitted indices become next frame's pending clears.
+  // Before ANY upload, clear ALL initFlags in the CPU array except
+  // those belonging to particles emitted THIS frame (which need to
+  // be uploaded with initFlag=1 so the GPU compute shader initialises
+  // them).
+  //
+  // Why clear everything rather than tracking individual indices?
+  // The previous approach (delayed "pending clear" list) suffered from
+  // a race condition: when a particle died and was re-emitted within a
+  // single frame, the delayed clear from the first emission would
+  // overwrite the fresh initFlag=1 from the re-emission in the NEXT
+  // frame's upload — causing the GPU to never initialise the particle,
+  // which then rendered with stale data (wrong color/position).
+  //
+  // By clearing all non-current initFlags before every upload we
+  // guarantee no stale flags survive across frames, regardless of how
+  // quickly particles are recycled.
   const current = _currentEmitIndices.get(buffers.curveData);
-  if (current && current.length > 0) {
-    _pendingClearIndices.set(buffers.curveData, current.slice());
-    current.length = 0;
+  const currentSet = current && current.length > 0 ? new Set(current) : null;
+
+  // Derive actual particle count from the position buffer (vec4 per particle).
+  // Do NOT use (arr.length - curveLen) / INIT_STRIDE — when force fields are
+  // enabled the curveData buffer has extra data appended after the init slots,
+  // which would inflate the count and cause the scan to overwrite force field data.
+  let clearedAny = false;
+  const maxParticles = buffers.position.array.length / 4;
+  for (let p = 0; p < maxParticles; p++) {
+    const flagOffset = curveLen + p * INIT_STRIDE + 3;
+    if (arr[flagOffset] > 0.5) {
+      // Keep initFlag=1 only for particles emitted this frame
+      if (!currentSet || !currentSet.has(p)) {
+        arr[flagOffset] = 0;
+        clearedAny = true;
+      }
+    }
   }
 
+  if (count > 0 || clearedAny) {
+    buffers.curveData.needsUpdate = true;
+  }
+  // NOTE: startValues and startColorsExt are NO LONGER uploaded via
+  // needsUpdate here.  Their init data is now carried inside each
+  // particle's curveData init slot and scattered to the GPU storage
+  // buffers by the compute shader's init block.  This prevents a
+  // full-buffer upload from overwriting startValues of particles that
+  // are still alive on the GPU but have already been recycled on the
+  // CPU (due to CPU/GPU death-timing desync).
+
+  if (current) current.length = 0;
   _emitCounts.set(buffers.curveData, 0);
   return count;
 }
@@ -517,6 +562,7 @@ export function createModifierComputeUpdate(
     //   base = curveLen + i * INIT_STRIDE
     // If initFlag (offset 3) is 1.0, copy init data into main buffers.
     const initBase = i.mul(INIT_STRIDE).add(curveLen);
+
     const initFlag = sCurveData.element(initBase.add(3));
     If(initFlag.greaterThan(0.5), () => {
       // Position (vec4: xyz + padding)
@@ -574,8 +620,28 @@ export function createModifierComputeUpdate(
             sCurveData.element(initBase.add(19))
           )
         );
-      // startValues and startColorsExt are CPU-only buffers uploaded via
-      // needsUpdate in flushEmitQueue — no GPU scatter needed for them.
+      // startValues (vec4: startLifetime, startSize, startOpacity, startColorR)
+      sStartValues
+        .element(i)
+        .assign(
+          vec4(
+            sCurveData.element(initBase.add(20)),
+            sCurveData.element(initBase.add(21)),
+            sCurveData.element(initBase.add(22)),
+            sCurveData.element(initBase.add(23))
+          )
+        );
+      // startColorsExt (vec4: startColorG, startColorB, rotationSpeed, noiseOffset)
+      sStartColorsExt
+        .element(i)
+        .assign(
+          vec4(
+            sCurveData.element(initBase.add(24)),
+            sCurveData.element(initBase.add(25)),
+            sCurveData.element(initBase.add(26)),
+            sCurveData.element(initBase.add(27))
+          )
+        );
 
       // Clear the init flag so this particle isn't re-initialized next frame.
       // The CPU array was already uploaded this frame; mutating the GPU copy

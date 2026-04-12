@@ -53,23 +53,30 @@ export function createPointSpriteTSLMaterial(
     blending: THREE.Blending;
     depthTest: boolean;
     depthWrite: boolean;
-  }
+  },
+  gpuCompute = false
 ): PointsNodeMaterial {
   const u = createParticleUniforms(sharedUniforms);
 
   // Read per-particle attributes
-  const aSize = attribute('size');
   const aColor = attribute('color');
-  const aLifetime = attribute('lifetime');
-  const aStartLifetime = attribute('startLifetime');
-  const aRotation = attribute('rotation');
-  const aStartFrame = attribute('startFrame');
+
+  // GPU compute uses packed vec4 buffers; CPU uses individual attributes
+  const aParticleState = gpuCompute ? attribute('particleState') : null;
+  const aStartValues = gpuCompute ? attribute('startValues') : null;
+  // CPU fallback: individual attributes
+  const aSize = gpuCompute ? null : attribute('size');
+  const aLifetime = gpuCompute ? null : attribute('lifetime');
+  const aStartLifetime = gpuCompute ? null : attribute('startLifetime');
+  const aRotation = gpuCompute ? null : attribute('rotation');
+  const aStartFrame = gpuCompute ? null : attribute('startFrame');
 
   // ── Vertex stage ────────────────────────────────────────────────────────
 
   // Compute model-view position and distance-based point size
   const mvPos = modelViewMatrix.mul(vec4(positionLocal, 1.0));
-  const sizeNode = aSize.mul(100.0).div(length(mvPos.xyz));
+  const sizeVal = gpuCompute ? aParticleState!.y : aSize!;
+  const sizeNode = sizeVal.mul(100.0).div(length(mvPos.xyz));
 
   // Pass varyings to fragment
   const vColor = varyingProperty('vec4', 'vColor');
@@ -82,10 +89,18 @@ export function createPointSpriteTSLMaterial(
   // Assign varyings in vertex
   const vertexSetup = Fn(() => {
     vColor.assign(aColor.toVar());
-    vLifetime.assign(aLifetime);
-    vStartLifetime.assign(aStartLifetime);
-    vRotation.assign(aRotation);
-    vStartFrame.assign(aStartFrame);
+    if (gpuCompute) {
+      // particleState: x=lifetime, y=size, z=rotation, w=startFrame
+      vLifetime.assign(aParticleState!.x);
+      vStartLifetime.assign(aStartValues!.x);
+      vRotation.assign(aParticleState!.z);
+      vStartFrame.assign(aParticleState!.w);
+    } else {
+      vLifetime.assign(aLifetime!);
+      vStartLifetime.assign(aStartLifetime!);
+      vRotation.assign(aRotation!);
+      vStartFrame.assign(aStartFrame!);
+    }
     vViewZ.assign(mvPos.z.negate());
     return positionLocal;
   })();
