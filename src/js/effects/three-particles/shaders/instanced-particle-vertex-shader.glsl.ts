@@ -1,9 +1,6 @@
 const InstancedParticleVertexShader = `
   attribute float instanceSize;
-  attribute float instanceColorR;
-  attribute float instanceColorG;
-  attribute float instanceColorB;
-  attribute float instanceColorA;
+  attribute vec4 instanceColor;
   attribute float instanceLifetime;
   attribute float instanceStartLifetime;
   attribute float instanceRotation;
@@ -25,7 +22,7 @@ const InstancedParticleVertexShader = `
 
   void main()
   {
-    vColor = vec4(instanceColorR, instanceColorG, instanceColorB, instanceColorA);
+    vColor = instanceColor;
     vLifetime = instanceLifetime;
     vStartLifetime = instanceStartLifetime;
     vStartFrame = instanceStartFrame;
