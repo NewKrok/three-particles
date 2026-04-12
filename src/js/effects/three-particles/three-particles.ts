@@ -1562,6 +1562,9 @@ export const createParticleSystem = (
         {
           ...subConfig.config,
           looping: false,
+          // Sub-emitters must always use CPU simulation because their compute
+          // nodes cannot be dispatched independently by the parent system.
+          simulationBackend: SimulationBackend.CPU,
           transform: {
             ...subConfig.config.transform,
             position: new THREE.Vector3(position.x, position.y, position.z),
