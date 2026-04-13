@@ -1,5 +1,7 @@
 # WebGPU Compute Support - Implementation Plan
 
+> **Status: COMPLETED** — All 6 phases have been implemented and shipped. This document is preserved as a historical reference for design decisions and architecture rationale. For the current architecture, see [Architecture](architecture.md).
+
 ## Overview
 
 Migrate three-particles from CPU-only simulation with GLSL shaders to a dual-path architecture supporting both WebGL (CPU sim + GLSL) and WebGPU (GPU compute sim + TSL rendering). Non-breaking, additive feature with automatic fallback.
@@ -101,7 +103,7 @@ src/js/effects/three-particles/
 
 - Unit tests for `detectSimulationBackend()` with mock renderers
 - Config parsing tests for `simulationBackend` field
-- Ensure all existing 638 tests still pass unchanged
+- Ensure all existing tests still pass unchanged
 
 ### 0.6 Deliverable
 
@@ -574,3 +576,28 @@ Foundation   TSL         Core        Modifiers    Forces      Bench &     Docs
 - **Phase 5-6:** Can ship as patch (docs, examples, benchmarks)
 
 Suggested version: `2.16.0` for Phase 1, `2.17.0` for Phase 2-4, `2.18.0` for Phase 5-6.
+
+---
+
+## Implementation Status
+
+All phases completed as of the `claude/webgpu-compute-support` branch:
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 0 | Foundation & Infrastructure | Completed |
+| Phase 1 | TSL Shader Migration | Completed |
+| Phase 2 | GPU Compute - Core Physics | Completed |
+| Phase 3 | GPU Compute - Modifiers | Completed |
+| Phase 4 | GPU Compute - Force Fields | Completed |
+| Phase 5 | Benchmark & Examples | Completed |
+| Phase 6 | Documentation & Polish | Completed |
+
+### Key Deviations from Plan
+
+- **Storage buffer layout:** Uses 8 packed vec4 buffers instead of the single 24-float stride buffer proposed in Phase 2.2. This avoids WebGPU's per-stage binding limits.
+- **Curve baking:** Uses Float32Array stored in the `curveData` buffer instead of 1D textures. Simpler and equally performant.
+- **Force fields:** Supports up to 16 (not 8) force fields per system. Packed into `curveData` tail.
+- **Max particles demonstrated:** 350K in the GPU Supernova demo (exceeded the 100K target).
+- **Noise:** Full 3D simplex noise implemented directly in TSL (`tsl-noise.ts`), not WGSL.
+- **SimulationBackend enum:** Uses `AUTO`/`CPU`/`GPU` (not `auto`/`cpu`/`gpu` strings from the original plan).

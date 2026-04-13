@@ -68,6 +68,7 @@ function animate() {
 | `dispose()` | `() => void` | Destroy system, free resources |
 | `update(cycleData)` | `(CycleData) => void` | Update this system individually |
 | `updateConfig(config)` | `(Partial<ParticleSystemConfig>) => void` | Update configuration at runtime without recreating the system. System-level properties (gravity, force fields, noise, emission, color/size/opacity over lifetime) take effect immediately. Per-particle spawn properties (startColor, startSize, etc.) affect only newly emitted particles. |
+| `computeNode` | `unknown \| null` | GPU compute node for WebGPU dispatch. Non-null when GPU compute is active. Must be dispatched via `renderer.compute(system.computeNode)` every frame before `renderer.render()`. Null when CPU simulation is used. |
 
 ---
 
@@ -96,6 +97,7 @@ type CycleData = {
 | `maxParticles` | `number` | 100 | Maximum concurrent particles |
 | `gravity` | `number` | 0.0 | Downward acceleration |
 | `simulationSpace` | `SimulationSpace` | LOCAL | LOCAL or WORLD coordinate space |
+| `simulationBackend` | `SimulationBackend` | AUTO | Simulation backend: AUTO (GPU if WebGPU available, else CPU), CPU, or GPU |
 
 ### Start Properties
 
@@ -523,6 +525,9 @@ const system = createParticleSystem({
 ### RendererType
 `POINTS` (default — classic point sprites) | `INSTANCED` (GPU instanced quads, no gl_PointSize limit) | `TRAIL` (ribbon trails behind particles) | `MESH` (3D mesh particles via GPU instancing)
 
+### SimulationBackend
+`AUTO` (default — GPU compute if WebGPU renderer detected, else CPU) | `CPU` (always JavaScript update loop) | `GPU` (request GPU compute, falls back to CPU if unavailable)
+
 ---
 
 ## Callbacks
@@ -782,6 +787,180 @@ function FireEffect({ config }: { config?: Record<string, unknown> }) {
 - **`<group ref>`** — Attach `system.instance` to a group so R3F manages the scene graph
 - **Config changes** — Pass `config` as a dependency to `useEffect` to recreate on changes
 - **No wrapper package needed** — The imperative API integrates naturally with React hooks
+
+---
+
+## WebGPU Compute Support
+
+Optional GPU-accelerated particle simulation via Three.js WebGPU renderer and TSL (Three Shading Language). Offloads all per-particle physics and modifiers to GPU compute shaders, enabling **50K-350K+ particles** at interactive frame rates.
+
+**Requirements:** Three.js r182+ with WebGPU build (`three/webgpu`), browser with WebGPU support (Chrome 113+, Edge 113+, Firefox Nightly). No breaking changes — all existing WebGL code works unchanged.
+
+### Setup
+
+```typescript
+// 1. Import from the WebGPU sub-module
+import { registerTSLMaterialFactory, SimulationBackend } from "@newkrok/three-particles";
+import {
+  createTSLParticleMaterial,
+  createTSLTrailMaterial,
+  createComputePipeline,
+  writeParticleToModifierBuffers,
+  deactivateParticleInModifierBuffers,
+  flushEmitQueue,
+  registerCurveDataLength,
+  encodeForceFieldsForGPU,
+} from "@newkrok/three-particles/webgpu";
+
+// 2. Register the TSL material factory (once, before creating any particle systems)
+registerTSLMaterialFactory({
+  createTSLParticleMaterial,
+  createTSLTrailMaterial,
+  createComputePipeline,
+  writeParticleToModifierBuffers,
+  deactivateParticleInModifierBuffers,
+  flushEmitQueue,
+  registerCurveDataLength,
+  encodeForceFieldsForGPU,
+});
+
+// 3. Create a WebGPU renderer
+import * as THREE from "three/webgpu";
+const renderer = new THREE.WebGPURenderer({ antialias: true });
+await renderer.init();
+
+// 4. Create a GPU-accelerated particle system
+const system = createParticleSystem({
+  simulationBackend: SimulationBackend.AUTO, // GPU if WebGPU available, else CPU
+  maxParticles: 100000,
+  // ... rest of config (same API as CPU)
+});
+
+scene.add(system.instance);
+
+// 5. In your render loop — dispatch compute BEFORE rendering
+function animate() {
+  system.update({ now: performance.now(), delta, elapsed });
+
+  if (system.computeNode) {
+    renderer.compute(system.computeNode);
+  }
+  renderer.render(scene, camera);
+}
+```
+
+### SimulationBackend
+
+```typescript
+enum SimulationBackend {
+  AUTO = 'AUTO',  // GPU compute if WebGPU renderer detected, else CPU (default)
+  CPU = 'CPU',    // Always JavaScript update loop (works with any renderer)
+  GPU = 'GPU',    // Request GPU compute; falls back to CPU if renderer lacks compute support
+}
+```
+
+| Value | WebGPU Renderer | WebGL Renderer |
+|-------|----------------|----------------|
+| `AUTO` | GPU compute | CPU (JavaScript) |
+| `CPU` | CPU (JavaScript) | CPU (JavaScript) |
+| `GPU` | GPU compute | CPU (fallback) |
+
+### What Runs on GPU
+
+- **Core physics:** gravity, velocity integration, position update, lifetime tracking, death detection
+- **All 7 modifiers:** size over lifetime, opacity over lifetime, color over lifetime (per-channel RGB curves), rotation over lifetime, linear velocity over lifetime (per-axis X/Y/Z curves), orbital velocity, noise (3D simplex FBM)
+- **Force fields:** point attractors/repulsors and directional forces with all falloff modes (NONE, LINEAR, QUADRATIC), up to 16 per system
+- **Curves:** baked into 256-sample Float32Array lookup tables at system creation for fast GPU evaluation (<0.4% interpolation error)
+
+### What Stays on CPU
+
+- **Emission:** particle activation, burst scheduling, rate-over-time, rate-over-distance
+- **Sub-emitters:** birth/death trigger spawning (sub-emitters are always forced to `SimulationBackend.CPU`)
+- **Configuration changes:** `updateConfig()` applies on the next frame
+- **Trail renderer:** `RendererType.TRAIL` always uses CPU simulation (POINTS, INSTANCED, and MESH work with GPU compute)
+
+### ParticleSystem.computeNode
+
+When GPU compute is active, the returned `ParticleSystem` object exposes a `computeNode` property. This must be dispatched every frame **before** `renderer.render()`:
+
+```typescript
+const system = createParticleSystem({ simulationBackend: SimulationBackend.GPU, ... });
+
+// In render loop:
+if (system.computeNode) {
+  renderer.compute(system.computeNode); // Dispatch GPU compute
+}
+renderer.render(scene, camera);
+```
+
+When CPU simulation is active (no WebGPU, or `simulationBackend: 'CPU'`), `computeNode` is `null`.
+
+### Fallback Behavior
+
+WebGPU is fully opt-in and non-breaking:
+- If no TSL factory is registered via `registerTSLMaterialFactory()`, the library uses GLSL shaders (existing WebGL path)
+- If `simulationBackend: 'GPU'` but the renderer lacks compute support, it silently falls back to CPU
+- The same `ParticleSystemConfig` works identically on both backends — no config changes needed
+- Renderer detection is duck-typed (checks for `.compute()` and `.hasFeature()` methods), not class-based
+
+### WebGPU with React Three Fiber
+
+```tsx
+import { useRef, useEffect } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { createParticleSystem, registerTSLMaterialFactory, SimulationBackend } from "@newkrok/three-particles";
+import {
+  createTSLParticleMaterial,
+  createTSLTrailMaterial,
+  createComputePipeline,
+  writeParticleToModifierBuffers,
+  deactivateParticleInModifierBuffers,
+  flushEmitQueue,
+  registerCurveDataLength,
+  encodeForceFieldsForGPU,
+} from "@newkrok/three-particles/webgpu";
+
+// Register once at module level
+registerTSLMaterialFactory({
+  createTSLParticleMaterial,
+  createTSLTrailMaterial,
+  createComputePipeline,
+  writeParticleToModifierBuffers,
+  deactivateParticleInModifierBuffers,
+  flushEmitQueue,
+  registerCurveDataLength,
+  encodeForceFieldsForGPU,
+});
+
+function GPUParticleEffect({ config }) {
+  const groupRef = useRef(null);
+  const systemRef = useRef(null);
+  const { gl: renderer } = useThree();
+
+  useEffect(() => {
+    const system = createParticleSystem({
+      simulationBackend: SimulationBackend.AUTO,
+      ...config,
+    });
+    systemRef.current = system;
+    groupRef.current?.add(system.instance);
+    return () => system.dispose();
+  }, [config]);
+
+  useFrame((_, delta) => {
+    const system = systemRef.current;
+    if (!system) return;
+    system.update({ now: performance.now(), delta, elapsed: 0 });
+    if (system.computeNode) {
+      renderer.compute(system.computeNode);
+    }
+  });
+
+  return <group ref={groupRef} />;
+}
+```
+
+**Important:** R3F must be configured to use `WebGPURenderer` (via the `gl` prop on `<Canvas>`) for GPU compute to activate.
 
 ---
 

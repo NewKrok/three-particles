@@ -67,6 +67,7 @@ function animate() {
 | startColor | MinMaxColor | white | Color range |
 | gravity | number | 0.0 | Gravity strength |
 | simulationSpace | LOCAL / WORLD | LOCAL | Coordinate space |
+| simulationBackend | AUTO / CPU / GPU | AUTO | Simulation backend (AUTO: GPU if WebGPU, else CPU) |
 | emission | Emission | rateOverTime: 10 | Emission config |
 | shape | ShapeConfig | — | Emitter shape |
 | map | THREE.Texture | undefined | Particle texture |
@@ -200,45 +201,94 @@ forceFields: [
 
 ## WebGPU Compute Support
 
-Optional GPU-accelerated particle simulation via Three.js WebGPU renderer and TSL (Three Shading Language). Enables 50K-100K+ particles with full physics on the GPU.
+Optional GPU-accelerated particle simulation via Three.js WebGPU renderer and TSL (Three Shading Language). Enables **50K-350K+ particles** with full physics on the GPU.
+
+**Requirements:** Three.js r182+ with WebGPU build (`three/webgpu`), browser with WebGPU support (Chrome 113+, Edge 113+). No breaking changes — all existing WebGL code works unchanged.
 
 ### Setup
 
 ```typescript
 import { createParticleSystem, registerTSLMaterialFactory, SimulationBackend } from "@newkrok/three-particles";
-import { createTSLParticleMaterial, createTSLTrailMaterial } from "@newkrok/three-particles/webgpu";
+import {
+  createTSLParticleMaterial,
+  createTSLTrailMaterial,
+  createComputePipeline,
+  writeParticleToModifierBuffers,
+  deactivateParticleInModifierBuffers,
+  flushEmitQueue,
+  registerCurveDataLength,
+  encodeForceFieldsForGPU,
+} from "@newkrok/three-particles/webgpu";
 
-// Register TSL materials (once, before creating systems)
-registerTSLMaterialFactory({ createTSLParticleMaterial, createTSLTrailMaterial });
+// Register TSL materials + GPU compute functions (once, before creating systems)
+registerTSLMaterialFactory({
+  createTSLParticleMaterial,
+  createTSLTrailMaterial,
+  createComputePipeline,
+  writeParticleToModifierBuffers,
+  deactivateParticleInModifierBuffers,
+  flushEmitQueue,
+  registerCurveDataLength,
+  encodeForceFieldsForGPU,
+});
+
+// Create WebGPU renderer
+import * as THREE from "three/webgpu";
+const renderer = new THREE.WebGPURenderer({ antialias: true });
+await renderer.init();
 
 // Create system with GPU backend
 const system = createParticleSystem({
-  simulationBackend: SimulationBackend.GPU, // or AUTO (default)
-  maxParticles: 50000,
-  // ... rest of config
+  simulationBackend: SimulationBackend.AUTO, // GPU if WebGPU available, else CPU
+  maxParticles: 100000,
+  // ... rest of config (same API as CPU)
 });
+
+// In render loop — dispatch compute BEFORE rendering
+system.update({ now: performance.now(), delta, elapsed });
+if (system.computeNode) {
+  renderer.compute(system.computeNode);
+}
+renderer.render(scene, camera);
 ```
 
 ### SimulationBackend
 
-| Value | Behavior |
-|-------|----------|
-| `AUTO` (default) | GPU if WebGPURenderer detected, else CPU |
-| `CPU` | Always JavaScript update loop |
-| `GPU` | Request GPU compute, falls back to CPU if unavailable |
+| Value | WebGPU Renderer | WebGL Renderer |
+|-------|----------------|----------------|
+| `AUTO` (default) | GPU compute | CPU (JavaScript) |
+| `CPU` | CPU (JavaScript) | CPU (JavaScript) |
+| `GPU` | GPU compute | CPU (fallback) |
 
 ### What runs on GPU
 
-- Core physics: gravity, velocity integration, position update, lifetime
-- All 7 modifiers: size/opacity/color over lifetime, rotation, linear/orbital velocity, noise
-- Force fields: point attractors/repulsors and directional forces with falloff
-- Curves: baked into 256-sample lookup textures for GPU evaluation
+- Core physics: gravity, velocity integration, position update, lifetime tracking
+- All 7 modifiers: size/opacity/color over lifetime, rotation, linear/orbital velocity, noise (3D simplex FBM)
+- Force fields: point/directional with falloff (up to 16 per system)
+- Curves: baked into 256-sample Float32Array lookup tables (<0.4% error)
 
 ### What stays on CPU
 
-- Emission (particle activation/deactivation)
-- Sub-emitter callbacks (onParticleBirth, onParticleDeath)
+- Emission (particle activation, burst scheduling, rate-over-distance)
+- Sub-emitter spawning (birth/death triggers; sub-emitters are forced to CPU backend)
 - Configuration changes (`updateConfig`)
+- Trail renderer (`RendererType.TRAIL` always uses CPU simulation)
+
+### Compute dispatch
+
+The returned `ParticleSystem` exposes `computeNode` (non-null when GPU compute is active). This must be dispatched every frame **before** `renderer.render()`:
+
+```typescript
+if (system.computeNode) {
+  renderer.compute(system.computeNode);
+}
+```
+
+### Fallback behavior
+
+- If no TSL factory registered: uses GLSL shaders (WebGL path)
+- If `GPU` requested but renderer lacks compute: silently falls back to CPU
+- Same `ParticleSystemConfig` works on both backends — no config changes needed
 
 ## Usage with React Three Fiber
 

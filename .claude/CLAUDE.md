@@ -116,17 +116,41 @@ See [Development Workflow](doc/workflow.md) for the full step-by-step guide.
 
 ---
 
+## WebGPU Compute — Development Guide
+
+The library supports a **dual-path architecture**: WebGL (CPU simulation + GLSL) and WebGPU (GPU compute simulation + TSL materials). See [Architecture](doc/architecture.md) for the full technical deep-dive.
+
+### Key Design Decisions
+
+- **Additive, non-breaking:** All WebGPU code is in `webgpu/` and the separate `src/webgpu.ts` entry point. The WebGL path is never modified.
+- **Opt-in registration:** Users call `registerTSLMaterialFactory()` to enable WebGPU. If not called, only GLSL shaders are used.
+- **Duck-typed detection:** `isComputeCapableRenderer()` checks for `.compute()` and `.hasFeature()` methods — no hard dependency on `THREE.WebGPURenderer`.
+- **Single compute dispatch:** All modifiers run in one GPU compute pass (compile-time branching via TSL, not runtime branching).
+- **Curve baking:** Lifetime curves are pre-baked to 256-sample Float32Arrays at system creation, stored in the `curveData` buffer.
+- **Sub-emitters forced to CPU:** Sub-emitters always use `SimulationBackend.CPU` because they need CPU-side death detection callbacks.
+- **Trail always CPU:** `RendererType.TRAIL` uses CPU simulation regardless of backend setting.
+
+### When Working on WebGPU Code
+
+- **TSL materials** (`webgpu/tsl-*.ts`): Each renderer type has its own TSL material. They detect GPU compute via the `gpuCompute` flag — when true, data comes from packed vec4 storage buffers; when false, from individual float attributes.
+- **Compute shaders** (`webgpu/compute-*.ts`): Written in TSL (compiles to WGSL). Core physics, all 7 modifiers, and force fields run in a single dispatch.
+- **Storage buffers:** 8 vec4 bindings per system. Layout documented in [Architecture](doc/architecture.md#storage-buffer-layout).
+- **Testing:** WebGPU-specific tests are in `src/__tests__/three-particles-webgpu-integration.test.ts`. Use mock factories (no real WebGPU context in Jest).
+- **Imports:** `three/tsl` and `three/webgpu` are external — never imported from the main entry point. They're only used inside `webgpu/` files.
+
+---
+
 ## Detailed Documentation
 
 Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into every conversation:
 
 | Document | When to read |
 |----------|-------------|
-| [Architecture](doc/architecture.md) | Understanding internal data flow, shader pipeline, module responsibilities |
+| [Architecture](doc/architecture.md) | Understanding internal data flow, shader pipeline, WebGPU dual-path architecture, storage buffer layout |
 | [CI/CD Pipeline](doc/ci-cd.md) | Release process, workflow troubleshooting, version bump logic |
 | [Development Workflow](doc/workflow.md) | Step-by-step workflow, agent orchestration pattern, pre-commit checks |
 | [Testing Guide](doc/testing.md) | Mocking patterns, test helpers, coverage targets, writing effective tests |
-| [WebGPU Compute Plan](doc/webgpu-compute-plan.md) | WebGPU implementation phases, TSL migration, compute shader architecture |
+| [WebGPU Compute Plan](doc/webgpu-compute-plan.md) | Original implementation plan (all 6 phases completed) — useful as historical reference for design decisions |
 
 ---
 

@@ -149,15 +149,40 @@ let _tslMaterialFactory: TSLMaterialFactory | null = null;
 /**
  * Registers the TSL (Three Shading Language) material factory for WebGPU support.
  *
- * Call this once before creating particle systems that use WebGPU rendering.
- * The factory is typically imported from the WebGPU sub-module:
+ * Call this **once** before creating any particle systems that use WebGPU rendering.
+ * The factory functions are imported from the `@newkrok/three-particles/webgpu` sub-module.
+ *
+ * When registered, all particle systems will use TSL-based `NodeMaterial` (compiles to WGSL)
+ * instead of GLSL `ShaderMaterial`. If the factory also includes the GPU compute functions
+ * (`createComputePipeline`, `writeParticleToModifierBuffers`, etc.), particle systems with
+ * `simulationBackend: 'AUTO'` or `'GPU'` will run physics and modifiers on the GPU.
+ *
+ * @param factory - Object containing TSL material creators and optional GPU compute helpers.
  *
  * @example
  * ```typescript
  * import { registerTSLMaterialFactory } from '@newkrok/three-particles';
- * import { createTSLParticleMaterial, createTSLTrailMaterial } from '@newkrok/three-particles/webgpu';
+ * import {
+ *   createTSLParticleMaterial,
+ *   createTSLTrailMaterial,
+ *   createComputePipeline,
+ *   writeParticleToModifierBuffers,
+ *   deactivateParticleInModifierBuffers,
+ *   flushEmitQueue,
+ *   registerCurveDataLength,
+ *   encodeForceFieldsForGPU,
+ * } from '@newkrok/three-particles/webgpu';
  *
- * registerTSLMaterialFactory({ createTSLParticleMaterial, createTSLTrailMaterial });
+ * registerTSLMaterialFactory({
+ *   createTSLParticleMaterial,
+ *   createTSLTrailMaterial,
+ *   createComputePipeline,
+ *   writeParticleToModifierBuffers,
+ *   deactivateParticleInModifierBuffers,
+ *   flushEmitQueue,
+ *   registerCurveDataLength,
+ *   encodeForceFieldsForGPU,
+ * });
  * ```
  */
 export const registerTSLMaterialFactory = (
