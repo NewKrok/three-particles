@@ -119,6 +119,22 @@ describe('createInstancedBillboardTSLMaterial', () => {
       );
       expect(matFalse.depthWrite).toBe(false);
     });
+
+    it('disables tone mapping to match GLSL ShaderMaterial output', () => {
+      const mat = createInstancedBillboardTSLMaterial(
+        makeSharedUniforms(),
+        makeRendererConfig()
+      );
+      expect(mat.toneMapped).toBe(false);
+    });
+
+    it('disables fog to match GLSL ShaderMaterial output', () => {
+      const mat = createInstancedBillboardTSLMaterial(
+        makeSharedUniforms(),
+        makeRendererConfig()
+      );
+      expect(mat.fog).toBe(false);
+    });
   });
 
   // ── Shader nodes ──────────────────────────────────────────────────────────

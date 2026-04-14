@@ -53,6 +53,7 @@ import {
   type SharedUniforms,
   createParticleUniforms,
   linearizeDepth,
+  compensateOutputSRGB,
 } from './tsl-shared.js';
 import type * as THREE from 'three';
 
@@ -316,7 +317,7 @@ export function createInstancedBillboardTSLMaterial(
     });
     Discard(outColor.w.lessThan(0.001));
 
-    return outColor;
+    return compensateOutputSRGB({ color: outColor });
   })();
 
   // ── Material assembly ──────────────────────────────────────────────────────
@@ -326,6 +327,8 @@ export function createInstancedBillboardTSLMaterial(
   material.blending = rendererConfig.blending;
   material.depthTest = rendererConfig.depthTest;
   material.depthWrite = rendererConfig.depthWrite;
+  material.toneMapped = false;
+  material.fog = false;
 
   // vertexNode replaces the default clip-space position.  For instanced
   // billboards we compute the full MVP ourselves (view-space billboard offset +

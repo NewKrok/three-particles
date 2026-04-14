@@ -102,6 +102,24 @@ describe('createMeshParticleTSLMaterial', () => {
       );
       expect(mat.depthWrite).toBe(false);
     });
+
+    it('disables tone mapping to match GLSL ShaderMaterial output', () => {
+      const mat = createMeshParticleTSLMaterial(
+        makeSharedUniforms(),
+        makeRendererConfig(),
+        false
+      );
+      expect(mat.toneMapped).toBe(false);
+    });
+
+    it('disables fog to match GLSL ShaderMaterial output', () => {
+      const mat = createMeshParticleTSLMaterial(
+        makeSharedUniforms(),
+        makeRendererConfig(),
+        false
+      );
+      expect(mat.fog).toBe(false);
+    });
   });
 
   describe('shader nodes', () => {

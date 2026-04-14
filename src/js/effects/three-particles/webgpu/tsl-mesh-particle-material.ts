@@ -50,6 +50,7 @@ import {
   type SharedUniforms,
   createParticleUniforms,
   linearizeDepth,
+  compensateOutputSRGB,
 } from './tsl-shared.js';
 
 import type * as THREE from 'three';
@@ -268,7 +269,7 @@ export function createMeshParticleTSLMaterial(
     });
     Discard(outColor.w.lessThan(0.001));
 
-    return outColor;
+    return compensateOutputSRGB({ color: outColor });
   })();
 
   // ── Material assembly ──────────────────────────────────────────────────────
@@ -278,6 +279,8 @@ export function createMeshParticleTSLMaterial(
   material.blending = rendererConfig.blending;
   material.depthTest = rendererConfig.depthTest;
   material.depthWrite = rendererConfig.depthWrite;
+  material.toneMapped = false;
+  material.fog = false;
 
   // vertexNode receives a clip-space vec4 (manual MVP to avoid double-transform)
   material.vertexNode = vertexSetup;

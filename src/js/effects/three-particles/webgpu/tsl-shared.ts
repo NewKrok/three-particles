@@ -6,7 +6,7 @@
  * - Soft particle depth fade
  * - Background color discard
  */
-import { DataTexture, Vector3 } from 'three';
+import { DataTexture, NoColorSpace, Vector3, type Texture } from 'three';
 import {
   Fn,
   vec2,
@@ -26,6 +26,7 @@ import {
   Discard,
   If,
   length,
+  sRGBTransferEOTF,
   type ShaderNodeObject,
   type Node,
 } from 'three/tsl';
@@ -64,8 +65,18 @@ export type SharedUniforms = {
 
 export function createParticleUniforms(sharedUniforms: SharedUniforms) {
   const dummy = getDummyTexture();
+
+  // Disable automatic sRGB→linear hardware conversion on particle textures.
+  // The GLSL ShaderMaterial path reads raw sRGB values via texture2D() and
+  // writes them directly without output color-space conversion.  To match
+  // that behaviour in the TSL/WebGPU path (which applies a full-screen
+  // linear→sRGB output pass), we must feed raw values into the shader so
+  // the renderer's output transform produces identical results.
+  const map = (sharedUniforms.map.value ?? dummy) as Texture;
+  if (map) map.colorSpace = NoColorSpace;
+
   return {
-    uMap: sharedUniforms.map.value ?? dummy,
+    uMap: map,
     uElapsed: uniform(float(sharedUniforms.elapsed.value)),
     uFps: uniform(float(sharedUniforms.fps.value)),
     uUseFPSForFrameIndex: uniform(
@@ -218,5 +229,25 @@ export const applyBackgroundDiscard = Fn(
         Discard();
       });
     });
+  }
+);
+
+// ─── Output color-space compensation ────────────────────────────────────────
+
+/**
+ * Applies sRGB→linear (EOTF) to the RGB channels of a vec4 color.
+ *
+ * The GLSL ShaderMaterial path writes raw sRGB texture values directly to
+ * the framebuffer — no output color-space conversion is applied because the
+ * custom fragment shader omits `#include <colorspace_fragment>`.
+ *
+ * The WebGPU renderer, however, always runs a full-screen output pass that
+ * performs a linear→sRGB conversion on the entire framebuffer.  To produce
+ * identical results we apply the *inverse* transform (sRGB→linear) on the
+ * fragment output so the two cancel out:  sRGB → linear → sRGB ≡ sRGB.
+ */
+export const compensateOutputSRGB = Fn(
+  ({ color }: Record<string, ShaderNodeObject<Node>>) => {
+    return vec4(sRGBTransferEOTF(color.rgb), color.a);
   }
 );

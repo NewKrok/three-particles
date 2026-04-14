@@ -649,6 +649,13 @@ export const createParticleSystem = (
       ? createDefaultMeshTexture()
       : createDefaultParticleTexture());
 
+  // Ensure ClampToEdgeWrapping for particle textures to prevent bleeding
+  // at sprite-sheet tile boundaries (especially visible with WebGPU).
+  if (particleMap) {
+    particleMap.wrapS = THREE.ClampToEdgeWrapping;
+    particleMap.wrapT = THREE.ClampToEdgeWrapping;
+  }
+
   const {
     transform,
     duration,

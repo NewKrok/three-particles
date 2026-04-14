@@ -813,3 +813,39 @@ describe('dispose', () => {
     // No error means it handled material disposal properly
   });
 });
+
+describe('particle texture wrapping', () => {
+  it('sets ClampToEdgeWrapping on particle texture to prevent sprite-sheet bleeding', () => {
+    const ps = createParticleSystem({ maxParticles: 10 }, 1000);
+    const points = ps.instance as THREE.Points;
+    const mat = points.material as THREE.ShaderMaterial;
+    const map = mat.uniforms.map?.value as THREE.Texture | null;
+
+    if (map) {
+      expect(map.wrapS).toBe(THREE.ClampToEdgeWrapping);
+      expect(map.wrapT).toBe(THREE.ClampToEdgeWrapping);
+    }
+
+    ps.dispose();
+  });
+
+  it('sets ClampToEdgeWrapping on user-provided texture', () => {
+    const userTexture = new THREE.Texture();
+    userTexture.wrapS = THREE.RepeatWrapping;
+    userTexture.wrapT = THREE.RepeatWrapping;
+
+    const ps = createParticleSystem(
+      { maxParticles: 10, map: userTexture },
+      1000
+    );
+    const points = ps.instance as THREE.Points;
+    const mat = points.material as THREE.ShaderMaterial;
+    const map = mat.uniforms.map?.value as THREE.Texture | null;
+
+    expect(map).toBe(userTexture);
+    expect(map!.wrapS).toBe(THREE.ClampToEdgeWrapping);
+    expect(map!.wrapT).toBe(THREE.ClampToEdgeWrapping);
+
+    ps.dispose();
+  });
+});

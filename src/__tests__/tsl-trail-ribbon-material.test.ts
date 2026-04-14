@@ -70,6 +70,22 @@ describe('createTrailRibbonTSLMaterial', () => {
     expect(mat.depthWrite).toBe(true);
   });
 
+  it('disables tone mapping to match GLSL ShaderMaterial output', () => {
+    const mat = createTrailRibbonTSLMaterial(
+      makeTrailUniforms(),
+      rendererConfig
+    );
+    expect(mat.toneMapped).toBe(false);
+  });
+
+  it('disables fog to match GLSL ShaderMaterial output', () => {
+    const mat = createTrailRibbonTSLMaterial(
+      makeTrailUniforms(),
+      rendererConfig
+    );
+    expect(mat.fog).toBe(false);
+  });
+
   it('sets positionNode and colorNode as valid TSL nodes', () => {
     const mat = createTrailRibbonTSLMaterial(
       makeTrailUniforms(),

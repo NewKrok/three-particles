@@ -38,6 +38,7 @@ import {
   type SharedUniforms,
   createParticleUniforms,
   linearizeDepth,
+  compensateOutputSRGB,
 } from './tsl-shared.js';
 import type * as THREE from 'three';
 
@@ -181,7 +182,7 @@ export function createPointSpriteTSLMaterial(
     });
     Discard(outColor.w.lessThan(0.001));
 
-    return outColor;
+    return compensateOutputSRGB({ color: outColor });
   })();
 
   // ── Material assembly ───────────────────────────────────────────────────
@@ -191,6 +192,8 @@ export function createPointSpriteTSLMaterial(
   material.blending = rendererConfig.blending;
   material.depthTest = rendererConfig.depthTest;
   material.depthWrite = rendererConfig.depthWrite;
+  material.toneMapped = false;
+  material.fog = false;
   material.sizeNode = sizeNode;
   material.positionNode = vertexSetup;
   material.colorNode = fragmentColor;

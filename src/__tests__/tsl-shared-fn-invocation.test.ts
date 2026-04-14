@@ -194,4 +194,11 @@ describe('createParticleUniforms', () => {
     const u = createParticleUniforms(makeUniforms({ map: { value: null } }));
     expect(u.uMap).toBe(getDummyTexture());
   });
+
+  it('sets texture colorSpace to NoColorSpace to bypass hardware sRGB conversion', () => {
+    const tex = new DataTexture(new Uint8Array([255, 0, 0, 255]), 1, 1);
+    tex.colorSpace = 'srgb';
+    const u = createParticleUniforms(makeUniforms({ map: { value: tex } }));
+    expect(u.uMap.colorSpace).toBe('');
+  });
 });

@@ -13,7 +13,7 @@
  * - NO texture sheet animation
  * - Trail uniforms are completely separate from the main particle uniforms
  */
-import { DoubleSide } from 'three';
+import { DoubleSide, NoColorSpace } from 'three';
 import {
   Fn,
   attribute,
@@ -42,7 +42,11 @@ import {
   type Node,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
-import { getDummyTexture, linearizeDepth } from './tsl-shared.js';
+import {
+  getDummyTexture,
+  linearizeDepth,
+  compensateOutputSRGB,
+} from './tsl-shared.js';
 import type * as THREE from 'three';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -76,8 +80,12 @@ export type TrailUniforms = {
 
 function createTrailUniforms(trailUniforms: TrailUniforms) {
   const dummy = getDummyTexture();
+  // Disable sRGB→linear hardware conversion to match GLSL ShaderMaterial output
+  const map = (trailUniforms.map.value ?? dummy) as THREE.Texture;
+  if (map) map.colorSpace = NoColorSpace;
+
   return {
-    uMap: trailUniforms.map.value ?? dummy,
+    uMap: map,
     uUseMap: uniform(float(trailUniforms.useMap.value ? 1 : 0)),
     uDiscardBg: uniform(
       float(trailUniforms.discardBackgroundColor.value ? 1 : 0)
@@ -291,7 +299,7 @@ export function createTrailRibbonTSLMaterial(
         .and(abs(length(diff)).lessThan(u.uBgTolerance))
     );
 
-    return outColor;
+    return compensateOutputSRGB({ color: outColor });
   })();
 
   // ── Material assembly ─────────────────────────────────────────────────────
@@ -301,6 +309,8 @@ export function createTrailRibbonTSLMaterial(
   material.blending = rendererConfig.blending;
   material.depthTest = rendererConfig.depthTest;
   material.depthWrite = rendererConfig.depthWrite;
+  material.toneMapped = false;
+  material.fog = false;
   material.side = DoubleSide;
 
   // positionNode replaces the default local-space position fed into MVP
