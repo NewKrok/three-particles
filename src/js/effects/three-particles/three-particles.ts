@@ -1923,6 +1923,11 @@ export const createParticleSystem = (
           positionArr[posIdx + 1],
           positionArr[posIdx + 2]
         );
+        // Convert local particle position to world space so the sub-emitter
+        // spawns at the correct scene position regardless of transform offset.
+        if (simulationSpace === SimulationSpace.LOCAL) {
+          particleSystem.localToWorld(_subEmitterPosition);
+        }
         spawnSubEmitters(
           deathSubEmitters,
           _subEmitterPosition,
@@ -1945,6 +1950,11 @@ export const createParticleSystem = (
           positionArr[posIdx + 1],
           positionArr[posIdx + 2]
         );
+        // Convert local particle position to world space so the sub-emitter
+        // spawns at the correct scene position regardless of transform offset.
+        if (simulationSpace === SimulationSpace.LOCAL) {
+          particleSystem.localToWorld(_subEmitterPosition);
+        }
         spawnSubEmitters(
           birthSubEmitters,
           _subEmitterPosition,
