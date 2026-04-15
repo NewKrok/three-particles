@@ -1,4 +1,5 @@
 export * from './three-particles-bezier.js';
+export * from './three-particles-collision.js';
 export * from './three-particles-constants.js';
 export * from './three-particles-curves.js';
 export * from './three-particles-enums.js';

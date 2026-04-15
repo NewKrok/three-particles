@@ -34,6 +34,7 @@
 | Soft Particles (depth-based fade near geometry) | ✅ |
 | Real-time config updates (`updateConfig`) | ✅ |
 | WebGPU compute support (TSL shaders, GPU physics, modifiers, force fields, noise) | ✅ |
+| Collision planes (kill / clamp / bounce modes, CPU + GPU compute) | ✅ |
 
 ---
 

@@ -11,4 +11,6 @@ export {
   registerCurveDataLength,
 } from './js/effects/three-particles/webgpu/compute-modifiers.js';
 
+export { encodeCollisionPlanesForGPU } from './js/effects/three-particles/webgpu/compute-collision-planes.js';
+
 export { encodeForceFieldsForGPU } from './js/effects/three-particles/webgpu/compute-force-fields.js';

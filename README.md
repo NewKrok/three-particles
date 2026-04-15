@@ -19,6 +19,7 @@ Particle system for ThreeJS.
 *   Highly customizable particle properties (position, velocity, size, color, alpha, rotation, etc.).
 *   Support for various emitter shapes and parameters.
 *   Force fields and attractors for dynamic particle behavior (point attraction/repulsion, directional wind).
+*   Collision planes — kill, clamp, or bounce particles off infinite planes (e.g., water surfaces, floors, walls). Works on both CPU and GPU compute paths.
 *   Sub-emitters triggered on particle birth or death events.
 *   Serialization support for saving and loading particle system configs.
 *   GPU instancing renderer (`RendererType.INSTANCED`) — removes `gl_PointSize` hardware limit, ideal for large particles or high particle counts.
@@ -76,6 +77,10 @@ updateParticleSystems({now, delta, elapsed});
 system.updateConfig({
   gravity: -9.8,
   forceFields: [{ type: 'DIRECTIONAL', direction: { x: 1, y: 0, z: 0 }, strength: 5 }],
+  // Collision planes — kill, clamp, or bounce particles off surfaces
+  collisionPlanes: [
+    { position: { x: 0, y: 5, z: 0 }, normal: { x: 0, y: -1, z: 0 }, mode: 'KILL' },
+  ],
 });
 ```
 

@@ -42,6 +42,10 @@ import {
 } from 'three/webgpu';
 
 import {
+  createCollisionPlaneTSL,
+  COLLISION_PLANE_DATA_SIZE,
+} from './compute-collision-planes.js';
+import {
   createForceFieldTSL,
   FORCE_FIELD_DATA_SIZE,
 } from './compute-force-fields.js';
@@ -107,6 +111,7 @@ export type ModifierFlags = {
   orbitalVelocity: boolean;
   noise: boolean;
   forceFields: boolean;
+  collisionPlanes: boolean;
 };
 
 /** Per-frame modifier uniform values. */
@@ -179,6 +184,13 @@ export type ModifierComputePipeline = {
     /** Uniform for the active force field count. */
     countUniform: ShaderNodeObject<Node>;
   } | null;
+  /** Collision plane metadata for runtime updates (null if no collision planes). */
+  collisionPlaneInfo: {
+    /** Float offset into curveData where collision plane data starts. */
+    offset: number;
+    /** Uniform for the active collision plane count. */
+    countUniform: ShaderNodeObject<Node>;
+  } | null;
 };
 
 // ─── Storage Buffer Creation ─────────────────────────────────────────────────
@@ -189,12 +201,15 @@ export type ModifierComputePipeline = {
  *
  * @param hasForceFields - If true, reserves space for force field data at the
  *   end of the curveData buffer (after baked curves + per-particle init data).
+ * @param hasCollisionPlanes - If true, reserves space for collision plane data
+ *   at the end of the curveData buffer (after force field data).
  */
 export function createModifierStorageBuffers(
   maxParticles: number,
   instanced: boolean,
   curveData: Float32Array,
-  hasForceFields = false
+  hasForceFields = false,
+  hasCollisionPlanes = false
 ): ModifierStorageBuffers {
   const Cls = instanced
     ? StorageInstancedBufferAttribute
@@ -204,13 +219,15 @@ export function createModifierStorageBuffers(
   //   [0 .. curveLen-1]                             baked curve samples
   //   [curveLen + i*INIT_STRIDE .. +INIT_STRIDE-1]  init data for particle i
   //   [curveLen + maxP*INIT_STRIDE .. +FF_SIZE-1]   force field data (if enabled)
+  //   [... + FF_SIZE .. +CP_SIZE-1]                 collision plane data (if enabled)
   //
   // Each particle has a fixed slot — O(1) lookup in the compute shader.
-  // Force field data is appended at the end to stay within the 8 storage
-  // buffer per-stage limit.
+  // Force field and collision plane data are appended at the end to stay
+  // within the 8 storage buffer per-stage limit.
   const curveLen = Math.max(curveData.length, 1);
   const ffSize = hasForceFields ? FORCE_FIELD_DATA_SIZE : 0;
-  const totalLen = curveLen + maxParticles * INIT_STRIDE + ffSize;
+  const cpSize = hasCollisionPlanes ? COLLISION_PLANE_DATA_SIZE : 0;
+  const totalLen = curveLen + maxParticles * INIT_STRIDE + ffSize + cpSize;
   const combined = new Float32Array(totalLen);
   combined.set(curveData.length > 0 ? curveData : new Float32Array([0]));
   // All init flags start at 0 (no init needed)
@@ -495,7 +512,8 @@ export function createModifierComputeUpdate(
   maxParticles: number,
   curveMap: BakedCurveMap,
   flags: ModifierFlags,
-  forceFieldCount = 0
+  forceFieldCount = 0,
+  collisionPlaneCount = 0
 ): ModifierComputePipeline {
   // ── Per-frame uniforms ──
 
@@ -544,6 +562,17 @@ export function createModifierComputeUpdate(
   const forceFieldOffset = curveLen + maxParticles * INIT_STRIDE;
   const forceFieldNodes = flags.forceFields
     ? createForceFieldTSL(sCurveData, forceFieldOffset, forceFieldCount)
+    : null;
+
+  // ── Collision plane nodes (reads from curveData tail, after force fields) ──
+  const ffSize = flags.forceFields ? FORCE_FIELD_DATA_SIZE : 0;
+  const collisionPlaneOffset = forceFieldOffset + ffSize;
+  const collisionPlaneNodes = flags.collisionPlanes
+    ? createCollisionPlaneTSL(
+        sCurveData,
+        collisionPlaneOffset,
+        collisionPlaneCount
+      )
     : null;
 
   // ── Compute kernel ──
@@ -685,6 +714,20 @@ export function createModifierComputeUpdate(
 
       // Velocity integration
       pos.assign(pos.add(vel.mul(uDelta)));
+
+      // Collision planes — after position update, before modifiers
+      if (collisionPlaneNodes) {
+        collisionPlaneNodes.apply({
+          pos,
+          vel,
+          oiaVec,
+          sColorNode: sColor,
+          ps,
+          startLife,
+          particleIdx: i,
+          sOrbitalIsActiveNode: sOrbitalIsActive,
+        });
+      }
 
       // Lifetime percentage for modifiers (computed before lifetime update
       // to match the CPU path, which reads lifetime before incrementing it)
@@ -922,6 +965,13 @@ export function createModifierComputeUpdate(
       ? {
           offset: forceFieldOffset,
           countUniform: forceFieldNodes.countUniform,
+        }
+      : null,
+    /** Collision plane offset and count uniform (null if no collision planes). */
+    collisionPlaneInfo: collisionPlaneNodes
+      ? {
+          offset: collisionPlaneOffset,
+          countUniform: collisionPlaneNodes.countUniform,
         }
       : null,
   };

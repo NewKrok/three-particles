@@ -1,5 +1,5 @@
-import { DataTexture as __WEBPACK_EXTERNAL_MODULE_three_DataTexture__, DoubleSide as __WEBPACK_EXTERNAL_MODULE_three_DoubleSide__, MathUtils as __WEBPACK_EXTERNAL_MODULE_three_MathUtils__, Vector3 as __WEBPACK_EXTERNAL_MODULE_three_Vector3__ } from "three";
-import { Continue as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Continue__, Discard as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__, Fn as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__, If as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__, Loop as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Loop__, abs as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__, attribute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_attribute__, cameraPosition as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraPosition__, cameraProjectionMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__, cameraViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraViewMatrix__, compute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_compute__, cos as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__, cross as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cross__, dot as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__, float as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__, floor as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__, fract as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_fract__, instanceIndex as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__, length as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_length__, max as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_max__, min as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__, mix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mix__, mod as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mod__, modelViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__, normalLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalLocal__, normalize as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalize__, pointUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_pointUV__, positionLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__, round as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_round__, screenUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_screenUV__, sin as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__, smoothstep as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_smoothstep__, step as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_step__, storage as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_storage__, texture as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_texture__, uniform as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__, uv as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uv__, varyingProperty as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__, vec2 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__, vec3 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__, vec4 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__ } from "three/tsl";
+import { DataTexture as __WEBPACK_EXTERNAL_MODULE_three_DataTexture__, DoubleSide as __WEBPACK_EXTERNAL_MODULE_three_DoubleSide__, MathUtils as __WEBPACK_EXTERNAL_MODULE_three_MathUtils__, NoColorSpace as __WEBPACK_EXTERNAL_MODULE_three_NoColorSpace__, Vector3 as __WEBPACK_EXTERNAL_MODULE_three_Vector3__ } from "three";
+import { Continue as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Continue__, Discard as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__, Fn as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__, If as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__, Loop as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Loop__, abs as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__, attribute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_attribute__, cameraPosition as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraPosition__, cameraProjectionMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__, cameraViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraViewMatrix__, compute as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_compute__, cos as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__, cross as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cross__, dot as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__, float as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__, floor as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_floor__, fract as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_fract__, instanceIndex as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__, length as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_length__, max as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_max__, min as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__, mix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mix__, mod as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_mod__, modelViewMatrix as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__, normalLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalLocal__, normalize as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalize__, pointUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_pointUV__, positionLocal as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__, round as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_round__, sRGBTransferEOTF as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sRGBTransferEOTF__, screenUV as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_screenUV__, sin as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__, smoothstep as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_smoothstep__, step as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_step__, storage as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_storage__, texture as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_texture__, uniform as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__, uv as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uv__, varyingProperty as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__, vec2 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__, vec3 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__, vec4 as __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__ } from "three/tsl";
 import { MeshBasicNodeMaterial as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_MeshBasicNodeMaterial__, PointsNodeMaterial as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_PointsNodeMaterial__, StorageBufferAttribute as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageBufferAttribute__, StorageInstancedBufferAttribute as __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageInstancedBufferAttribute__ } from "three/webgpu";
 /******/ // The require scope
 /******/ var __webpack_require__ = {};
@@ -111,6 +111,101 @@ var calculateValue = (particleSystemId, value, time = 0) => {
   const lifetimeCurve = value;
   return getCurveFunctionFromConfig(particleSystemId, lifetimeCurve)(time) * (lifetimeCurve.scale ?? 1);
 };
+var PLANE_STRIDE = 12;
+var MAX_COLLISION_PLANES = 16;
+var COLLISION_PLANE_DATA_SIZE = MAX_COLLISION_PLANES * PLANE_STRIDE;
+function encodeCollisionPlanesForGPU(planes) {
+  const data = new Float32Array(COLLISION_PLANE_DATA_SIZE);
+  const count = Math.min(planes.length, MAX_COLLISION_PLANES);
+  for (let i = 0; i < count; i++) {
+    const cp = planes[i];
+    const base = i * PLANE_STRIDE;
+    data[base] = cp.isActive ? 1 : 0;
+    let modeCode = 0;
+    if (cp.mode === "CLAMP" /* CLAMP */) modeCode = 1;
+    else if (cp.mode === "BOUNCE" /* BOUNCE */) modeCode = 2;
+    data[base + 1] = modeCode;
+    data[base + 2] = cp.position.x;
+    data[base + 3] = cp.position.y;
+    data[base + 4] = cp.position.z;
+    data[base + 5] = cp.normal.x;
+    data[base + 6] = cp.normal.y;
+    data[base + 7] = cp.normal.z;
+    data[base + 8] = cp.dampen;
+    data[base + 9] = cp.lifetimeLoss;
+    data[base + 10] = 0;
+    data[base + 11] = 0;
+  }
+  return data;
+}
+function createCollisionPlaneTSL(sCurveData, collisionPlaneOffset, collisionPlaneCount) {
+  const count = Math.min(collisionPlaneCount, MAX_COLLISION_PLANES);
+  const uCollisionPlaneCount = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(count));
+  const cpBase = collisionPlaneOffset;
+  const applyCollisionPlanesTSL = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(
+    ({
+      pos,
+      vel,
+      oiaVec,
+      sColorNode,
+      ps,
+      startLife,
+      particleIdx,
+      sOrbitalIsActiveNode
+    }) => {
+      __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Loop__(uCollisionPlaneCount, ({ i }) => {
+        const base = i.mul(PLANE_STRIDE).add(cpBase);
+        const isActive = sCurveData.element(base);
+        __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(isActive.lessThan(0.5), () => {
+          __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Continue__();
+        });
+        const mode = sCurveData.element(base.add(1));
+        const planePos = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(
+          sCurveData.element(base.add(2)),
+          sCurveData.element(base.add(3)),
+          sCurveData.element(base.add(4))
+        );
+        const planeNormal = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(
+          sCurveData.element(base.add(5)),
+          sCurveData.element(base.add(6)),
+          sCurveData.element(base.add(7))
+        );
+        const dampen = sCurveData.element(base.add(8));
+        const lifetimeLoss = sCurveData.element(base.add(9));
+        const toParticle = pos.sub(planePos);
+        const signedDist = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__(toParticle, planeNormal);
+        __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(signedDist.lessThan(0), () => {
+          __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(mode.lessThan(0.5), () => {
+            ps.x.assign(startLife.add(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(1)));
+          });
+          __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(mode.greaterThanEqual(0.5).and(mode.lessThan(1.5)), () => {
+            pos.assign(pos.sub(planeNormal.mul(signedDist)));
+            const velDotN = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__(vel, planeNormal);
+            __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(velDotN.lessThan(0), () => {
+              vel.assign(vel.sub(planeNormal.mul(velDotN)));
+            });
+          });
+          __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(mode.greaterThanEqual(1.5), () => {
+            pos.assign(pos.sub(planeNormal.mul(signedDist)));
+            const vDotN = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_dot__(vel, planeNormal);
+            const reflected = vel.sub(planeNormal.mul(vDotN.mul(2)));
+            vel.assign(reflected.mul(dampen));
+            __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(lifetimeLoss.greaterThan(0), () => {
+              ps.x.assign(ps.x.add(lifetimeLoss.mul(startLife).mul(1e3)));
+            });
+          });
+        });
+      });
+    },
+    "void"
+  );
+  return {
+    /** Uniform for the active collision plane count. */
+    countUniform: uCollisionPlaneCount,
+    /** TSL function to call in the compute kernel: apply({ pos, vel, ... }) */
+    apply: applyCollisionPlanesTSL
+  };
+}
 var FIELD_STRIDE = 12;
 var MAX_FORCE_FIELDS = 16;
 var FORCE_FIELD_DATA_SIZE = MAX_FORCE_FIELDS * FIELD_STRIDE;
@@ -302,11 +397,12 @@ __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(
 
 // src/js/effects/three-particles/webgpu/compute-modifiers.ts
 var INIT_STRIDE = 28;
-function createModifierStorageBuffers(maxParticles, instanced, curveData, hasForceFields = false) {
+function createModifierStorageBuffers(maxParticles, instanced, curveData, hasForceFields = false, hasCollisionPlanes = false) {
   const Cls = instanced ? __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageInstancedBufferAttribute__ : __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_StorageBufferAttribute__;
   const curveLen = Math.max(curveData.length, 1);
   const ffSize = hasForceFields ? FORCE_FIELD_DATA_SIZE : 0;
-  const totalLen = curveLen + maxParticles * INIT_STRIDE + ffSize;
+  const cpSize = hasCollisionPlanes ? COLLISION_PLANE_DATA_SIZE : 0;
+  const totalLen = curveLen + maxParticles * INIT_STRIDE + ffSize + cpSize;
   const combined = new Float32Array(totalLen);
   combined.set(curveData.length > 0 ? curveData : new Float32Array([0]));
   return {
@@ -439,7 +535,7 @@ function createCurveLookup(sCurveData) {
     }
   );
 }
-function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, forceFieldCount = 0) {
+function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, forceFieldCount = 0, collisionPlaneCount = 0) {
   const uDelta = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
   const uDeltaMs = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0));
   const uGravityVelocity = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(new __WEBPACK_EXTERNAL_MODULE_three_Vector3__(0, 0, 0));
@@ -471,6 +567,13 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
   const lookupCurve = createCurveLookup(sCurveData);
   const forceFieldOffset = curveLen + maxParticles * INIT_STRIDE;
   const forceFieldNodes = flags.forceFields ? createForceFieldTSL(sCurveData, forceFieldOffset, forceFieldCount) : null;
+  const ffSize = flags.forceFields ? FORCE_FIELD_DATA_SIZE : 0;
+  const collisionPlaneOffset = forceFieldOffset + ffSize;
+  const collisionPlaneNodes = flags.collisionPlanes ? createCollisionPlaneTSL(
+    sCurveData,
+    collisionPlaneOffset,
+    collisionPlaneCount
+  ) : null;
   const computeKernel = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(() => {
     const i = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_instanceIndex__;
     const initBase = i.mul(INIT_STRIDE).add(curveLen);
@@ -550,6 +653,18 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
         pos.assign(pos.sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec3__(uWorldPositionChange)));
       });
       pos.assign(pos.add(vel.mul(uDelta)));
+      if (collisionPlaneNodes) {
+        collisionPlaneNodes.apply({
+          pos,
+          vel,
+          oiaVec,
+          sColorNode: sColor,
+          ps,
+          startLife,
+          particleIdx: i,
+          sOrbitalIsActiveNode: sOrbitalIsActive
+        });
+      }
       const lifePct = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_min__(ps.x.div(startLife), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(1));
       ps.x.assign(ps.x.add(uDeltaMs));
       if (flags.linearVelocity) {
@@ -708,6 +823,11 @@ function createModifierComputeUpdate(buffers, maxParticles, curveMap, flags, for
     forceFieldInfo: forceFieldNodes ? {
       offset: forceFieldOffset,
       countUniform: forceFieldNodes.countUniform
+    } : null,
+    /** Collision plane offset and count uniform (null if no collision planes). */
+    collisionPlaneInfo: collisionPlaneNodes ? {
+      offset: collisionPlaneOffset,
+      countUniform: collisionPlaneNodes.countUniform
     } : null
   };
 }
@@ -895,8 +1015,10 @@ function getDummyTexture() {
 }
 function createParticleUniforms(sharedUniforms) {
   const dummy = getDummyTexture();
+  const map = sharedUniforms.map.value ?? dummy;
+  if (map) map.colorSpace = __WEBPACK_EXTERNAL_MODULE_three_NoColorSpace__;
   return {
-    uMap: sharedUniforms.map.value ?? dummy,
+    uMap: map,
     uElapsed: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(sharedUniforms.elapsed.value)),
     uFps: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(sharedUniforms.fps.value)),
     uUseFPSForFrameIndex: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(
@@ -998,6 +1120,11 @@ __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(
         __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__();
       });
     });
+  }
+);
+var compensateOutputSRGB = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(
+  ({ color }) => {
+    return __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sRGBTransferEOTF__(color.rgb), color.a);
   }
 );
 
@@ -1102,13 +1229,15 @@ function createInstancedBillboardTSLMaterial(sharedUniforms, rendererConfig, gpu
       outColor.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(outColor.xyz, outColor.w.mul(softFade)));
     });
     __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__(outColor.w.lessThan(1e-3));
-    return outColor;
+    return compensateOutputSRGB({ color: outColor });
   })();
   const material = new __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_MeshBasicNodeMaterial__();
   material.transparent = rendererConfig.transparent;
   material.blending = rendererConfig.blending;
   material.depthTest = rendererConfig.depthTest;
   material.depthWrite = rendererConfig.depthWrite;
+  material.toneMapped = false;
+  material.fog = false;
   material.vertexNode = vertexNode;
   material.colorNode = fragmentColor;
   return material;
@@ -1223,13 +1352,15 @@ function createMeshParticleTSLMaterial(sharedUniforms, rendererConfig, gpuComput
       outColor.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(outColor.xyz, outColor.w.mul(softFade)));
     });
     __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__(outColor.w.lessThan(1e-3));
-    return outColor;
+    return compensateOutputSRGB({ color: outColor });
   })();
   const material = new __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_MeshBasicNodeMaterial__();
   material.transparent = rendererConfig.transparent;
   material.blending = rendererConfig.blending;
   material.depthTest = rendererConfig.depthTest;
   material.depthWrite = rendererConfig.depthWrite;
+  material.toneMapped = false;
+  material.fog = false;
   material.vertexNode = vertexSetup;
   material.colorNode = fragmentColor;
   return material;
@@ -1320,13 +1451,15 @@ function createPointSpriteTSLMaterial(sharedUniforms, rendererConfig, gpuCompute
       outColor.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(outColor.xyz, outColor.w.mul(softFade)));
     });
     __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__(outColor.w.lessThan(1e-3));
-    return outColor;
+    return compensateOutputSRGB({ color: outColor });
   })();
   const material = new __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_PointsNodeMaterial__();
   material.transparent = rendererConfig.transparent;
   material.blending = rendererConfig.blending;
   material.depthTest = rendererConfig.depthTest;
   material.depthWrite = rendererConfig.depthWrite;
+  material.toneMapped = false;
+  material.fog = false;
   material.sizeNode = sizeNode;
   material.positionNode = vertexSetup;
   material.colorNode = fragmentColor;
@@ -1334,8 +1467,10 @@ function createPointSpriteTSLMaterial(sharedUniforms, rendererConfig, gpuCompute
 }
 function createTrailUniforms(trailUniforms) {
   const dummy = getDummyTexture();
+  const map = trailUniforms.map.value ?? dummy;
+  if (map) map.colorSpace = __WEBPACK_EXTERNAL_MODULE_three_NoColorSpace__;
   return {
-    uMap: trailUniforms.map.value ?? dummy,
+    uMap: map,
     uUseMap: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(trailUniforms.useMap.value ? 1 : 0)),
     uDiscardBg: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_uniform__(
       __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(trailUniforms.discardBackgroundColor.value ? 1 : 0)
@@ -1443,13 +1578,15 @@ function createTrailRibbonTSLMaterial(trailUniforms, rendererConfig) {
     __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Discard__(
       u.uDiscardBg.greaterThan(0.5).and(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_abs__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_length__(diff)).lessThan(u.uBgTolerance))
     );
-    return outColor;
+    return compensateOutputSRGB({ color: outColor });
   })();
   const material = new __WEBPACK_EXTERNAL_MODULE_three_webgpu_84e9d76f_MeshBasicNodeMaterial__();
   material.transparent = rendererConfig.transparent;
   material.blending = rendererConfig.blending;
   material.depthTest = rendererConfig.depthTest;
   material.depthWrite = rendererConfig.depthWrite;
+  material.toneMapped = false;
+  material.fog = false;
   material.side = __WEBPACK_EXTERNAL_MODULE_three_DoubleSide__;
   material.positionNode = positionNode;
   material.colorNode = colorNode;
@@ -1483,7 +1620,7 @@ function createTSLParticleMaterial(rendererType, sharedUniforms, rendererConfig,
 function createTSLTrailMaterial(trailUniforms, rendererConfig) {
   return createTrailRibbonTSLMaterial(trailUniforms, rendererConfig);
 }
-function createComputePipeline(maxParticles, instanced, normalizedConfig, particleSystemId, forceFieldCount) {
+function createComputePipeline(maxParticles, instanced, normalizedConfig, particleSystemId, forceFieldCount, collisionPlaneCount = 0) {
   const bakedCurves = bakeParticleSystemCurves(
     normalizedConfig,
     particleSystemId
@@ -1497,24 +1634,27 @@ function createComputePipeline(maxParticles, instanced, normalizedConfig, partic
     linearVelocity: velocityOverLifetime.isActive && (isLifeTimeCurve(velocityOverLifetime.linear.x ?? 0) || isLifeTimeCurve(velocityOverLifetime.linear.y ?? 0) || isLifeTimeCurve(velocityOverLifetime.linear.z ?? 0) || velocityOverLifetime.linear.x !== 0 || velocityOverLifetime.linear.y !== 0 || velocityOverLifetime.linear.z !== 0),
     orbitalVelocity: velocityOverLifetime.isActive && (isLifeTimeCurve(velocityOverLifetime.orbital.x ?? 0) || isLifeTimeCurve(velocityOverLifetime.orbital.y ?? 0) || isLifeTimeCurve(velocityOverLifetime.orbital.z ?? 0) || velocityOverLifetime.orbital.x !== 0 || velocityOverLifetime.orbital.y !== 0 || velocityOverLifetime.orbital.z !== 0),
     noise: normalizedConfig.noise.isActive,
-    forceFields: forceFieldCount > 0
+    forceFields: forceFieldCount > 0,
+    collisionPlanes: collisionPlaneCount > 0
   };
   const buffers = createModifierStorageBuffers(
     maxParticles,
     instanced,
     bakedCurves.data,
-    flags.forceFields
+    flags.forceFields,
+    flags.collisionPlanes
   );
   return createModifierComputeUpdate(
     buffers,
     maxParticles,
     bakedCurves,
     flags,
-    forceFieldCount
+    forceFieldCount,
+    collisionPlaneCount
   );
 }
 
 
 //# sourceMappingURL=webgpu.js.map
 //# sourceMappingURL=webgpu.js.map
-export { createComputePipeline, createTSLParticleMaterial, createTSLTrailMaterial, deactivateParticleInModifierBuffers, encodeForceFieldsForGPU, flushEmitQueue, registerCurveDataLength, writeParticleToModifierBuffers };
+export { createComputePipeline, createTSLParticleMaterial, createTSLTrailMaterial, deactivateParticleInModifierBuffers, encodeCollisionPlanesForGPU, encodeForceFieldsForGPU, flushEmitQueue, registerCurveDataLength, writeParticleToModifierBuffers };

@@ -114,7 +114,8 @@ export function createComputePipeline(
   instanced: boolean,
   normalizedConfig: NormalizedParticleSystemConfig,
   particleSystemId: number,
-  forceFieldCount: number
+  forceFieldCount: number,
+  collisionPlaneCount = 0
 ): ModifierComputePipeline {
   const bakedCurves = bakeParticleSystemCurves(
     normalizedConfig,
@@ -146,13 +147,15 @@ export function createComputePipeline(
         velocityOverLifetime.orbital.z !== 0),
     noise: normalizedConfig.noise.isActive,
     forceFields: forceFieldCount > 0,
+    collisionPlanes: collisionPlaneCount > 0,
   };
 
   const buffers = createModifierStorageBuffers(
     maxParticles,
     instanced,
     bakedCurves.data,
-    flags.forceFields
+    flags.forceFields,
+    flags.collisionPlanes
   );
 
   return createModifierComputeUpdate(
@@ -160,6 +163,7 @@ export function createComputePipeline(
     maxParticles,
     bakedCurves,
     flags,
-    forceFieldCount
+    forceFieldCount,
+    collisionPlaneCount
   );
 }

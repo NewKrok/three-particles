@@ -241,6 +241,34 @@ export const enum ForceFieldFalloff {
 }
 
 /**
+ * Defines the behavior when a particle crosses a collision plane.
+ *
+ * @enum {string}
+ */
+export const enum CollisionPlaneMode {
+  /**
+   * Kill the particle immediately when it crosses the plane.
+   * The particle is deactivated and returned to the free list.
+   * Ideal for boundaries like water surfaces where bubbles pop.
+   */
+  KILL = 'KILL',
+
+  /**
+   * Clamp the particle's position to the plane surface.
+   * The velocity component along the plane normal is zeroed.
+   * The particle stays alive and slides along the plane.
+   */
+  CLAMP = 'CLAMP',
+
+  /**
+   * Bounce the particle off the plane.
+   * The velocity is reflected across the plane normal and dampened.
+   * Use `dampen` to control energy loss on bounce.
+   */
+  BOUNCE = 'BOUNCE',
+}
+
+/**
  * Defines the simulation backend used for particle updates.
  *
  * @enum {string}

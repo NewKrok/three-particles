@@ -1,6 +1,13 @@
 
 export const examples = [
   {
+    id: "underwater-bubbles",
+    title: "Underwater Bubbles",
+    description: "Rising bubbles that pop when they reach a water surface — demonstrates the collision planes (kill zone) feature.",
+    tags: ["collisionPlanes", "kill", "advanced"],
+    config: {"duration":60,"looping":true,"startLifetime":{"min":4.0,"max":8.0},"startSpeed":{"min":1.0,"max":2.5},"startSize":{"min":0.3,"max":1.5},"startOpacity":1.0,"startRotation":{"min":0,"max":360},"startColor":{"min":{"r":0.6,"g":0.85,"b":1.0},"max":{"r":0.9,"g":1.0,"b":1.0}},"maxParticles":300,"gravity":-2.0,"emission":{"rateOverTime":50},"shape":{"shape":"CONE","cone":{"angle":30,"radius":3,"radiusThickness":1.0,"arc":360}},"transform":{"position":{"y":-4},"rotation":{"x":180}},"renderer":{"blending":"THREE.AdditiveBlending","transparent":true,"depthTest":true,"depthWrite":false},"collisionPlanes":[{"position":{"x":0,"y":3,"z":0},"normal":{"x":0,"y":-1,"z":0},"mode":"KILL"}],"sizeOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0.4,"percentage":0},{"x":0.15,"y":0.8},{"x":0.5,"y":1.0},{"x":1,"y":1.0,"percentage":1}]}},"opacityOverLifetime":{"isActive":true,"lifetimeCurve":{"bezierPoints":[{"x":0,"y":0,"percentage":0},{"x":0.03,"y":1.0},{"x":0.6,"y":1.0,"percentage":0.6},{"x":1,"y":0.8,"percentage":1}]}},"noise":{"isActive":true,"useRandomOffset":true,"strength":0.2,"frequency":0.3,"octaves":2,"positionAmount":0.4}},
+  },
+  {
     id: "gpu-supernova",
     title: "GPU Supernova",
     description: "350K textured particles in a cataclysmic stellar explosion — WebGPU compute drives force fields, orbital dynamics, noise turbulence, and vivid neon color gradients.",

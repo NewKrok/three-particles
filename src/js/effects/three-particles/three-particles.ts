@@ -11,6 +11,7 @@ import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.
 import TrailFragmentShader from './shaders/trail-fragment-shader.glsl.js';
 import TrailVertexShader from './shaders/trail-vertex-shader.glsl.js';
 import { removeBezierCurveFunction } from './three-particles-bezier.js';
+import { applyCollisionPlanes } from './three-particles-collision.js';
 import {
   SCALAR_STRIDE,
   S_IS_ACTIVE,
@@ -25,6 +26,7 @@ import {
   S_COLOR_A,
 } from './three-particles-constants.js';
 import {
+  CollisionPlaneMode,
   EmitFrom,
   ForceFieldFalloff,
   ForceFieldType,
@@ -53,6 +55,7 @@ import {
 } from './three-particles-utils.js';
 
 import {
+  CollisionPlaneConfig,
   Constant,
   CurveFunction,
   CycleData,
@@ -60,6 +63,7 @@ import {
   GeneralData,
   LifetimeCurve,
   MappedAttributes,
+  NormalizedCollisionPlaneConfig,
   NormalizedForceFieldConfig,
   NormalizedParticleSystemConfig,
   ParticleSystem,
@@ -142,6 +146,8 @@ type TSLMaterialFactory = {
   registerCurveDataLength?: (...args: any[]) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   encodeForceFieldsForGPU?: (...args: any[]) => Float32Array;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  encodeCollisionPlanesForGPU?: (...args: any[]) => Float32Array;
 };
 
 let _tslMaterialFactory: TSLMaterialFactory | null = null;
@@ -200,6 +206,10 @@ const _localForceFieldPos = new THREE.Vector3();
 const _localForceFieldDir = new THREE.Vector3();
 const _inverseQuat = new THREE.Quaternion();
 let _localForceFields: Array<NormalizedForceFieldConfig> = [];
+// Collision plane local-space conversion helpers (reused across frames)
+const _localCollisionPlanePos = new THREE.Vector3();
+const _localCollisionPlaneNormal = new THREE.Vector3();
+let _localCollisionPlanes: Array<NormalizedCollisionPlaneConfig> = [];
 // Trail ribbon helpers (reused across frames to avoid allocations)
 const _trailDir = new THREE.Vector3();
 const _trailPerp = new THREE.Vector3();
@@ -239,6 +249,21 @@ const normalizeForceFields = (
     strength: ff.strength ?? 1,
     range: Math.max(0, ff.range ?? Infinity),
     falloff: ff.falloff ?? ForceFieldFalloff.LINEAR,
+  }));
+
+/**
+ * Normalizes raw collision plane configs into the internal representation with THREE.Vector3 fields.
+ */
+const normalizeCollisionPlanes = (
+  rawPlanes: Array<CollisionPlaneConfig> | undefined
+): Array<NormalizedCollisionPlaneConfig> =>
+  (rawPlanes ?? []).map((cp: CollisionPlaneConfig) => ({
+    isActive: cp.isActive ?? true,
+    position: toVector3(cp.position, new THREE.Vector3(0, 0, 0)),
+    normal: toVector3(cp.normal, new THREE.Vector3(0, 1, 0)).normalize(),
+    mode: cp.mode ?? CollisionPlaneMode.KILL,
+    dampen: Math.max(0, Math.min(1, cp.dampen ?? 0.5)),
+    lifetimeLoss: Math.max(0, Math.min(1, cp.lifetimeLoss ?? 0)),
   }));
 
 /**
@@ -440,6 +465,7 @@ const DEFAULT_PARTICLE_SYSTEM_CONFIG: ParticleSystemConfig = {
     startFrame: 0,
   },
   forceFields: [],
+  collisionPlanes: [],
 };
 
 const calculatePositionAndVelocity = (
@@ -684,6 +710,9 @@ export const createParticleSystem = (
 
   const normalizedForceFields: Array<NormalizedForceFieldConfig> =
     normalizeForceFields(rawForceFields);
+
+  const normalizedCollisionPlanes: Array<NormalizedCollisionPlaneConfig> =
+    normalizeCollisionPlanes(normalizedConfig.collisionPlanes);
 
   if (typeof renderer?.blending === 'string')
     renderer.blending = blendingMap[renderer.blending];
@@ -1024,7 +1053,8 @@ export const createParticleSystem = (
       useInstancedAttributes,
       normalizedConfig,
       generalData.particleSystemId,
-      normalizedForceFields.length
+      normalizedForceFields.length,
+      normalizedCollisionPlanes.length
     );
     // Register the curveDataLength so the init data helpers know the offset.
     if (gpuPipeline && _tslMaterialFactory!.registerCurveDataLength) {
@@ -1941,6 +1971,7 @@ export const createParticleSystem = (
     simulationSpace,
     gravity,
     normalizedForceFields,
+    normalizedCollisionPlanes,
     emission,
     normalizedConfig,
     iterationCount: 0,
@@ -2025,6 +2056,13 @@ export const createParticleSystem = (
     if (partialConfig.forceFields !== undefined) {
       instanceData.normalizedForceFields = normalizeForceFields(
         cfg.forceFields
+      );
+    }
+
+    // Re-normalize collision planes when changed
+    if (partialConfig.collisionPlanes !== undefined) {
+      instanceData.normalizedCollisionPlanes = normalizeCollisionPlanes(
+        cfg.collisionPlanes
       );
     }
 
@@ -2162,6 +2200,7 @@ const updateParticleSystemInstance = (
     simulationSpace,
     gravity,
     normalizedForceFields,
+    normalizedCollisionPlanes,
     onParticleDeath,
     onParticleBirth,
     mappedAttributes: ma,
@@ -2170,6 +2209,7 @@ const updateParticleSystemInstance = (
   } = props;
 
   const hasForceFields = normalizedForceFields.length > 0;
+  const hasCollisionPlanes = normalizedCollisionPlanes.length > 0;
 
   const lifetime = now - creationTime;
   const normalizedLifetime = lifetime % (duration * 1000);
@@ -2264,6 +2304,41 @@ const updateParticleSystemInstance = (
     }
   }
 
+  // Transform collision plane positions/normals into local space once per frame
+  if (hasCollisionPlanes) {
+    if (!hasForceFields) _inverseQuat.copy(worldQuaternion).invert();
+
+    _localCollisionPlanes.length = normalizedCollisionPlanes.length;
+
+    for (let i = 0; i < normalizedCollisionPlanes.length; i++) {
+      const src = normalizedCollisionPlanes[i];
+      let dst = _localCollisionPlanes[i];
+      if (!dst) {
+        dst = {
+          isActive: true,
+          position: new THREE.Vector3(),
+          normal: new THREE.Vector3(),
+          mode: CollisionPlaneMode.KILL,
+          dampen: 0.5,
+          lifetimeLoss: 0,
+        };
+        _localCollisionPlanes[i] = dst;
+      }
+      dst.isActive = src.isActive;
+      dst.mode = src.mode;
+      dst.dampen = src.dampen;
+      dst.lifetimeLoss = src.lifetimeLoss;
+
+      _localCollisionPlanePos.copy(src.position);
+      particleSystem.worldToLocal(_localCollisionPlanePos);
+      dst.position.copy(_localCollisionPlanePos);
+
+      _localCollisionPlaneNormal.copy(src.normal);
+      _localCollisionPlaneNormal.applyQuaternion(_inverseQuat);
+      dst.normal.copy(_localCollisionPlaneNormal);
+    }
+  }
+
   const creationTimes = generalData.creationTimes;
   const scalarArr = props.scalarArray;
   const positionArr = ma.position.array;
@@ -2341,6 +2416,23 @@ const updateParticleSystemInstance = (
       cp.buffers.curveData.needsUpdate = true;
       (cp.forceFieldInfo.countUniform as unknown as { value: number }).value =
         normalizedForceFields.length;
+    }
+
+    // Collision plane buffer update — write encoded data into curveData tail
+    if (
+      cp.collisionPlaneInfo &&
+      hasCollisionPlanes &&
+      _tslMaterialFactory?.encodeCollisionPlanesForGPU
+    ) {
+      const encodedCP = _tslMaterialFactory.encodeCollisionPlanesForGPU(
+        _localCollisionPlanes
+      );
+      const curveArr = cp.buffers.curveData.array as Float32Array;
+      curveArr.set(encodedCP, cp.collisionPlaneInfo.offset);
+      cp.buffers.curveData.needsUpdate = true;
+      (
+        cp.collisionPlaneInfo.countUniform as unknown as { value: number }
+      ).value = normalizedCollisionPlanes.length;
     }
 
     // Flush emit queue — uploads queued particle data to GPU and sets the
@@ -2424,6 +2516,24 @@ const updateParticleSystemInstance = (
             positionArr[positionIndex + 1] += positionOffset.y;
             positionArr[positionIndex + 2] += positionOffset.z;
           }
+
+          // Collision planes (shadow sim — for KILL death detection only)
+          if (hasCollisionPlanes) {
+            applyCollisionPlanes({
+              collisionPlanes: _localCollisionPlanes,
+              velocity,
+              positionArr,
+              positionIndex,
+              scalarArr,
+              scalarBase: base,
+              deactivateParticle: (pi: number) => {
+                if (onParticleDeath)
+                  onParticleDeath(pi, positionArr, velocities[pi], now);
+                deactivateParticle(pi);
+              },
+              particleIndex: index,
+            });
+          }
         }
       }
     }
@@ -2487,6 +2597,28 @@ const updateParticleSystemInstance = (
             positionArr[positionIndex + 1] += velocity.y * delta;
             positionArr[positionIndex + 2] += velocity.z * delta;
             positionNeedsUpdate = true;
+          }
+
+          // Collision planes — after position update, before modifiers
+          if (hasCollisionPlanes) {
+            const killed = applyCollisionPlanes({
+              collisionPlanes: _localCollisionPlanes,
+              velocity,
+              positionArr,
+              positionIndex: index * 3,
+              scalarArr,
+              scalarBase: base,
+              deactivateParticle: (pi: number) => {
+                if (onParticleDeath)
+                  onParticleDeath(pi, positionArr, velocities[pi], now);
+                deactivateParticle(pi);
+              },
+              particleIndex: index,
+            });
+            if (killed) {
+              positionNeedsUpdate = true;
+              continue;
+            }
           }
 
           scalarArr[base + S_LIFETIME] = particleLifetime;

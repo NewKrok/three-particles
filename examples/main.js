@@ -31,6 +31,7 @@ try {
           flushEmitQueue,
           registerCurveDataLength,
           encodeForceFieldsForGPU,
+          encodeCollisionPlanesForGPU,
         } = await import("./three-particles-webgpu.esm.js");
         particleModule.registerTSLMaterialFactory({
           createTSLParticleMaterial,
@@ -41,6 +42,7 @@ try {
           flushEmitQueue,
           registerCurveDataLength,
           encodeForceFieldsForGPU,
+          encodeCollisionPlanesForGPU,
         });
       }
       webgpuAvailable = true;

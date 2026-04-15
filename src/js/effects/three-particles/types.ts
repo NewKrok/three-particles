@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 import {
+  CollisionPlaneMode,
   EmitFrom,
   ForceFieldFalloff,
   ForceFieldType,
@@ -947,6 +948,78 @@ export type NormalizedForceFieldConfig = {
 };
 
 /**
+ * Configuration for a collision plane that constrains particle positions.
+ * Collision planes define infinite planes in 3D space. When a particle crosses
+ * from the front side (positive normal direction) to the back side, the
+ * configured response mode is triggered.
+ *
+ * @example
+ * ```typescript
+ * // Water surface — kill bubbles when they reach y=5
+ * const waterSurface: CollisionPlaneConfig = {
+ *   position: { x: 0, y: 5, z: 0 },
+ *   normal: { x: 0, y: -1, z: 0 },
+ *   mode: CollisionPlaneMode.KILL,
+ * };
+ *
+ * // Bouncy floor
+ * const floor: CollisionPlaneConfig = {
+ *   position: { x: 0, y: 0, z: 0 },
+ *   normal: { x: 0, y: 1, z: 0 },
+ *   mode: CollisionPlaneMode.BOUNCE,
+ *   dampen: 0.6,
+ * };
+ *
+ * // Invisible wall clamp
+ * const wall: CollisionPlaneConfig = {
+ *   position: { x: 5, y: 0, z: 0 },
+ *   normal: { x: -1, y: 0, z: 0 },
+ *   mode: CollisionPlaneMode.CLAMP,
+ * };
+ * ```
+ */
+export type CollisionPlaneConfig = {
+  /** Whether this collision plane is active. @default true */
+  isActive?: boolean;
+  /** A point on the plane surface. @default (0,0,0) */
+  position?: Point3D;
+  /**
+   * The plane normal vector (will be normalized internally).
+   * Defines the "front" side of the plane. Particles crossing from front
+   * to back trigger the collision response.
+   * @default (0,1,0)
+   */
+  normal?: Point3D;
+  /** The collision response mode. @default CollisionPlaneMode.KILL */
+  mode?: CollisionPlaneMode;
+  /**
+   * Energy retention factor for BOUNCE mode (0–1).
+   * 0 = no bounce (all energy absorbed), 1 = perfect bounce (no energy loss).
+   * @default 0.5
+   */
+  dampen?: number;
+  /**
+   * Fraction of the particle's start lifetime to subtract on collision (0–1).
+   * Applied on each collision for BOUNCE mode; ignored for KILL and CLAMP.
+   * @default 0
+   */
+  lifetimeLoss?: number;
+};
+
+/**
+ * Internal normalized collision plane configuration where all properties are required.
+ * Created during particle system initialization from user-provided {@link CollisionPlaneConfig}.
+ */
+export type NormalizedCollisionPlaneConfig = {
+  isActive: boolean;
+  position: THREE.Vector3;
+  normal: THREE.Vector3;
+  mode: CollisionPlaneMode;
+  dampen: number;
+  lifetimeLoss: number;
+};
+
+/**
  * Configuration object for the particle system.
  * Defines all aspects of the particle system, including its appearance, behavior, and runtime events.
  */
@@ -1508,6 +1581,32 @@ export type ParticleSystemConfig = {
   forceFields?: Array<ForceFieldConfig>;
 
   /**
+   * Collision planes that constrain particle positions.
+   *
+   * Each plane defines an infinite surface in 3D space. When a particle crosses
+   * from the front side (positive normal direction) to the back side, the
+   * configured response mode is triggered: KILL (remove), CLAMP (stop at surface),
+   * or BOUNCE (reflect with energy loss).
+   *
+   * Plane positions and normals are in world space. Multiple planes are checked
+   * in order; for KILL mode, the first collision deactivates the particle.
+   *
+   * @default []
+   *
+   * @example
+   * ```typescript
+   * collisionPlanes: [
+   *   {
+   *     position: { x: 0, y: 5, z: 0 },
+   *     normal: { x: 0, y: -1, z: 0 },
+   *     mode: CollisionPlaneMode.KILL,
+   *   },
+   * ]
+   * ```
+   */
+  collisionPlanes?: Array<CollisionPlaneConfig>;
+
+  /**
    * Called on every update frame with particle system data.
    */
   onUpdate?: (data: {
@@ -1661,6 +1760,7 @@ export type ParticleSystemInstance = {
   simulationSpace: SimulationSpace;
   gravity: number;
   normalizedForceFields: Array<NormalizedForceFieldConfig>;
+  normalizedCollisionPlanes: Array<NormalizedCollisionPlaneConfig>;
   emission: Emission;
   normalizedConfig: NormalizedParticleSystemConfig;
   iterationCount: number;

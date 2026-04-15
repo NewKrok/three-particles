@@ -525,6 +525,9 @@ const system = createParticleSystem({
 ### RendererType
 `POINTS` (default — classic point sprites) | `INSTANCED` (GPU instanced quads, no gl_PointSize limit) | `TRAIL` (ribbon trails behind particles) | `MESH` (3D mesh particles via GPU instancing)
 
+### CollisionPlaneMode
+`KILL` (deactivate particle immediately) | `CLAMP` (stop particle at the plane surface) | `BOUNCE` (reflect velocity with optional dampen)
+
 ### SimulationBackend
 `AUTO` (default — GPU compute if WebGPU renderer detected, else CPU) | `CPU` (always JavaScript update loop) | `GPU` (request GPU compute, falls back to CPU if unavailable)
 
@@ -691,6 +694,48 @@ createParticleSystem({
       type: ForceFieldType.DIRECTIONAL,
       direction: { x: 1, y: 0, z: 0 },
       strength: 2,
+    },
+  ],
+});
+```
+
+---
+
+## Collision Planes
+
+Infinite planes that constrain particle positions. When a particle crosses from the front side (positive normal direction) to the back side, the configured response mode is triggered.
+
+```typescript
+type CollisionPlaneConfig = {
+  isActive?: boolean;         // Whether this plane is active (default: true)
+  position?: Point3D;         // A point on the plane surface (default: {x:0, y:0, z:0})
+  normal?: Point3D;           // Plane normal vector, defines the "front" side (default: {x:0, y:1, z:0})
+  mode?: CollisionPlaneMode;  // Response mode (default: KILL)
+  dampen?: number;            // Velocity dampen factor for BOUNCE mode, 0-1 (default: 0)
+  lifetimeLoss?: number;      // Fraction of start lifetime to subtract on collision, 0-1 (default: 0)
+};
+```
+
+### CollisionPlaneMode
+- `KILL` — Deactivate the particle immediately when it crosses the plane
+- `CLAMP` — Stop the particle at the plane surface (zero velocity toward plane)
+- `BOUNCE` — Reflect the velocity vector off the plane normal with optional dampen
+
+**Example — Bouncy floor and kill ceiling:**
+```typescript
+createParticleSystem({
+  // ... particle config
+  collisionPlanes: [
+    {
+      position: { x: 0, y: 0, z: 0 },
+      normal: { x: 0, y: 1, z: 0 },
+      mode: CollisionPlaneMode.BOUNCE,
+      dampen: 0.6,
+    },
+    {
+      position: { x: 0, y: 10, z: 0 },
+      normal: { x: 0, y: -1, z: 0 },
+      mode: CollisionPlaneMode.KILL,
     },
   ],
 });
@@ -870,6 +915,7 @@ enum SimulationBackend {
 - **Core physics:** gravity, velocity integration, position update, lifetime tracking, death detection
 - **All 7 modifiers:** size over lifetime, opacity over lifetime, color over lifetime (per-channel RGB curves), rotation over lifetime, linear velocity over lifetime (per-axis X/Y/Z curves), orbital velocity, noise (3D simplex FBM)
 - **Force fields:** point attractors/repulsors and directional forces with all falloff modes (NONE, LINEAR, QUADRATIC), up to 16 per system
+- **Collision planes:** kill/clamp/bounce modes with dampen and lifetime loss, encoded as packed uniform buffer
 - **Curves:** baked into 256-sample Float32Array lookup tables at system creation for fast GPU evaluation (<0.4% interpolation error)
 
 ### What Stays on CPU

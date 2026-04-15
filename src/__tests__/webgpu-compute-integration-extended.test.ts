@@ -130,6 +130,7 @@ describe('GPU compute integration', () => {
       expect.any(Boolean),
       expect.any(Object),
       expect.any(Number),
+      expect.any(Number),
       expect.any(Number)
     );
     ps.dispose();

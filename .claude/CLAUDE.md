@@ -21,6 +21,7 @@ src/js/effects/three-particles/
 ├── three-particles-utils.ts          # Shape generators, value resolution, texture
 ├── three-particles-enums.ts          # SimulationSpace, Shape, EmitFrom, etc.
 ├── three-particles-forces.ts         # Force fields and attractors
+├── three-particles-collision.ts      # CPU collision plane logic
 ├── three-particles-renderer-detect.ts # WebGPU renderer detection
 ├── three-particles-serialization.ts  # Config save/load serialization
 ├── types.ts                          # Complete TypeScript type definitions
@@ -35,6 +36,7 @@ src/js/effects/three-particles/
     ├── compute-particle-update.ts    # Core physics compute shader
     ├── compute-modifiers.ts          # All 7 modifiers compute shader
     ├── compute-force-fields.ts       # Force field GPU compute
+    ├── compute-collision-planes.ts   # Collision plane GPU compute
     ├── curve-bake.ts                 # Curve baking (bezier/easing → Float32Array)
     └── tsl-noise.ts                  # 3D simplex noise in TSL
 ```
@@ -126,6 +128,7 @@ The library supports a **dual-path architecture**: WebGL (CPU simulation + GLSL)
 - **Opt-in registration:** Users call `registerTSLMaterialFactory()` to enable WebGPU. If not called, only GLSL shaders are used.
 - **Duck-typed detection:** `isComputeCapableRenderer()` checks for `.compute()` and `.hasFeature()` methods — no hard dependency on `THREE.WebGPURenderer`.
 - **Single compute dispatch:** All modifiers run in one GPU compute pass (compile-time branching via TSL, not runtime branching).
+- **Collision planes on GPU:** Collision planes use the same dual-path pattern as force fields — CPU logic in `three-particles-collision.ts`, GPU compute in `webgpu/compute-collision-planes.ts`. Plane data is encoded into a packed Float32Array and uploaded as a uniform buffer.
 - **Curve baking:** Lifetime curves are pre-baked to 256-sample Float32Arrays at system creation, stored in the `curveData` buffer.
 - **Sub-emitters forced to CPU:** Sub-emitters always use `SimulationBackend.CPU` because they need CPU-side death detection callbacks.
 - **Trail always CPU:** `RendererType.TRAIL` uses CPU simulation regardless of backend setting.
@@ -163,6 +166,7 @@ Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into 
 | Enums & constants | `src/js/effects/three-particles/three-particles-enums.ts` |
 | Modifiers | `src/js/effects/three-particles/three-particles-modifiers.ts` |
 | Force fields | `src/js/effects/three-particles/three-particles-forces.ts` |
+| Collision planes | `src/js/effects/three-particles/three-particles-collision.ts` |
 | Serialization | `src/js/effects/three-particles/three-particles-serialization.ts` |
 | Curves / Bezier | `three-particles-curves.ts`, `three-particles-bezier.ts` |
 | Utilities | `src/js/effects/three-particles/three-particles-utils.ts` |
@@ -176,7 +180,7 @@ Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into 
 
 ## Project Status
 
-Completed: Core system, all shape emitters, lifetime modifiers, noise, burst/distance emission, texture sheet animation, world/local space, sub-emitters, force fields, GPU instancing, trail renderer (with smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons), mesh renderer, soft particles, serialization, TypeDoc, visual editor, examples page, CI/CD, benchmark suite, React Three Fiber docs, llms.txt, real-time config updates (`updateConfig`), WebGPU compute support (TSL shaders, GPU physics, modifiers, force fields, noise, curve baking).
+Completed: Core system, all shape emitters, lifetime modifiers, noise, burst/distance emission, texture sheet animation, world/local space, sub-emitters, force fields, collision planes (kill/clamp/bounce), GPU instancing, trail renderer (with smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons), mesh renderer, soft particles, serialization, TypeDoc, visual editor, examples page, CI/CD, benchmark suite, React Three Fiber docs, llms.txt, real-time config updates (`updateConfig`), WebGPU compute support (TSL shaders, GPU physics, modifiers, force fields, collision planes, noise, curve baking).
 
 **Planned:** Trail Phase 2 (UV texture modes, UV scrolling, width by speed), preset system.
 

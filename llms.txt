@@ -199,6 +199,17 @@ forceFields: [
 ]
 ```
 
+## Collision Planes
+
+Infinite planes that constrain particles with three response modes: kill, clamp, or bounce.
+
+```typescript
+collisionPlanes: [
+  { position: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, mode: CollisionPlaneMode.BOUNCE, dampen: 0.6 },
+  { position: { x: 0, y: 5, z: 0 }, normal: { x: 0, y: -1, z: 0 }, mode: CollisionPlaneMode.KILL },
+]
+```
+
 ## WebGPU Compute Support
 
 Optional GPU-accelerated particle simulation via Three.js WebGPU renderer and TSL (Three Shading Language). Enables **50K-350K+ particles** with full physics on the GPU.
@@ -265,6 +276,7 @@ renderer.render(scene, camera);
 - Core physics: gravity, velocity integration, position update, lifetime tracking
 - All 7 modifiers: size/opacity/color over lifetime, rotation, linear/orbital velocity, noise (3D simplex FBM)
 - Force fields: point/directional with falloff (up to 16 per system)
+- Collision planes: kill/clamp/bounce with dampen and lifetime loss
 - Curves: baked into 256-sample Float32Array lookup tables (<0.4% error)
 
 ### What stays on CPU
