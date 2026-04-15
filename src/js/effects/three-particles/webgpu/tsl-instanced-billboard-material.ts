@@ -177,57 +177,67 @@ export function createInstancedBillboardTSLMaterial(
    * clip-space position and expose it via the material's `vertexNode` property.
    */
   const vertexNode = Fn((): ShaderNodeObject<Node> => {
-    // Populate varyings
-    vColor.assign(aColor.toVar());
-    if (gpuCompute) {
-      // particleState: x=lifetime, y=size, z=rotation, w=startFrame
-      vLifetime.assign(aParticleState!.x);
-      vStartLifetime.assign(aStartValues!.x);
-      vRotation.assign(aParticleState!.z);
-      vStartFrame.assign(aParticleState!.w);
-    } else {
-      vLifetime.assign(aLifetime!);
-      vStartLifetime.assign(aStartLifetime!);
-      vRotation.assign(aRotation!);
-      vStartFrame.assign(aStartFrame!);
-    }
+    // Early-out for dead particles: skip all transforms and emit a degenerate
+    // clip-space position that produces zero-area triangles.
+    const clipPos = vec4(0.0, 0.0, 0.0, 0.0).toVar();
 
-    // UV: quad vertex ranges from -0.5..0.5; remap to 0..1 and flip Y so the
-    // top-left of the texture corresponds to the top-left of the billboard.
-    // This matches gl_PointCoord which has Y running top-to-bottom.
-    //   vUv.x = position.x + 0.5
-    //   vUv.y = 0.5 - position.y
-    vUv.assign(vec2(positionLocal.x.add(0.5), float(0.5).sub(positionLocal.y)));
+    If(aColor.w.greaterThan(0.0), () => {
+      // Populate varyings
+      vColor.assign(aColor.toVar());
+      if (gpuCompute) {
+        // particleState: x=lifetime, y=size, z=rotation, w=startFrame
+        vLifetime.assign(aParticleState!.x);
+        vStartLifetime.assign(aStartValues!.x);
+        vRotation.assign(aParticleState!.z);
+        vStartFrame.assign(aParticleState!.w);
+      } else {
+        vLifetime.assign(aLifetime!);
+        vStartLifetime.assign(aStartLifetime!);
+        vRotation.assign(aRotation!);
+        vStartFrame.assign(aStartFrame!);
+      }
 
-    // Transform the particle world position into view space
-    // Use .xyz to handle vec3→vec4 padding by WebGPU storage buffer alignment
-    const mvPosition = modelViewMatrix
-      .mul(vec4(aInstanceOffset.xyz, 1.0))
-      .toVar();
+      // UV: quad vertex ranges from -0.5..0.5; remap to 0..1 and flip Y so the
+      // top-left of the texture corresponds to the top-left of the billboard.
+      // This matches gl_PointCoord which has Y running top-to-bottom.
+      //   vUv.x = position.x + 0.5
+      //   vUv.y = 0.5 - position.y
+      vUv.assign(
+        vec2(positionLocal.x.add(0.5), float(0.5).sub(positionLocal.y))
+      );
 
-    // Match POINTS renderer pixel size:
-    //   gl_PointSize = instanceSize * 100.0 / distance
-    // Equivalent view-space billboard half-extent (in view units):
-    //   perspectiveSize = pointSizePx * (-mvPosition.z)
-    //                     / (projectionMatrix[1][1] * viewportHeight * 0.5)
-    // projectionMatrix[1][1] == cameraProjectionMatrix.element(1).element(1)
-    const dist = length(mvPosition.xyz);
-    const sizeVal = gpuCompute ? aParticleState!.y : aSize!;
-    const pointSizePx = sizeVal.mul(100.0).div(dist);
-    const projY = cameraProjectionMatrix.element(1).element(1);
-    const perspectiveSize = pointSizePx
-      .mul(mvPosition.z.negate())
-      .div(projY.mul(uViewportHeight).mul(0.5));
+      // Transform the particle world position into view space
+      // Use .xyz to handle vec3→vec4 padding by WebGPU storage buffer alignment
+      const mvPosition = modelViewMatrix
+        .mul(vec4(aInstanceOffset.xyz, 1.0))
+        .toVar();
 
-    // Billboard: expand the quad in view space (no rotation here; rotation is
-    // applied to UVs in the fragment stage, identical to the POINTS approach)
-    mvPosition.x.addAssign(positionLocal.x.mul(perspectiveSize));
-    mvPosition.y.addAssign(positionLocal.y.mul(perspectiveSize));
+      // Match POINTS renderer pixel size:
+      //   gl_PointSize = instanceSize * 100.0 / distance
+      // Equivalent view-space billboard half-extent (in view units):
+      //   perspectiveSize = pointSizePx * (-mvPosition.z)
+      //                     / (projectionMatrix[1][1] * viewportHeight * 0.5)
+      // projectionMatrix[1][1] == cameraProjectionMatrix.element(1).element(1)
+      const dist = length(mvPosition.xyz);
+      const sizeVal = gpuCompute ? aParticleState!.y : aSize!;
+      const pointSizePx = sizeVal.mul(100.0).div(dist);
+      const projY = cameraProjectionMatrix.element(1).element(1);
+      const perspectiveSize = pointSizePx
+        .mul(mvPosition.z.negate())
+        .div(projY.mul(uViewportHeight).mul(0.5));
 
-    vViewZ.assign(mvPosition.z.negate());
+      // Billboard: expand the quad in view space (no rotation here; rotation is
+      // applied to UVs in the fragment stage, identical to the POINTS approach)
+      mvPosition.x.addAssign(positionLocal.x.mul(perspectiveSize));
+      mvPosition.y.addAssign(positionLocal.y.mul(perspectiveSize));
 
-    // Project to clip space
-    return cameraProjectionMatrix.mul(mvPosition);
+      vViewZ.assign(mvPosition.z.negate());
+
+      // Project to clip space
+      clipPos.assign(cameraProjectionMatrix.mul(mvPosition));
+    });
+
+    return clipPos;
   })();
 
   // ── Fragment stage ─────────────────────────────────────────────────────────

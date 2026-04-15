@@ -27,6 +27,13 @@ const MeshParticleVertexShader = `
 
   void main()
   {
+    // Early-out for dead particles: skip all expensive transforms and emit
+    // a degenerate position that produces zero-area triangles.
+    if (instanceColor.a <= 0.0) {
+      gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
+      return;
+    }
+
     vColor = instanceColor;
     vLifetime = instanceLifetime;
     vStartLifetime = instanceStartLifetime;

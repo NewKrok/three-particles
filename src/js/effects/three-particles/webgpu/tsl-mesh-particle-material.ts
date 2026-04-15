@@ -138,57 +138,67 @@ export function createMeshParticleTSLMaterial(
    * Also populates all varyings for the fragment stage.
    */
   const vertexSetup = Fn(() => {
-    // Populate varyings
-    vColor.assign(aColor.toVar());
-    if (gpuCompute) {
-      vLifetime.assign(aParticleState!.x);
-      vStartLifetime.assign(aStartValues!.x);
-      vStartFrame.assign(aParticleState!.w);
-      vRotation.assign(aParticleState!.z);
-    } else {
-      vLifetime.assign(aLifetime!);
-      vStartLifetime.assign(aStartLifetime!);
-      vStartFrame.assign(aStartFrame!);
-      vRotation.assign(aRotation!);
-    }
+    // Early-out for dead particles: skip all expensive transforms and emit
+    // a degenerate clip-space position that produces zero-area triangles.
+    // This avoids quaternion rotation, scaling, normal transforms, and
+    // matrix multiplications for every vertex of inactive mesh instances.
+    const clipPos = vec4(0.0, 0.0, 0.0, 0.0).toVar();
 
-    // Build quaternion: GPU compute derives it from particleState.z (rotation
-    // angle around Z); CPU path reads the pre-computed instanceQuat attribute.
-    let quat: ShaderNodeObject<Node>;
-    if (gpuCompute) {
-      const halfZ = aParticleState!.z.mul(0.5);
-      quat = vec4(0.0, 0.0, sin(halfZ), cos(halfZ));
-    } else {
-      quat = aInstanceQuat!;
-    }
+    If(aColor.w.greaterThan(0.0), () => {
+      // Populate varyings
+      vColor.assign(aColor.toVar());
+      if (gpuCompute) {
+        vLifetime.assign(aParticleState!.x);
+        vStartLifetime.assign(aStartValues!.x);
+        vStartFrame.assign(aParticleState!.w);
+        vRotation.assign(aParticleState!.z);
+      } else {
+        vLifetime.assign(aLifetime!);
+        vStartLifetime.assign(aStartLifetime!);
+        vStartFrame.assign(aStartFrame!);
+        vRotation.assign(aRotation!);
+      }
 
-    // 1. Rotate mesh vertex position by instance quaternion
-    const rotatedPos = applyQuaternion({
-      v: positionLocal,
-      q: quat,
+      // Build quaternion: GPU compute derives it from particleState.z (rotation
+      // angle around Z); CPU path reads the pre-computed instanceQuat attribute.
+      let quat: ShaderNodeObject<Node>;
+      if (gpuCompute) {
+        const halfZ = aParticleState!.z.mul(0.5);
+        quat = vec4(0.0, 0.0, sin(halfZ), cos(halfZ));
+      } else {
+        quat = aInstanceQuat!;
+      }
+
+      // 1. Rotate mesh vertex position by instance quaternion
+      const rotatedPos = applyQuaternion({
+        v: positionLocal,
+        q: quat,
+      });
+
+      // 2. Scale by particle size
+      const scaledPos = rotatedPos.mul(gpuCompute ? aParticleState!.y : aSize!);
+
+      // 3. Translate to particle world position
+      // Use .xyz to handle vec3→vec4 padding by WebGPU storage buffer alignment
+      const worldPos = scaledPos.add(aInstanceOffset.xyz);
+
+      // Compute model-view position for depth and normal
+      const mvPos = modelViewMatrix.mul(vec4(worldPos, 1.0));
+      vViewZ.assign(mvPos.z.negate());
+
+      // Transform normal: rotate by quaternion then into view space
+      const rotatedNormal = applyQuaternion({
+        v: normalLocal,
+        q: quat,
+      });
+      const mvNormal = modelViewMatrix.mul(vec4(rotatedNormal, 0.0)).xyz;
+      vNormal.assign(mvNormal.normalize());
+
+      clipPos.assign(cameraProjectionMatrix.mul(mvPos));
     });
-
-    // 2. Scale by particle size
-    const scaledPos = rotatedPos.mul(gpuCompute ? aParticleState!.y : aSize!);
-
-    // 3. Translate to particle world position
-    // Use .xyz to handle vec3→vec4 padding by WebGPU storage buffer alignment
-    const worldPos = scaledPos.add(aInstanceOffset.xyz);
-
-    // Compute model-view position for depth and normal
-    const mvPos = modelViewMatrix.mul(vec4(worldPos, 1.0));
-    vViewZ.assign(mvPos.z.negate());
-
-    // Transform normal: rotate by quaternion then into view space
-    const rotatedNormal = applyQuaternion({
-      v: normalLocal,
-      q: quat,
-    });
-    const mvNormal = modelViewMatrix.mul(vec4(rotatedNormal, 0.0)).xyz;
-    vNormal.assign(mvNormal.normalize());
 
     // Return clip-space position (manual MVP to avoid double-transform)
-    return cameraProjectionMatrix.mul(mvPos);
+    return clipPos;
   })();
 
   // ── Fragment stage ─────────────────────────────────────────────────────────

@@ -1152,29 +1152,35 @@ function createInstancedBillboardTSLMaterial(sharedUniforms, rendererConfig, gpu
   const vUv = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__("vec2", "vUv");
   const vViewZ = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__("float", "vViewZ");
   const vertexNode = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(() => {
-    vColor.assign(aColor.toVar());
-    if (gpuCompute) {
-      vLifetime.assign(aParticleState.x);
-      vStartLifetime.assign(aStartValues.x);
-      vRotation.assign(aParticleState.z);
-      vStartFrame.assign(aParticleState.w);
-    } else {
-      vLifetime.assign(aLifetime);
-      vStartLifetime.assign(aStartLifetime);
-      vRotation.assign(aRotation);
-      vStartFrame.assign(aStartFrame);
-    }
-    vUv.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__.x.add(0.5), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0.5).sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__.y)));
-    const mvPosition = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__.mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(aInstanceOffset.xyz, 1)).toVar();
-    const dist = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_length__(mvPosition.xyz);
-    const sizeVal = gpuCompute ? aParticleState.y : aSize;
-    const pointSizePx = sizeVal.mul(100).div(dist);
-    const projY = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__.element(1).element(1);
-    const perspectiveSize = pointSizePx.mul(mvPosition.z.negate()).div(projY.mul(uViewportHeight).mul(0.5));
-    mvPosition.x.addAssign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__.x.mul(perspectiveSize));
-    mvPosition.y.addAssign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__.y.mul(perspectiveSize));
-    vViewZ.assign(mvPosition.z.negate());
-    return __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__.mul(mvPosition);
+    const clipPos = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(0, 0, 0, 0).toVar();
+    __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(aColor.w.greaterThan(0), () => {
+      vColor.assign(aColor.toVar());
+      if (gpuCompute) {
+        vLifetime.assign(aParticleState.x);
+        vStartLifetime.assign(aStartValues.x);
+        vRotation.assign(aParticleState.z);
+        vStartFrame.assign(aParticleState.w);
+      } else {
+        vLifetime.assign(aLifetime);
+        vStartLifetime.assign(aStartLifetime);
+        vRotation.assign(aRotation);
+        vStartFrame.assign(aStartFrame);
+      }
+      vUv.assign(
+        __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec2__(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__.x.add(0.5), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_float__(0.5).sub(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__.y))
+      );
+      const mvPosition = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__.mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(aInstanceOffset.xyz, 1)).toVar();
+      const dist = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_length__(mvPosition.xyz);
+      const sizeVal = gpuCompute ? aParticleState.y : aSize;
+      const pointSizePx = sizeVal.mul(100).div(dist);
+      const projY = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__.element(1).element(1);
+      const perspectiveSize = pointSizePx.mul(mvPosition.z.negate()).div(projY.mul(uViewportHeight).mul(0.5));
+      mvPosition.x.addAssign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__.x.mul(perspectiveSize));
+      mvPosition.y.addAssign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__.y.mul(perspectiveSize));
+      vViewZ.assign(mvPosition.z.negate());
+      clipPos.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__.mul(mvPosition));
+    });
+    return clipPos;
   })();
   const fragmentColor = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(() => {
     const outColor = vColor.toVar();
@@ -1268,40 +1274,44 @@ function createMeshParticleTSLMaterial(sharedUniforms, rendererConfig, gpuComput
   const vNormal = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__("vec3", "vNormal");
   const vViewZ = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_varyingProperty__("float", "vViewZ");
   const vertexSetup = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(() => {
-    vColor.assign(aColor.toVar());
-    if (gpuCompute) {
-      vLifetime.assign(aParticleState.x);
-      vStartLifetime.assign(aStartValues.x);
-      vStartFrame.assign(aParticleState.w);
-      vRotation.assign(aParticleState.z);
-    } else {
-      vLifetime.assign(aLifetime);
-      vStartLifetime.assign(aStartLifetime);
-      vStartFrame.assign(aStartFrame);
-      vRotation.assign(aRotation);
-    }
-    let quat;
-    if (gpuCompute) {
-      const halfZ = aParticleState.z.mul(0.5);
-      quat = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(0, 0, __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__(halfZ), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__(halfZ));
-    } else {
-      quat = aInstanceQuat;
-    }
-    const rotatedPos = applyQuaternion({
-      v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__,
-      q: quat
+    const clipPos = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(0, 0, 0, 0).toVar();
+    __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_If__(aColor.w.greaterThan(0), () => {
+      vColor.assign(aColor.toVar());
+      if (gpuCompute) {
+        vLifetime.assign(aParticleState.x);
+        vStartLifetime.assign(aStartValues.x);
+        vStartFrame.assign(aParticleState.w);
+        vRotation.assign(aParticleState.z);
+      } else {
+        vLifetime.assign(aLifetime);
+        vStartLifetime.assign(aStartLifetime);
+        vStartFrame.assign(aStartFrame);
+        vRotation.assign(aRotation);
+      }
+      let quat;
+      if (gpuCompute) {
+        const halfZ = aParticleState.z.mul(0.5);
+        quat = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(0, 0, __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_sin__(halfZ), __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cos__(halfZ));
+      } else {
+        quat = aInstanceQuat;
+      }
+      const rotatedPos = applyQuaternion({
+        v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_positionLocal__,
+        q: quat
+      });
+      const scaledPos = rotatedPos.mul(gpuCompute ? aParticleState.y : aSize);
+      const worldPos = scaledPos.add(aInstanceOffset.xyz);
+      const mvPos = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__.mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(worldPos, 1));
+      vViewZ.assign(mvPos.z.negate());
+      const rotatedNormal = applyQuaternion({
+        v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalLocal__,
+        q: quat
+      });
+      const mvNormal = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__.mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(rotatedNormal, 0)).xyz;
+      vNormal.assign(mvNormal.normalize());
+      clipPos.assign(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__.mul(mvPos));
     });
-    const scaledPos = rotatedPos.mul(gpuCompute ? aParticleState.y : aSize);
-    const worldPos = scaledPos.add(aInstanceOffset.xyz);
-    const mvPos = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__.mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(worldPos, 1));
-    vViewZ.assign(mvPos.z.negate());
-    const rotatedNormal = applyQuaternion({
-      v: __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_normalLocal__,
-      q: quat
-    });
-    const mvNormal = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_modelViewMatrix__.mul(__WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_vec4__(rotatedNormal, 0)).xyz;
-    vNormal.assign(mvNormal.normalize());
-    return __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_cameraProjectionMatrix__.mul(mvPos);
+    return clipPos;
   })();
   const fragmentColor = __WEBPACK_EXTERNAL_MODULE_three_tsl_3a8d0cc7_Fn__(() => {
     const outColor = vColor.toVar();
