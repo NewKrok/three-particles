@@ -64,10 +64,10 @@ const getTrailMesh = (ps: ParticleSystem): THREE.Mesh | undefined => {
  */
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = getSimulationObject(ps);
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };

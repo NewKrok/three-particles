@@ -5,7 +5,7 @@
 - **Framework:** Jest 30.x with ts-jest ESM preset
 - **Test location:** `src/__tests__/*.test.ts`
 - **Coverage target:** ≥90% statement, ≥80% branch
-- **Current coverage:** 99.5% statement, 97.8% branch (638 tests, 27 test suites)
+- **Current coverage:** ~93% statement, ~85% branch (947 tests, 43 test suites)
 
 ---
 
@@ -39,7 +39,7 @@ Coverage reports are generated in `coverage/` (text + lcov format).
 
 ---
 
-## Existing Test Files (27 suites, 638 tests)
+## Existing Test Files (43 suites, 947 tests)
 
 | File | What it covers |
 |------|----------------|
@@ -59,17 +59,33 @@ Coverage reports are generated in `coverage/` (text + lcov format).
 | `three-particles-texture.test.ts` | Texture sheet animation |
 | `three-particles-velocity.test.ts` | Velocity and gravity interactions |
 | `three-particles-world-space.test.ts` | World vs Local simulation space |
-| `three-particles-sub-emitters.test.ts` | Sub-emitter birth/death triggers |
+| `three-particles-sub-emitters.test.ts` | Sub-emitter birth/death triggers (including GPU backend forced CPU) |
 | `three-particles-forces.test.ts` | Force fields: point and directional |
 | `three-particles-forces-extended.test.ts` | Force field falloff and edge cases |
 | `three-particles-serialization.test.ts` | Config serialization/deserialization |
 | `three-particles-serialization-extended.test.ts` | Serialization edge cases |
 | `three-particles-instanced.test.ts` | RendererType.INSTANCED |
 | `three-particles-trail.test.ts` | RendererType.TRAIL, ribbon rendering |
+| `three-particles-trail-improvements.test.ts` | Trail smoothing, adaptive sampling, twist prevention |
 | `three-particles-mesh.test.ts` | RendererType.MESH, 3D mesh particles |
+| `three-particles-soft-particles.test.ts` | Soft particles depth-based fade |
 | `three-particles-integration.test.ts` | Integration tests across modules |
+| `three-particles-update-config.test.ts` | Runtime config updates (`updateConfig`) |
+| `three-particles-update-config-integration.test.ts` | `updateConfig` integration scenarios |
 | `three-particles-advanced.test.ts` | Advanced scenarios and combinations |
 | `three-particles-coverage-gaps.test.ts` | Targeted coverage gap tests |
+| `three-particles-renderer-detect.test.ts` | WebGPU renderer detection, `resolveSimulationBackend` |
+| `three-particles-webgpu-integration.test.ts` | TSL factory registration, backend branching |
+| `three-particles-compute.test.ts` | GPU compute pipeline creation and dispatch |
+| `three-particles-compute-modifiers.test.ts` | GPU modifier compute (storage buffers, curve baking) |
+| `three-particles-compute-force-fields.test.ts` | GPU force field encoding and compute |
+| `three-particles-curve-bake.test.ts` | Curve baking (bezier/easing → Float32Array) |
+| `compute-modifiers-flush.test.ts` | Emit queue flush to GPU buffers |
+| `orbital-rotation.test.ts` | Orbital velocity rotation compute |
+| `tsl-point-sprite-material.test.ts` | TSL POINTS material creation |
+| `tsl-instanced-billboard-material.test.ts` | TSL INSTANCED material creation |
+| `tsl-mesh-particle-material.test.ts` | TSL MESH material creation |
+| `tsl-noise.test.ts` | TSL 3D simplex noise implementation |
 
 ---
 

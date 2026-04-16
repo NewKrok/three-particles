@@ -7,6 +7,7 @@ import {
   ForceFieldFalloff,
   ForceFieldType,
   LifeTimeCurve,
+  SimulationBackend,
   SimulationSpace,
   Shape,
 } from '../js/effects/three-particles/three-particles-enums.js';
@@ -421,6 +422,7 @@ describe('round-trip: serialize then deserialize', () => {
       gravity: -9.8,
       maxParticles: 200,
       simulationSpace: SimulationSpace.WORLD,
+      simulationBackend: SimulationBackend.GPU,
     };
     const result = deserializeParticleSystem(serializeParticleSystem(original));
     expect(result.duration).toBe(3.5);
@@ -428,6 +430,15 @@ describe('round-trip: serialize then deserialize', () => {
     expect(result.gravity).toBe(-9.8);
     expect(result.maxParticles).toBe(200);
     expect(result.simulationSpace).toBe(SimulationSpace.WORLD);
+    expect(result.simulationBackend).toBe(SimulationBackend.GPU);
+  });
+
+  it('should preserve simulationBackend AUTO value', () => {
+    const original: ParticleSystemConfig = {
+      simulationBackend: SimulationBackend.AUTO,
+    };
+    const result = deserializeParticleSystem(serializeParticleSystem(original));
+    expect(result.simulationBackend).toBe(SimulationBackend.AUTO);
   });
 
   it('should reconstruct transform vectors', () => {

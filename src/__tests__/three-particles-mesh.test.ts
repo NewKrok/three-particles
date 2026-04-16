@@ -51,10 +51,10 @@ const createMeshSystem = (
  */
 const countActiveParticles = (ps: ParticleSystem): number => {
   const mesh = ps.instance as THREE.Mesh;
-  const isActiveArr = mesh.geometry.attributes.instanceIsActive.array;
+  const isActiveAttr = mesh.geometry.attributes.instanceIsActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -114,24 +114,27 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       const { ps } = createMeshSystem();
       const geom = getGeometry(ps);
 
-      const instancedAttrs = [
-        'instanceOffset',
+      // instanceOffset stays as InstancedBufferAttribute (separate vec3 buffer)
+      const offsetAttr = geom.getAttribute('instanceOffset');
+      expect(offsetAttr).toBeDefined();
+      expect(offsetAttr).toBeInstanceOf(THREE.InstancedBufferAttribute);
+
+      // Scalar attributes are InterleavedBufferAttribute backed by
+      // an InstancedInterleavedBuffer (interleaved vertex buffer refactor).
+      const scalarAttrs = [
         'instanceIsActive',
         'instanceLifetime',
         'instanceStartLifetime',
         'instanceSize',
         'instanceRotation',
-        'instanceColorR',
-        'instanceColorG',
-        'instanceColorB',
-        'instanceColorA',
+        'instanceColor',
         'instanceStartFrame',
       ];
 
-      for (const name of instancedAttrs) {
+      for (const name of scalarAttrs) {
         const attr = geom.getAttribute(name);
         expect(attr).toBeDefined();
-        expect(attr).toBeInstanceOf(THREE.InstancedBufferAttribute);
+        expect(attr).toBeInstanceOf(THREE.InterleavedBufferAttribute);
       }
 
       ps.dispose();
@@ -392,12 +395,16 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       step(500, 300);
 
       const geom = getGeometry(ps);
-      const sizeArr = geom.getAttribute('instanceSize').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const sizeAttr = geom.getAttribute('instanceSize');
+      const isActiveAttr2 = geom.getAttribute('instanceIsActive');
 
       let hasModifiedSize = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && sizeArr[i] > 0 && sizeArr[i] < 2) {
+        if (
+          isActiveAttr2.getX(i) &&
+          sizeAttr.getX(i) > 0 &&
+          sizeAttr.getX(i) < 2
+        ) {
           hasModifiedSize = true;
           break;
         }
@@ -430,12 +437,16 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       step(500, 300);
 
       const geom = getGeometry(ps);
-      const alphaArr = geom.getAttribute('instanceColorA').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const alphaAttr = geom.getAttribute('instanceColor');
+      const isActiveA = geom.getAttribute('instanceIsActive');
 
       let hasModifiedAlpha = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && alphaArr[i] > 0 && alphaArr[i] < 1) {
+        if (
+          isActiveA.getX(i) &&
+          alphaAttr.getW(i) > 0 &&
+          alphaAttr.getW(i) < 1
+        ) {
           hasModifiedAlpha = true;
           break;
         }
@@ -487,12 +498,12 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
       step(800, 600);
 
       const geom = getGeometry(ps);
-      const colorR = geom.getAttribute('instanceColorR').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const colorRAttr = geom.getAttribute('instanceColor');
+      const isActiveB = geom.getAttribute('instanceIsActive');
 
       let hasModifiedColor = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && colorR[i] < 1.0) {
+        if (isActiveB.getX(i) && colorRAttr.getX(i) < 1.0) {
           hasModifiedColor = true;
           break;
         }
@@ -516,12 +527,12 @@ describe('Mesh Particle Renderer (RendererType.MESH)', () => {
 
       const geom = getGeometry(ps);
       const offsetArr = geom.getAttribute('instanceOffset').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const isActiveC = geom.getAttribute('instanceIsActive');
 
       // With gravity, particles should move downward (negative Y)
       let hasGravityEffect = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && offsetArr[i * 3 + 1] < -0.01) {
+        if (isActiveC.getX(i) && offsetArr[i * 3 + 1] < -0.01) {
           hasGravityEffect = true;
           break;
         }

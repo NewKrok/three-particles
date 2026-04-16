@@ -12,10 +12,10 @@ import { ParticleSystem } from '../js/effects/three-particles/types.js';
 
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = ps.instance as THREE.Points;
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -426,11 +426,11 @@ describe('Edge cases - particle motion detection', () => {
     // Particles with non-zero speed should have moved
     const points = ps.instance as THREE.Points;
     const posArr = points.geometry.attributes.position.array;
-    const isActiveArr = points.geometry.attributes.isActive.array;
+    const isActiveAttr = points.geometry.attributes.isActive;
 
     let hasMoved = false;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
         // At least one coordinate should be non-zero
         if (
           posArr[i * 3] !== 0 ||

@@ -10,6 +10,66 @@ const version = await initVersionSwitcher() || "2.4.0";
 const particleModule = await import(cdnUrl(version));
 const { createParticleSystem, updateParticleSystems } = particleModule;
 
+// ─── WebGPU support ────────────────────────────────────────────────
+// The importmap maps "three" to three.webgpu.js for a unified Three.js
+// instance. All examples use WebGPURenderer (auto WebGL fallback).
+// GPU-tagged examples get TSL NodeMaterials; others use GLSL ShaderMaterial
+// via simulationBackend: "CPU".
+let webgpuAvailable = false;
+
+try {
+  if (navigator.gpu) {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (adapter) {
+      if (version === "local" && particleModule.registerTSLMaterialFactory) {
+        const {
+          createTSLParticleMaterial,
+          createTSLTrailMaterial,
+          createComputePipeline,
+          writeParticleToModifierBuffers,
+          deactivateParticleInModifierBuffers,
+          flushEmitQueue,
+          registerCurveDataLength,
+          encodeForceFieldsForGPU,
+          encodeCollisionPlanesForGPU,
+        } = await import("./three-particles-webgpu.esm.js");
+        particleModule.registerTSLMaterialFactory({
+          createTSLParticleMaterial,
+          createTSLTrailMaterial,
+          createComputePipeline,
+          writeParticleToModifierBuffers,
+          deactivateParticleInModifierBuffers,
+          flushEmitQueue,
+          registerCurveDataLength,
+          encodeForceFieldsForGPU,
+          encodeCollisionPlanesForGPU,
+        });
+      }
+      webgpuAvailable = true;
+    }
+  }
+} catch {
+  // WebGPU not available
+}
+
+// Debug: log WGSL shader compilation errors with source code
+if (typeof GPUDevice !== "undefined") {
+  const _origCSM = GPUDevice.prototype.createShaderModule;
+  GPUDevice.prototype.createShaderModule = function(descriptor) {
+    const module = _origCSM.call(this, descriptor);
+    module.getCompilationInfo().then(info => {
+      const errors = info.messages.filter(m => m.type === "error");
+      if (errors.length > 0) {
+        console.group("%c[WGSL Shader Error]", "color:red;font-weight:bold");
+        errors.forEach(e => console.error(`Line ${e.lineNum}:${e.linePos} — ${e.message}`));
+        console.log(descriptor.code);
+        console.groupEnd();
+      }
+    });
+    return module;
+  };
+}
+
 // Texture ID to file mapping
 const TEXTURE_MAP = {
   FLAME: "textures/flame.webp",
@@ -64,9 +124,21 @@ const MESH_GEOMETRIES = {
   CYLINDER: () => new THREE.CylinderGeometry(0.3, 0.3, 1, 8),
 };
 
-function prepareConfig(config, textureId, meshType) {
+function prepareConfig(config, textureId, meshType, forceGPU = false) {
   const prepared = JSON.parse(JSON.stringify(config));
   delete prepared._editorData;
+  if (!forceGPU) {
+    prepared.simulationBackend = "CPU";
+  }
+  // WebGPU does not support variable-size point primitives (pointUV / gl_PointCoord),
+  // so always force POINTS → INSTANCED when WebGPURenderer is in use.
+  if (webgpuAvailable) {
+    const rt = prepared.renderer?.rendererType;
+    if (!rt || rt === "POINTS") {
+      prepared.renderer = prepared.renderer || {};
+      prepared.renderer.rendererType = "INSTANCED";
+    }
+  }
   if (prepared.renderer?.blending) {
     prepared.renderer.blending = resolveBlending(prepared.renderer.blending);
   }
@@ -95,6 +167,7 @@ function prepareConfig(config, textureId, meshType) {
 // ─── Active demo management — only one demo runs at a time ───────────
 let activeCard = null;
 const cardRendererTypes = new Map();
+const cardBackendTypes = new Map();
 
 function getConfigRendererType(example) {
   return example.config?.renderer?.rendererType || "POINTS";
@@ -126,7 +199,14 @@ function setupSoftParticlesScene(renderer, camera, width, height) {
 
   // Ground plane — positioned so particles visibly intersect it
   const groundGeom = new THREE.PlaneGeometry(40, 40);
-  const groundMat = new THREE.MeshBasicMaterial({ color: 0x444444 });
+  // WebGPURenderer uses LinearSRGBColorSpace output (no sRGB encode on output).
+  // THREE.Color(0x444444) stores sRGB values but the renderer won't apply the
+  // sRGB transfer curve on output, making the plane look darker than intended.
+  // Use setRGB with LinearSRGBColorSpace so the hex values are stored directly
+  // as linear values, preserving the intended visual brightness.
+  const groundColor = new THREE.Color();
+  groundColor.setRGB(0x44 / 0xff, 0x44 / 0xff, 0x44 / 0xff, THREE.LinearSRGBColorSpace);
+  const groundMat = new THREE.MeshBasicMaterial({ color: groundColor });
   const groundMesh = new THREE.Mesh(groundGeom, groundMat);
   groundMesh.rotation.x = -Math.PI / 2;
   groundMesh.position.y = -2.5;
@@ -135,18 +215,23 @@ function setupSoftParticlesScene(renderer, camera, width, height) {
 }
 
 class LiveDemo {
-  constructor(container, exampleData, rendererType = "POINTS") {
+  constructor(container, exampleData, rendererType = "POINTS", backend = "CPU") {
     this.container = container;
     this.data = exampleData;
     this.rendererType = rendererType;
+    this.backend = backend;
     this.clock = new THREE.Clock();
+    this.frames = 0;
+    this.fpsAccum = 0;
+    this.lastFpsUpdate = 0;
     this.paused = false;
     this.pausedDuration = 0;
     this.pauseStartTime = 0;
+    this.disposed = false;
     this.init();
   }
 
-  init() {
+  async init() {
     const canvas = this.container.querySelector("canvas");
     canvas.style.display = "block";
     const img = this.container.querySelector(".preview-img");
@@ -159,11 +244,16 @@ class LiveDemo {
     const width = canvas.clientWidth || 320;
     const height = canvas.clientHeight || 220;
 
-    this.renderer = new THREE.WebGLRenderer({
+    this.renderer = new THREE.WebGPURenderer({
       canvas,
       antialias: true,
       alpha: true,
     });
+    await this.renderer.init();
+    if (this.disposed) { this.renderer.dispose(); return; }
+    // Particle shaders output raw sRGB values (textures are not linearised).
+    // Disable the output pass sRGB conversion to avoid double-gamma encoding.
+    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -182,9 +272,12 @@ class LiveDemo {
       this.scene.add(setup.groundMesh);
     }
 
-    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType);
+    const useGPU = webgpuAvailable && this.backend === "GPU";
+    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType, useGPU);
     config.renderer = config.renderer || {};
-    if (!isTrailExample(this.data) && !isMeshExample(this.data)) {
+    // Only override renderer type when NOT on WebGPU (prepareConfig already
+    // forces POINTS → INSTANCED for WebGPU since point primitives are unsupported).
+    if (!webgpuAvailable && !isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
     if (this.softParticlesSetup) {
@@ -198,6 +291,14 @@ class LiveDemo {
     const system = createParticleSystem(config);
     this.scene.add(system.instance);
     this.particleSystem = system;
+
+    // Update card stats backend label
+    const backendLabel = this.container.querySelector(".card-backend-label");
+    if (backendLabel) {
+      backendLabel.textContent = useGPU ? "GPU" : "CPU";
+      backendLabel.style.color = useGPU ? "#66bb6a" : "#4fc3f7";
+    }
+
     this.animate();
   }
 
@@ -205,12 +306,18 @@ class LiveDemo {
     if (!this.particleSystem) return;
     const delta = this.clock.getDelta();
     const elapsed = this.clock.getElapsedTime();
+    const now = performance.now();
 
     const cycleData = { now: Date.now() - this.pausedDuration, delta, elapsed };
     if (this.particleSystem.update) {
       this.particleSystem.update(cycleData);
     } else {
       updateParticleSystems(cycleData);
+    }
+
+    // GPU compute dispatch (must run before render, not inside onBeforeRender)
+    if (this.particleSystem.computeNode) {
+      this.renderer.compute(this.particleSystem.computeNode);
     }
 
     // Soft particles: render depth pass first
@@ -225,6 +332,19 @@ class LiveDemo {
     }
 
     this.renderer.render(this.scene, this.camera);
+
+    // FPS tracking
+    this.frames++;
+    this.fpsAccum += delta;
+    if (now - this.lastFpsUpdate > 500) {
+      const fps = this.fpsAccum > 0 ? this.frames / this.fpsAccum : 0;
+      const fpsEl = this.container.querySelector(".card-fps");
+      if (fpsEl) fpsEl.textContent = `${fps.toFixed(0)} FPS`;
+      this.frames = 0;
+      this.fpsAccum = 0;
+      this.lastFpsUpdate = now;
+    }
+
     this.animationId = requestAnimationFrame(() => this.animate());
   }
 
@@ -246,6 +366,7 @@ class LiveDemo {
   }
 
   dispose() {
+    this.disposed = true;
     if (this.animationId) cancelAnimationFrame(this.animationId);
     if (this.particleSystem) this.particleSystem.dispose();
     if (this.softParticlesSetup) {
@@ -310,7 +431,8 @@ function startDemo(card, exampleData) {
   stopActiveDemo();
   gtag("event", "click", { event_category: "demo", event_label: "play", demo: exampleData.id });
   const rendererType = cardRendererTypes.get(card) || "POINTS";
-  card._liveDemo = new LiveDemo(card, exampleData, rendererType);
+  const backend = cardBackendTypes.get(card) || "CPU";
+  card._liveDemo = new LiveDemo(card, exampleData, rendererType, backend);
   card.classList.add("active");
   activeCard = card;
   updateCardPlayPauseBtn(card, true);
@@ -320,12 +442,14 @@ function startDemo(card, exampleData) {
 let expandDemo = null;
 let expandExampleData = null;
 let expandRendererType = "POINTS";
+let expandBackendType = "GPU";
 
 class ExpandedDemo {
-  constructor(canvas, exampleData, rendererType = "POINTS") {
+  constructor(canvas, exampleData, rendererType = "POINTS", backend = "CPU") {
     this.canvas = canvas;
     this.data = exampleData;
     this.rendererType = rendererType;
+    this.backend = backend;
     this.clock = new THREE.Clock();
     this.frames = 0;
     this.fpsAccum = 0;
@@ -334,18 +458,22 @@ class ExpandedDemo {
     this.paused = false;
     this.pausedDuration = 0;
     this.pauseStartTime = 0;
+    this.disposed = false;
     this.init();
   }
 
-  init() {
+  async init() {
     const width = this.canvas.clientWidth || 800;
     const height = this.canvas.clientHeight || 600;
 
-    this.renderer = new THREE.WebGLRenderer({
+    this.renderer = new THREE.WebGPURenderer({
       canvas: this.canvas,
       antialias: true,
       alpha: true,
     });
+    await this.renderer.init();
+    if (this.disposed) { this.renderer.dispose(); return; }
+    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -364,9 +492,10 @@ class ExpandedDemo {
       this.scene.add(setup.groundMesh);
     }
 
-    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType);
+    const useGPU = webgpuAvailable && this.backend === "GPU";
+    const config = prepareConfig(this.data.config, this.data.textureId, this.data.meshType, useGPU);
     config.renderer = config.renderer || {};
-    if (!isTrailExample(this.data) && !isMeshExample(this.data)) {
+    if (!webgpuAvailable && !isTrailExample(this.data) && !isMeshExample(this.data)) {
       config.renderer.rendererType = this.rendererType;
     }
     if (this.softParticlesSetup) {
@@ -380,6 +509,13 @@ class ExpandedDemo {
     const system = createParticleSystem(config);
     this.scene.add(system.instance);
     this.particleSystem = system;
+
+    // Update backend label in stats bar
+    const backendLabel = document.getElementById("expand-backend-label");
+    if (backendLabel) {
+      backendLabel.textContent = useGPU ? "GPU" : "CPU";
+      backendLabel.style.color = useGPU ? "#66bb6a" : "#4fc3f7";
+    }
 
     const label = document.getElementById("expand-renderer-label");
     if (label) {
@@ -410,6 +546,11 @@ class ExpandedDemo {
       this.particleSystem.update(cycleData);
     } else {
       updateParticleSystems(cycleData);
+    }
+
+    // GPU compute dispatch (must run before render, not inside onBeforeRender)
+    if (this.particleSystem.computeNode) {
+      this.renderer.compute(this.particleSystem.computeNode);
     }
 
     // Soft particles: render depth pass first
@@ -480,6 +621,7 @@ class ExpandedDemo {
   }
 
   dispose() {
+    this.disposed = true;
     if (this.animationId) cancelAnimationFrame(this.animationId);
     if (this.particleSystem) this.particleSystem.dispose();
     if (this.softParticlesSetup) {
@@ -514,7 +656,7 @@ function updateExpandPlayPauseBtn(playing) {
   }
 }
 
-function openExpandModal(exampleData, rendererType) {
+function openExpandModal(exampleData, rendererType, backend = "GPU") {
   const overlay = document.getElementById("expand-overlay");
   const canvas = document.getElementById("expand-canvas");
   const titleEl = document.getElementById("expand-title");
@@ -524,27 +666,29 @@ function openExpandModal(exampleData, rendererType) {
   titleEl.textContent = exampleData.title;
   expandExampleData = exampleData;
   expandRendererType = rendererType;
+  expandBackendType = backend;
 
-  const toggle = document.getElementById("expand-renderer-toggle");
-  if (isTrailExample(exampleData)) {
-    toggle.innerHTML = `<span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span>`;
-  } else if (isMeshExample(exampleData)) {
-    toggle.innerHTML = `<span class="trail-badge" title="3D Mesh renderer">MESH</span>`;
-  } else {
-    toggle.innerHTML = `
-      <button data-type="POINTS" title="Point sprites (THREE.Points)">POINTS</button>
-      <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INSTANCED</button>
+  // Backend (GPU/CPU) toggle
+  const backendToggle = document.getElementById("expand-backend-toggle");
+  if (webgpuAvailable) {
+    backendToggle.innerHTML = `
+      <button data-backend="CPU" title="CPU simulation (GLSL ShaderMaterial)">CPU</button>
+      <button data-backend="GPU" title="GPU compute simulation (TSL / WebGPU)">GPU</button>
     `;
-    toggle.querySelectorAll("button").forEach((b) => {
-      b.classList.toggle("active", b.dataset.type === rendererType);
+    backendToggle.querySelectorAll("button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.backend === backend);
     });
+    backendToggle.style.display = "";
+  } else {
+    backendToggle.innerHTML = "";
+    backendToggle.style.display = "none";
   }
 
   overlay.classList.add("open");
   updateExpandPlayPauseBtn(true);
 
   requestAnimationFrame(() => {
-    expandDemo = new ExpandedDemo(canvas, exampleData, rendererType);
+    expandDemo = new ExpandedDemo(canvas, exampleData, rendererType, backend);
   });
 }
 
@@ -553,18 +697,18 @@ document.getElementById("expand-close").addEventListener("click", closeExpandMod
 document.getElementById("expand-overlay").addEventListener("click", (e) => {
   if (e.target === document.getElementById("expand-overlay")) closeExpandModal();
 });
-document.getElementById("expand-renderer-toggle").addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-type]");
-  if (!btn || (expandExampleData && (isTrailExample(expandExampleData) || isMeshExample(expandExampleData)))) return;
-  const type = btn.dataset.type;
-  const toggle = document.getElementById("expand-renderer-toggle");
+document.getElementById("expand-backend-toggle").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-backend]");
+  if (!btn) return;
+  const backend = btn.dataset.backend;
+  const toggle = document.getElementById("expand-backend-toggle");
   toggle.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
   btn.classList.add("active");
-  expandRendererType = type;
+  expandBackendType = backend;
   if (expandDemo && expandExampleData) {
     expandDemo.dispose();
     const canvas = document.getElementById("expand-canvas");
-    expandDemo = new ExpandedDemo(canvas, expandExampleData, type);
+    expandDemo = new ExpandedDemo(canvas, expandExampleData, expandRendererType, backend);
     updateExpandPlayPauseBtn(true);
   }
 });
@@ -584,7 +728,7 @@ document.getElementById("expand-restart-btn").addEventListener("click", () => {
   if (!expandExampleData) return;
   if (expandDemo) expandDemo.dispose();
   const canvas = document.getElementById("expand-canvas");
-  expandDemo = new ExpandedDemo(canvas, expandExampleData, expandRendererType);
+  expandDemo = new ExpandedDemo(canvas, expandExampleData, expandRendererType, expandBackendType);
   updateExpandPlayPauseBtn(true);
 });
 
@@ -631,6 +775,10 @@ examples.forEach((example) => {
       <div class="stop-hint" style="display:none">
         <span>Click to stop</span>
       </div>
+      <div class="card-stats">
+        <span class="card-fps">-- FPS</span>
+        <span class="card-backend-label"></span>
+      </div>
     </div>
     <div class="card-info">
       <h3>${example.title}</h3>
@@ -640,14 +788,12 @@ examples.forEach((example) => {
       </div>
       <div class="card-controls">
         <div class="card-btns">
-          ${isTrailExample(example)
-            ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge" title="Trail / Ribbon renderer">TRAIL</span></div>`
-            : isMeshExample(example)
-              ? `<div class="renderer-toggle trail-fixed"><span class="trail-badge" title="3D Mesh renderer">MESH</span></div>`
-              : `<div class="renderer-toggle">
-              <button class="active" data-type="POINTS" title="Point sprites (THREE.Points)">PTS</button>
-              <button data-type="INSTANCED" title="GPU instancing (InstancedBufferGeometry)">INST</button>
+          ${webgpuAvailable
+            ? `<div class="backend-toggle">
+              <button data-backend="CPU" title="CPU simulation (GLSL ShaderMaterial)">CPU</button>
+              <button class="active" data-backend="GPU" title="GPU compute simulation (TSL / WebGPU)">GPU</button>
             </div>`
+            : ""
           }
           <button class="icon-btn playpause-btn" title="Play" disabled>
             <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -690,16 +836,18 @@ examples.forEach((example) => {
   grid.appendChild(card);
 
   cardRendererTypes.set(card, getConfigRendererType(example));
+  cardBackendTypes.set(card, webgpuAvailable ? "GPU" : "CPU");
 
-  if (!isTrailExample(example) && !isMeshExample(example)) {
-    card.querySelector(".renderer-toggle").addEventListener("click", (e) => {
+  const backendToggle = card.querySelector(".backend-toggle");
+  if (backendToggle) {
+    backendToggle.addEventListener("click", (e) => {
       e.stopPropagation();
-      const btn = e.target.closest("button[data-type]");
+      const btn = e.target.closest("button[data-backend]");
       if (!btn) return;
-      const type = btn.dataset.type;
-      card.querySelector(".renderer-toggle").querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+      const backend = btn.dataset.backend;
+      backendToggle.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      cardRendererTypes.set(card, type);
+      cardBackendTypes.set(card, backend);
       if (activeCard === card) {
         stopActiveDemo();
         startDemo(card, example);
@@ -723,17 +871,18 @@ examples.forEach((example) => {
     e.stopPropagation();
     if (activeCard !== card) return;
     const rendererType = cardRendererTypes.get(card) || "POINTS";
+    const backend = cardBackendTypes.get(card) || "CPU";
     if (card._liveDemo) {
       card._liveDemo.dispose();
       card._liveDemo = null;
     }
-    card._liveDemo = new LiveDemo(card, example, rendererType);
+    card._liveDemo = new LiveDemo(card, example, rendererType, backend);
     updateCardPlayPauseBtn(card, true);
   });
 
   card.querySelector(".expand-btn").addEventListener("click", (e) => {
     e.stopPropagation();
-    openExpandModal(example, cardRendererTypes.get(card) || "POINTS");
+    openExpandModal(example, cardRendererTypes.get(card) || "POINTS", cardBackendTypes.get(card) || "CPU");
   });
 
   card.querySelector(".copy-btn").addEventListener("click", (e) => {

@@ -2,6 +2,8 @@
 
 ## High-Level Overview
 
+The library uses a **dual-path architecture** — WebGL (CPU simulation + GLSL shaders) and WebGPU (GPU compute simulation + TSL materials). The backend is selected automatically based on renderer capabilities, or forced via `simulationBackend`.
+
 ```
                     User Code
                        │
@@ -10,8 +12,8 @@
                        │
          ┌─────────────┼─────────────┐
          ▼             ▼             ▼
-    Normalize     BufferGeometry  ShaderMaterial
-     Config       + Attributes    + Uniforms
+    Normalize     BufferGeometry  Material
+     Config       + Attributes    (GLSL or TSL)
          │             │             │
          └──────┬──────┴─────────────┘
                 ▼
@@ -21,16 +23,15 @@
                 ▼  (every frame)
        updateParticleSystems(cycleData)
                 │
-    ┌───────────┼───────────┐
-    ▼           ▼           ▼
-  Emit      Update       Apply
- Particles  Positions   Modifiers
-    │           │           │
-    └───────────┴───────────┘
+    ┌───────────┼───────────────┐
+    ▼           ▼               ▼
+  Emit      Simulation       Apply
+ Particles  (CPU or GPU)    Modifiers
+    │           │               │
+    └───────────┴───────────────┘
                 │
-                ▼
-          GPU Rendering
-       (Vertex + Fragment Shaders)
+                ├── CPU path: buffer attribute updates → GPU rendering (GLSL)
+                └── GPU path: compute dispatch → GPU rendering (TSL/WGSL)
 ```
 
 ---
@@ -39,25 +40,38 @@
 
 ```
 src/js/effects/three-particles/
-├── index.ts                    ← Public API re-exports
-├── three-particles.ts          ← Core: lifecycle, emission, update loop
-├── three-particles-modifiers.ts ← Per-particle property animation
-├── three-particles-curves.ts   ← 30 easing functions
-├── three-particles-bezier.ts   ← Custom Bezier curve evaluation + caching
-├── three-particles-utils.ts    ← Shape generators, value resolution, texture
-├── three-particles-enums.ts    ← SimulationSpace, Shape, EmitFrom, etc.
-├── three-particles-forces.ts   ← Force fields and attractors
+├── index.ts                         ← Public API re-exports
+├── three-particles.ts               ← Core: lifecycle, emission, update loop
+├── three-particles-modifiers.ts     ← Per-particle property animation (CPU path)
+├── three-particles-curves.ts        ← 30 easing functions
+├── three-particles-bezier.ts        ← Custom Bezier curve evaluation + caching
+├── three-particles-utils.ts         ← Shape generators, value resolution, texture
+├── three-particles-enums.ts         ← SimulationSpace, Shape, SimulationBackend, etc.
+├── three-particles-forces.ts        ← Force fields and attractors (CPU path)
+├── three-particles-renderer-detect.ts ← WebGPU renderer detection + backend resolution
 ├── three-particles-serialization.ts ← Config save/load serialization
-├── types.ts                    ← Complete TypeScript type definitions
-└── shaders/
-    ├── particle-system-vertex-shader.glsl.ts       ← POINTS: position, size, color → GPU
-    ├── particle-system-fragment-shader.glsl.ts     ← POINTS: texture, rotation, animation
-    ├── instanced-particle-vertex-shader.glsl.ts    ← INSTANCED: quad-based particles
-    ├── instanced-particle-fragment-shader.glsl.ts  ← INSTANCED: fragment processing
-    ├── trail-vertex-shader.glsl.ts                 ← TRAIL: ribbon vertex positions + UVs
-    ├── trail-fragment-shader.glsl.ts               ← TRAIL: ribbon fragment with tapering
-    ├── mesh-particle-vertex-shader.glsl.ts         ← MESH: 3D geometry + quaternion rotation
-    └── mesh-particle-fragment-shader.glsl.ts       ← MESH: directional lighting + texture
+├── types.ts                         ← Complete TypeScript type definitions
+├── shaders/                         ← GLSL shaders (WebGL path)
+│   ├── particle-system-vertex-shader.glsl.ts       ← POINTS
+│   ├── particle-system-fragment-shader.glsl.ts     ← POINTS
+│   ├── instanced-particle-vertex-shader.glsl.ts    ← INSTANCED
+│   ├── instanced-particle-fragment-shader.glsl.ts  ← INSTANCED
+│   ├── trail-vertex-shader.glsl.ts                 ← TRAIL
+│   ├── trail-fragment-shader.glsl.ts               ← TRAIL
+│   ├── mesh-particle-vertex-shader.glsl.ts         ← MESH
+│   └── mesh-particle-fragment-shader.glsl.ts       ← MESH
+└── webgpu/                          ← WebGPU compute + TSL materials
+    ├── tsl-materials.ts             ← TSL material factory dispatch
+    ├── tsl-shared.ts                ← Shared TSL nodes (texture animation, soft particles)
+    ├── tsl-point-sprite-material.ts ← POINTS renderer TSL material
+    ├── tsl-instanced-billboard-material.ts ← INSTANCED renderer TSL material
+    ├── tsl-mesh-particle-material.ts     ← MESH renderer TSL material
+    ├── tsl-trail-ribbon-material.ts      ← TRAIL renderer TSL material
+    ├── compute-particle-update.ts   ← Core physics compute shader
+    ├── compute-modifiers.ts         ← All 7 modifiers in single compute dispatch
+    ├── compute-force-fields.ts      ← Force field GPU compute + encoding
+    ├── curve-bake.ts                ← Curve baking (bezier/easing → Float32Array)
+    └── tsl-noise.ts                 ← 3D simplex noise in TSL
 ```
 
 ### Module Dependencies
@@ -65,18 +79,26 @@ src/js/effects/three-particles/
 ```
 index.ts
   └─► three-particles.ts (core)
-        ├─► three-particles-modifiers.ts
+        ├─► three-particles-modifiers.ts     (CPU path)
         │     ├─► three-particles-curves.ts
         │     └─► three-particles-bezier.ts
         ├─► three-particles-utils.ts
         │     ├─► three-particles-curves.ts
         │     └─► three-particles-bezier.ts
-        ├─► three-particles-forces.ts
+        ├─► three-particles-forces.ts        (CPU path)
+        ├─► three-particles-renderer-detect.ts
         ├─► three-particles-serialization.ts
         ├─► three-particles-enums.ts
         ├─► types.ts
-        └─► shaders/*.glsl.ts
+        └─► shaders/*.glsl.ts               (WebGL path)
+
+webgpu.ts (separate entry point)
+  └─► webgpu/tsl-materials.ts
+  └─► webgpu/compute-modifiers.ts
+  └─► webgpu/compute-force-fields.ts
 ```
+
+The `webgpu/` module is loaded **only when the user registers the TSL factory**. It is never imported by the main entry point, keeping the WebGL-only bundle small.
 
 No circular dependencies (enforced by CI via `madge --circular`).
 
@@ -471,3 +493,141 @@ All fields optional — merged with defaults at creation:
   elapsed: number  // Total elapsed seconds
 }
 ```
+
+---
+
+## WebGPU Dual-Path Architecture
+
+### Overview
+
+When a WebGPU-capable renderer is detected and the TSL material factory is registered, the library switches to a fully GPU-accelerated pipeline. The existing WebGL path (CPU simulation + GLSL shaders) remains completely untouched — all WebGPU code is additive.
+
+```
+createParticleSystem(config)
+        │
+        ▼
+  resolveSimulationBackend(renderer, config.simulationBackend)
+        │
+        ├── GPU path (WebGPURenderer + TSL factory registered)
+        │   ├── Material: TSL NodeMaterial (compiles to WGSL)
+        │   ├── Simulation: GPU compute shaders (storage buffers)
+        │   └── Emission: CPU → flush to GPU via staging writes
+        │
+        └── CPU path (WebGLRenderer or no factory)
+            ├── Material: GLSL ShaderMaterial
+            ├── Simulation: JavaScript update loop
+            └── Emission: CPU (direct buffer attribute writes)
+```
+
+### Renderer Detection
+
+`three-particles-renderer-detect.ts` uses duck-typing (no class checks):
+
+- `isComputeCapableRenderer(renderer)` — checks for `.compute()` and `.hasFeature()` methods
+- `resolveSimulationBackend(renderer, preference)` — maps user preference + renderer capability to `CPU` or `GPU`
+
+### TSL Material System
+
+TSL (Three Shading Language) materials are node-based and compile to WGSL for WebGPU. Each renderer type has a dedicated TSL material:
+
+| Renderer Type | TSL Material File | Key Feature |
+|---------------|-------------------|-------------|
+| POINTS | `tsl-point-sprite-material.ts` | Point size based on distance |
+| INSTANCED | `tsl-instanced-billboard-material.ts` | Camera-facing quads, no gl_PointSize limit |
+| MESH | `tsl-mesh-particle-material.ts` | 3D geometry with quaternion rotation |
+| TRAIL | `tsl-trail-ribbon-material.ts` | Pre-baked ribbon geometry |
+
+Materials detect GPU compute mode via a `gpuCompute` flag:
+- **GPU compute active:** materials read particle data from packed vec4 storage buffers
+- **CPU simulation:** materials read individual float attributes (same as GLSL path)
+
+Shared TSL nodes (`tsl-shared.ts`) provide texture sheet animation, soft particles, and background discard — reused across all material types.
+
+### GPU Compute Pipeline
+
+All per-particle physics and modifiers run in a **single GPU compute dispatch** per frame:
+
+```
+CPU: system.update(cycleData)
+  │
+  ├── 1. Emit particles (CPU-side)
+  │     └── Queue new particle data
+  │
+  ├── 2. flushEmitQueue() → write queued particles to GPU storage buffers
+  │
+  └── 3. renderer.compute(system.computeNode) → GPU dispatch
+        │
+        ├── Core physics (compute-particle-update.ts):
+        │   ├── Gravity application
+        │   ├── Velocity integration → position update
+        │   ├── Lifetime tracking
+        │   ├── Death detection (lifetime > startLifetime → deactivate)
+        │   └── World-space compensation
+        │
+        ├── Modifiers (compute-modifiers.ts, single dispatch):
+        │   ├── Size over lifetime (curve lookup)
+        │   ├── Opacity over lifetime (curve lookup)
+        │   ├── Color over lifetime (3 RGB curves)
+        │   ├── Rotation over lifetime
+        │   ├── Linear velocity (per-axis X/Y/Z curves)
+        │   ├── Orbital velocity (Euler rotation around offset)
+        │   └── Noise (3D simplex FBM via tsl-noise.ts)
+        │
+        └── Force fields (compute-force-fields.ts):
+            ├── POINT: radial attract/repel with falloff
+            └── DIRECTIONAL: constant direction force
+```
+
+### Storage Buffer Layout
+
+GPU particle data is stored in 8 storage buffer bindings (packed as vec4):
+
+| Buffer | Content (vec4) | Description |
+|--------|---------------|-------------|
+| `position` | xyz + padding | Particle world position |
+| `velocity` | xyz + padding | Particle velocity |
+| `color` | rgba | Particle color (modifiable) |
+| `particleState` | lifetime, size, rotation, startFrame | Per-frame mutable state |
+| `startValues` | startLifetime, startSize, startOpacity, startColorR | Immutable spawn values |
+| `startColorsExt` | startColorG, startColorB, rotationSpeed, noiseOffset | Extended spawn values |
+| `orbitalIsActive` | offsetX, offsetY, offsetZ, isActive | Orbital velocity state + active flag |
+| `curveData` | float[] | Baked curves + force field data + per-particle init data |
+
+### Curve Baking
+
+Lifetime curves (bezier, easing) are baked to `Float32Array` at system creation time:
+
+- **Resolution:** 256 samples per curve (1 KB each)
+- **GPU lookup:** `data[curveIndex * 256 + floor(t * 255)]` with linear interpolation
+- **Error:** <0.4% vs analytical curve evaluation
+- Stored in the `curveData` buffer, shared across all modifiers
+
+### Force Field Encoding
+
+Force fields are packed into the tail of `curveData`:
+
+- 12 floats per field x max 16 fields = 192 floats
+- Layout: isActive, type (0=POINT/1=DIRECTIONAL), position, direction, strength, range, falloff, padding
+- Updated per frame from CPU via `encodeForceFieldsForGPU()`
+- Infinity encoded as 1e10 (avoids Float32 issues)
+
+### CPU↔GPU Sync
+
+**Emission flow:**
+1. CPU emits particle → writes to staging queue
+2. `flushEmitQueue()` copies queued data to GPU storage buffers (28 floats per particle)
+3. Compute shader reads init flags and initializes new particles
+4. Prevents overwriting active particle data when slots are recycled
+
+**Death detection:**
+- GPU detects death (`lifetime > startLifetime`) and sets `isActive = 0`
+- CPU also tracks death independently for sub-emitter callbacks (no GPU readback needed)
+- When sub-emitters with death triggers exist, a lightweight CPU-side "shadow simulation" tracks approximate positions
+
+### Limitations
+
+- **Trail renderer** (`RendererType.TRAIL`) always uses CPU simulation — GPU compute does not apply
+- **Sub-emitters** are forced to `SimulationBackend.CPU`
+- **Max 16 force fields** per system on GPU
+- **No async GPU readback** — CPU cannot read particle positions from GPU without a frame stall
+- **Curve resolution** capped at 256 samples per curve

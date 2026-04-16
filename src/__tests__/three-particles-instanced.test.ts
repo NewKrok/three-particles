@@ -43,10 +43,10 @@ const createInstancedSystem = (
  */
 const countActiveParticles = (ps: ParticleSystem): number => {
   const mesh = ps.instance as THREE.Mesh;
-  const isActiveArr = mesh.geometry.attributes.instanceIsActive.array;
+  const isActiveAttr = mesh.geometry.attributes.instanceIsActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -92,24 +92,27 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       const { ps } = createInstancedSystem();
       const geom = getGeometry(ps);
 
-      const instancedAttrs = [
-        'instanceOffset',
+      // instanceOffset stays as InstancedBufferAttribute (separate vec3 buffer)
+      const offsetAttr = geom.getAttribute('instanceOffset');
+      expect(offsetAttr).toBeDefined();
+      expect(offsetAttr).toBeInstanceOf(THREE.InstancedBufferAttribute);
+
+      // Scalar attributes are InterleavedBufferAttribute backed by
+      // an InstancedInterleavedBuffer (interleaved vertex buffer refactor).
+      const scalarAttrs = [
         'instanceIsActive',
         'instanceLifetime',
         'instanceStartLifetime',
         'instanceSize',
         'instanceRotation',
-        'instanceColorR',
-        'instanceColorG',
-        'instanceColorB',
-        'instanceColorA',
+        'instanceColor',
         'instanceStartFrame',
       ];
 
-      for (const name of instancedAttrs) {
+      for (const name of scalarAttrs) {
         const attr = geom.getAttribute(name);
         expect(attr).toBeDefined();
-        expect(attr).toBeInstanceOf(THREE.InstancedBufferAttribute);
+        expect(attr).toBeInstanceOf(THREE.InterleavedBufferAttribute);
       }
 
       ps.dispose();
@@ -226,13 +229,17 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       step(500, 300);
 
       const geom = getGeometry(ps);
-      const sizeArr = geom.getAttribute('instanceSize').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const sizeAttr = geom.getAttribute('instanceSize');
+      const isActiveAttr2 = geom.getAttribute('instanceIsActive');
 
       // Active particles at ~25% lifetime should have size < startSize*1.0
       let hasModifiedSize = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && sizeArr[i] > 0 && sizeArr[i] < 2) {
+        if (
+          isActiveAttr2.getX(i) &&
+          sizeAttr.getX(i) > 0 &&
+          sizeAttr.getX(i) < 2
+        ) {
           hasModifiedSize = true;
           break;
         }
@@ -266,13 +273,17 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       step(800, 600);
 
       const geom = getGeometry(ps);
-      const alphaArr = geom.getAttribute('instanceColorA').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const alphaAttr = geom.getAttribute('instanceColor');
+      const isActiveAttr2 = geom.getAttribute('instanceIsActive');
 
       // Active particles should have reduced alpha (< 1 since they've aged)
       let hasReducedAlpha = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && alphaArr[i] < 1 && alphaArr[i] > 0) {
+        if (
+          isActiveAttr2.getX(i) &&
+          alphaAttr.getW(i) < 1 &&
+          alphaAttr.getW(i) > 0
+        ) {
           hasReducedAlpha = true;
           break;
         }
@@ -466,12 +477,12 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       step(800, 600);
 
       const geom = getGeometry(ps);
-      const rArr = geom.getAttribute('instanceColorR').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const rAttr = geom.getAttribute('instanceColor');
+      const isActiveAttr2 = geom.getAttribute('instanceIsActive');
 
       let hasReducedColor = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && rArr[i] < 1 && rArr[i] > 0) {
+        if (isActiveAttr2.getX(i) && rAttr.getX(i) < 1 && rAttr.getX(i) > 0) {
           hasReducedColor = true;
           break;
         }
@@ -500,12 +511,12 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
       step(600, 400);
 
       const geom = getGeometry(ps);
-      const rotArr = geom.getAttribute('instanceRotation').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const rotAttr = geom.getAttribute('instanceRotation');
+      const isActiveAttr2 = geom.getAttribute('instanceIsActive');
 
       let hasRotated = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && Math.abs(rotArr[i]) > 0.001) {
+        if (isActiveAttr2.getX(i) && Math.abs(rotAttr.getX(i)) > 0.001) {
           hasRotated = true;
           break;
         }
@@ -535,11 +546,11 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
 
       const geom = getGeometry(ps);
       const offsetArr = geom.getAttribute('instanceOffset').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const isActiveAttr2 = geom.getAttribute('instanceIsActive');
 
       let hasMovedY = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && Math.abs(offsetArr[i * 3 + 1]) > 0.1) {
+        if (isActiveAttr2.getX(i) && Math.abs(offsetArr[i * 3 + 1]) > 0.1) {
           hasMovedY = true;
           break;
         }
@@ -584,12 +595,12 @@ describe('GPU Instancing (RendererType.INSTANCED)', () => {
 
       const geom = getGeometry(ps);
       const offsetArr = geom.getAttribute('instanceOffset').array;
-      const isActiveArr = geom.getAttribute('instanceIsActive').array;
+      const isActiveAttr2 = geom.getAttribute('instanceIsActive');
 
       // Gravity should have moved particles in the -Y direction
       let hasGravity = false;
       for (let i = 0; i < 20; i++) {
-        if (isActiveArr[i] && offsetArr[i * 3 + 1] < -0.01) {
+        if (isActiveAttr2.getX(i) && offsetArr[i * 3 + 1] < -0.01) {
           hasGravity = true;
           break;
         }

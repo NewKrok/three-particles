@@ -33,15 +33,8 @@
 | Mesh Particle Renderer (`RendererType.MESH`) | ✅ |
 | Soft Particles (depth-based fade near geometry) | ✅ |
 | Real-time config updates (`updateConfig`) | ✅ |
-
----
-
-## High Priority — Performance & Ecosystem
-
-### WebGPU Compute Support
-- Leverage Three.js WebGPU renderer (production-ready since r171)
-- Compute shaders for particle simulation on GPU — 10-100x performance for large systems
-- Automatic fallback to WebGL when WebGPU is unavailable
+| WebGPU compute support (TSL shaders, GPU physics, modifiers, force fields, noise) | ✅ |
+| Collision planes (kill / clamp / bounce modes, CPU + GPU compute) | ✅ |
 
 ---
 

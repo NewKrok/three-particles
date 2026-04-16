@@ -31,11 +31,11 @@ const countActive = (ps: ParticleSystem, instanced = false): number => {
       : (instance.children[0] as THREE.Points | THREE.Mesh | undefined);
   if (!obj) return 0;
   const attrName = instanced ? 'instanceIsActive' : 'isActive';
-  const arr = obj.geometry?.attributes?.[attrName]?.array;
-  if (!arr) return 0;
+  const attr = obj.geometry?.attributes?.[attrName];
+  if (!attr) return 0;
   let count = 0;
-  for (let i = 0; i < arr.length; i++) {
-    if (arr[i]) count++;
+  for (let i = 0; i < attr.count; i++) {
+    if (attr.getX(i)) count++;
   }
   return count;
 };
@@ -226,10 +226,13 @@ describe('integration — modifiers and forces combined', () => {
         ? ps.instance
         : ps.instance.children[0]
     ) as THREE.Points;
-    const sizeArr = pointsObj.geometry.attributes.size.array;
-    const isActiveArr = pointsObj.geometry.attributes.isActive.array;
-    const sizes = Array.from(sizeArr).filter((_, i) => isActiveArr[i]);
-    const hasReducedSize = sizes.some((s) => (s as number) < 1);
+    const sizeAttr = pointsObj.geometry.attributes.size;
+    const isActiveAttr = pointsObj.geometry.attributes.isActive;
+    const sizes: number[] = [];
+    for (let i = 0; i < sizeAttr.count; i++) {
+      if (isActiveAttr.getX(i)) sizes.push(sizeAttr.getX(i));
+    }
+    const hasReducedSize = sizes.some((s) => s < 1);
     expect(hasReducedSize).toBe(true);
 
     ps.dispose();

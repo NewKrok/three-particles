@@ -5,6 +5,7 @@ import {
   getCurveFunction,
 } from './three-particles-curves.js';
 import {
+  CollisionPlaneMode,
   ForceFieldFalloff,
   ForceFieldType,
   LifeTimeCurve,
@@ -12,6 +13,7 @@ import {
 import { blendingMap } from './three-particles.js';
 import type {
   BezierCurve,
+  CollisionPlaneConfig,
   CurveFunction,
   EasingCurve,
   ForceFieldConfig,
@@ -205,6 +207,7 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
     'looping',
     'gravity',
     'simulationSpace',
+    'simulationBackend',
     'maxParticles',
   ] as const) {
     if (field in raw) (config as RawObject)[field] = raw[field];
@@ -369,6 +372,24 @@ function deserializeConfig(raw: RawObject): ParticleSystemConfig {
       if ('falloff' in ff) result.falloff = ff['falloff'] as ForceFieldFalloff;
       return result;
     });
+  }
+
+  // collisionPlanes — array of CollisionPlaneConfig objects
+  if (Array.isArray(raw['collisionPlanes'])) {
+    config.collisionPlanes = (raw['collisionPlanes'] as RawObject[]).map(
+      (cp) => {
+        const result: CollisionPlaneConfig = {};
+        if ('isActive' in cp) result.isActive = cp['isActive'] as boolean;
+        if ('mode' in cp) result.mode = cp['mode'] as CollisionPlaneMode;
+        if (cp['position'])
+          result.position = deserializeVector3(cp['position']);
+        if (cp['normal']) result.normal = deserializeVector3(cp['normal']);
+        if ('dampen' in cp) result.dampen = cp['dampen'] as number;
+        if ('lifetimeLoss' in cp)
+          result.lifetimeLoss = cp['lifetimeLoss'] as number;
+        return result;
+      }
+    );
   }
 
   // _editorData and any other unknown fields — preserve as-is

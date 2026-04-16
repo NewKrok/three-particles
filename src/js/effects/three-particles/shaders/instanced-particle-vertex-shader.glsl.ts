@@ -1,9 +1,6 @@
 const InstancedParticleVertexShader = `
   attribute float instanceSize;
-  attribute float instanceColorR;
-  attribute float instanceColorG;
-  attribute float instanceColorB;
-  attribute float instanceColorA;
+  attribute vec4 instanceColor;
   attribute float instanceLifetime;
   attribute float instanceStartLifetime;
   attribute float instanceRotation;
@@ -25,7 +22,14 @@ const InstancedParticleVertexShader = `
 
   void main()
   {
-    vColor = vec4(instanceColorR, instanceColorG, instanceColorB, instanceColorA);
+    // Early-out for dead particles: skip all transforms and emit a degenerate
+    // position that produces zero-area triangles.
+    if (instanceColor.a <= 0.0) {
+      gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
+      return;
+    }
+
+    vColor = instanceColor;
     vLifetime = instanceLifetime;
     vStartLifetime = instanceStartLifetime;
     vStartFrame = instanceStartFrame;

@@ -15,10 +15,10 @@ import { ParticleSystem } from '../js/effects/three-particles/types.js';
 
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = ps.instance as THREE.Points;
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -85,8 +85,8 @@ describe('Force fields integration in particle system', () => {
     // Particles should have moved toward the force field
     const attrs = getAttributes(ps);
     let movedUpward = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
         const y = attrs.position.array[i * 3 + 1];
         if (y > 0.001) {
           movedUpward = true;
@@ -121,8 +121,8 @@ describe('Force fields integration in particle system', () => {
     // Particles should have moved in the X direction
     const attrs = getAttributes(ps);
     let movedRight = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
         const x = attrs.position.array[i * 3];
         if (x > 0.01) {
           movedRight = true;
@@ -248,8 +248,8 @@ describe('Velocity over lifetime integration', () => {
 
     const attrs = getAttributes(ps);
     let movedRight = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
         if (attrs.position.array[i * 3] > 0.01) {
           movedRight = true;
           break;
@@ -762,10 +762,10 @@ describe('World space simulation extended', () => {
     ps.update({ now: 1048, delta: 0.016, elapsed: 0.048 });
 
     // Count active on the actual Points geometry
-    const isActiveArr = points.geometry.attributes.isActive.array;
+    const isActiveAttr = points.geometry.attributes.isActive;
     let count = 0;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) count++;
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) count++;
     }
     expect(count).toBeGreaterThan(0);
 

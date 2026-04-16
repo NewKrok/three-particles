@@ -135,6 +135,33 @@
       // Prepare config
       const config = JSON.parse(JSON.stringify(example.config));
       delete config._editorData;
+
+      // Preview generator uses WebGLRenderer (CPU only) — force CPU backend,
+      // cap particle counts so GPU-designed demos don't freeze the browser,
+      // and upgrade POINTS → INSTANCED so small startSize values stay visible
+      // (POINTS uses gl_PointSize which makes sub-pixel particles invisible).
+      config.simulationBackend = "CPU";
+      if (!config.renderer) config.renderer = {};
+      const rt = config.renderer.rendererType;
+      if (!rt || rt === "POINTS") {
+        config.renderer.rendererType = "INSTANCED";
+      }
+      const MAX_PREVIEW_PARTICLES = 5000;
+      if (config.maxParticles > MAX_PREVIEW_PARTICLES) {
+        const scale = MAX_PREVIEW_PARTICLES / config.maxParticles;
+        config.maxParticles = MAX_PREVIEW_PARTICLES;
+        if (config.emission) {
+          if (config.emission.rateOverTime) {
+            config.emission.rateOverTime = Math.ceil(config.emission.rateOverTime * scale);
+          }
+          if (config.emission.bursts) {
+            for (const burst of config.emission.bursts) {
+              burst.count = Math.ceil(burst.count * scale);
+            }
+          }
+        }
+      }
+
       if (config.renderer?.blending) {
         config.renderer.blending = resolveBlending(config.renderer.blending);
       }
@@ -180,10 +207,10 @@
       const system = createParticleSystem(config);
       scene.add(system.instance);
 
-      // Animate for 2 seconds using requestAnimationFrame
+      // Animate until previewTime (or 2s default) using requestAnimationFrame
       await new Promise((resolve) => {
         const startTime = performance.now();
-        const duration = 2000; // 2 seconds
+        const duration = (example.previewTime || 2) * 1000;
         let lastTime = startTime;
 
         function frame(now) {

@@ -22,10 +22,10 @@ import {
  */
 const countActiveParticles = (ps: ParticleSystem): number => {
   const points = ps.instance as THREE.Points;
-  const isActiveArr = points.geometry.attributes.isActive.array;
+  const isActiveAttr = points.geometry.attributes.isActive;
   let count = 0;
-  for (let i = 0; i < isActiveArr.length; i++) {
-    if (isActiveArr[i]) count++;
+  for (let i = 0; i < isActiveAttr.count; i++) {
+    if (isActiveAttr.getX(i)) count++;
   }
   return count;
 };
@@ -187,10 +187,7 @@ describe('createParticleSystem', () => {
     expect(attrs.startLifetime).toBeDefined();
     expect(attrs.rotation).toBeDefined();
     expect(attrs.size).toBeDefined();
-    expect(attrs.colorR).toBeDefined();
-    expect(attrs.colorG).toBeDefined();
-    expect(attrs.colorB).toBeDefined();
-    expect(attrs.colorA).toBeDefined();
+    expect(attrs.color).toBeDefined();
     expect(attrs.startFrame).toBeDefined();
 
     ps.dispose();
@@ -266,10 +263,10 @@ describe('createParticleSystem', () => {
       maxParticles: 10,
     });
     const points = ps.instance as THREE.Points;
-    const startLifetimeArr = points.geometry.attributes.startLifetime.array;
+    const startLifetimeAttr = points.geometry.attributes.startLifetime;
     for (let i = 0; i < 10; i++) {
-      expect(startLifetimeArr[i]).toBeGreaterThanOrEqual(1000);
-      expect(startLifetimeArr[i]).toBeLessThanOrEqual(3000);
+      expect(startLifetimeAttr.getX(i)).toBeGreaterThanOrEqual(1000);
+      expect(startLifetimeAttr.getX(i)).toBeLessThanOrEqual(3000);
     }
     ps.dispose();
   });
@@ -371,6 +368,22 @@ describe('createParticleSystem', () => {
     ps.dispose();
   });
 
+  it('should handle plain-object tiles from JSON config (not Vector2)', () => {
+    // Simulates what happens when config comes from JSON (e.g. examples-data.js)
+    // where tiles is { x: 5, y: 2 } instead of new THREE.Vector2(5, 2).
+    // deepMerge strips the Vector2 prototype, so the code must reconstruct it.
+    const ps = createParticleSystem({
+      textureSheetAnimation: {
+        tiles: { x: 5, y: 2 } as unknown as THREE.Vector2,
+        timeMode: TimeMode.FPS,
+        fps: 0,
+        startFrame: { min: 0, max: 10 },
+      },
+    });
+    expect(ps.instance).toBeDefined();
+    ps.dispose();
+  });
+
   it('should set up texture sheet animation with random startFrame', () => {
     const ps = createParticleSystem({
       textureSheetAnimation: {
@@ -383,10 +396,10 @@ describe('createParticleSystem', () => {
     });
 
     const points = ps.instance as THREE.Points;
-    const startFrameArr = points.geometry.attributes.startFrame.array;
+    const startFrameAttr = points.geometry.attributes.startFrame;
     for (let i = 0; i < 10; i++) {
-      expect(startFrameArr[i]).toBeGreaterThanOrEqual(0);
-      expect(startFrameArr[i]).toBeLessThanOrEqual(15);
+      expect(startFrameAttr.getX(i)).toBeGreaterThanOrEqual(0);
+      expect(startFrameAttr.getX(i)).toBeLessThanOrEqual(15);
     }
     ps.dispose();
   });
@@ -635,11 +648,11 @@ describe('Particle activation and color', () => {
 
     // Check that at least one active particle has the correct color
     let foundColoredParticle = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
-        expect(attrs.colorR.array[i]).toBeCloseTo(1);
-        expect(attrs.colorG.array[i]).toBeCloseTo(0);
-        expect(attrs.colorB.array[i]).toBeCloseTo(0);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
+        expect(attrs.color.getX(i)).toBeCloseTo(1);
+        expect(attrs.color.getY(i)).toBeCloseTo(0);
+        expect(attrs.color.getZ(i)).toBeCloseTo(0);
         foundColoredParticle = true;
         break;
       }
@@ -660,10 +673,10 @@ describe('Particle activation and color', () => {
 
     step(100);
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
-        expect(attrs.colorR.array[i]).toBeGreaterThanOrEqual(0);
-        expect(attrs.colorR.array[i]).toBeLessThanOrEqual(1);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
+        expect(attrs.color.getX(i)).toBeGreaterThanOrEqual(0);
+        expect(attrs.color.getX(i)).toBeLessThanOrEqual(1);
         break;
       }
     }
@@ -682,9 +695,9 @@ describe('Particle activation and color', () => {
     step(100);
     // After lifetime, some particles should be deactivated
     const attrs = getAttributes(ps);
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (!attrs.isActive.array[i]) {
-        expect(attrs.colorA.array[i]).toBe(0);
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (!attrs.isActive.getX(i)) {
+        expect(attrs.color.getW(i)).toBe(0);
       }
     }
 
@@ -707,8 +720,8 @@ describe('Gravity', () => {
     // Particles should have moved due to gravity
     const attrs = getAttributes(ps);
     let positionChanged = false;
-    for (let i = 0; i < attrs.isActive.array.length; i++) {
-      if (attrs.isActive.array[i]) {
+    for (let i = 0; i < attrs.isActive.count; i++) {
+      if (attrs.isActive.getX(i)) {
         const posIndex = i * 3;
         const y = attrs.position.array[posIndex + 1];
         // With negative gravity the particle should move in y direction
@@ -798,5 +811,41 @@ describe('dispose', () => {
     const ps = createParticleSystem({ maxParticles: 10 }, 1000);
     ps.dispose();
     // No error means it handled material disposal properly
+  });
+});
+
+describe('particle texture wrapping', () => {
+  it('sets ClampToEdgeWrapping on particle texture to prevent sprite-sheet bleeding', () => {
+    const ps = createParticleSystem({ maxParticles: 10 }, 1000);
+    const points = ps.instance as THREE.Points;
+    const mat = points.material as THREE.ShaderMaterial;
+    const map = mat.uniforms.map?.value as THREE.Texture | null;
+
+    if (map) {
+      expect(map.wrapS).toBe(THREE.ClampToEdgeWrapping);
+      expect(map.wrapT).toBe(THREE.ClampToEdgeWrapping);
+    }
+
+    ps.dispose();
+  });
+
+  it('sets ClampToEdgeWrapping on user-provided texture', () => {
+    const userTexture = new THREE.Texture();
+    userTexture.wrapS = THREE.RepeatWrapping;
+    userTexture.wrapT = THREE.RepeatWrapping;
+
+    const ps = createParticleSystem(
+      { maxParticles: 10, map: userTexture },
+      1000
+    );
+    const points = ps.instance as THREE.Points;
+    const mat = points.material as THREE.ShaderMaterial;
+    const map = mat.uniforms.map?.value as THREE.Texture | null;
+
+    expect(map).toBe(userTexture);
+    expect(map!.wrapS).toBe(THREE.ClampToEdgeWrapping);
+    expect(map!.wrapT).toBe(THREE.ClampToEdgeWrapping);
+
+    ps.dispose();
   });
 });

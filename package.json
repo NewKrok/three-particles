@@ -8,6 +8,7 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist/",
+    "webgpu.d.ts",
     "README.md",
     "LICENSE",
     "llms.txt",
@@ -19,6 +20,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./webgpu": {
+      "import": "./dist/webgpu.js",
+      "types": "./webgpu.d.ts"
     }
   },
   "repository": {
@@ -73,15 +78,15 @@
     "three": "^0.182.0"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.29.0",
+    "@babel/preset-env": "^7.29.2",
     "@babel/preset-typescript": "^7.28.5",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.6.0",
     "@types/three": "^0.183.1",
-    "@typescript-eslint/eslint-plugin": "^8.57.1",
-    "@typescript-eslint/parser": "^8.57.1",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
     "babel-jest": "^30.3.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
@@ -90,14 +95,14 @@
     "husky": "^9.1.7",
     "jest": "^30.3.0",
     "madge": "^8.0.0",
-    "prettier": "^3.8.1",
+    "prettier": "^3.8.3",
     "rimraf": "^6.1.3",
-    "ts-jest": "^29.4.6",
+    "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
-    "typedoc": "^0.28.17",
+    "typedoc": "^0.28.19",
     "typescript": "^5.9.3",
-    "webpack": "^5.105.4",
-    "webpack-cli": "^7.0.1"
+    "webpack": "^5.106.2",
+    "webpack-cli": "^7.0.2"
   }
 }

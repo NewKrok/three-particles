@@ -19,12 +19,14 @@ Particle system for ThreeJS.
 *   Highly customizable particle properties (position, velocity, size, color, alpha, rotation, etc.).
 *   Support for various emitter shapes and parameters.
 *   Force fields and attractors for dynamic particle behavior (point attraction/repulsion, directional wind).
+*   Collision planes — kill, clamp, or bounce particles off infinite planes (e.g., water surfaces, floors, walls). Works on both CPU and GPU compute paths.
 *   Sub-emitters triggered on particle birth or death events.
 *   Serialization support for saving and loading particle system configs.
 *   GPU instancing renderer (`RendererType.INSTANCED`) — removes `gl_PointSize` hardware limit, ideal for large particles or high particle counts.
 *   Trail / Ribbon renderer (`RendererType.TRAIL`) — continuous ribbon trails behind particles with configurable width, opacity, and color tapering.
 *   Mesh particle renderer (`RendererType.MESH`) — render each particle as a 3D mesh (debris, gems, coins) using GPU instancing with full 3D rotation and simple directional lighting.
 *   Soft particles — depth-based alpha fade near opaque geometry, eliminating hard intersection lines.
+*   **WebGPU compute support** — GPU compute shaders for particle simulation (gravity, velocity, modifiers, force fields, noise) via Three.js TSL. Enables 50K-350K+ particles at full framerate. Automatic fallback to CPU when WebGPU is unavailable.
 *   TypeDoc API documentation available.
 
 # Live Demo & Examples
@@ -75,6 +77,10 @@ updateParticleSystems({now, delta, elapsed});
 system.updateConfig({
   gravity: -9.8,
   forceFields: [{ type: 'DIRECTIONAL', direction: { x: 1, y: 0, z: 0 }, strength: 5 }],
+  // Collision planes — kill, clamp, or bounce particles off surfaces
+  collisionPlanes: [
+    { position: { x: 0, y: 5, z: 0 }, normal: { x: 0, y: -1, z: 0 }, mode: 'KILL' },
+  ],
 });
 ```
 
@@ -149,6 +155,80 @@ function FireEffect({ config }: { config?: Record<string, unknown> }) {
 - Use `useFrame` to drive updates each frame (call `system.update()` instead of `updateParticleSystems()` for per-system control)
 - Add the `system.instance` to a `<group>` ref so R3F manages the scene graph
 - Return a cleanup function from `useEffect` that calls `system.dispose()`
+
+# WebGPU Compute Support
+
+Optional GPU-accelerated particle simulation via Three.js WebGPU renderer and TSL (Three Shading Language). Offloads all per-particle physics and modifiers to GPU compute shaders, enabling **50K-350K+ particles** at interactive frame rates.
+
+## Requirements
+
+- Three.js **r182+** with the WebGPU build (`three/webgpu`)
+- A browser with [WebGPU support](https://caniuse.com/webgpu) (Chrome 113+, Edge 113+, Firefox Nightly)
+- No breaking changes — all existing WebGL code works unchanged
+
+## Setup
+
+```typescript
+// 1. Enable WebGPU support (once, before creating any particle system)
+import { enableWebGPU } from "@newkrok/three-particles/webgpu";
+enableWebGPU();
+
+// 2. Create a WebGPU renderer
+import * as THREE from "three/webgpu";
+const renderer = new THREE.WebGPURenderer({ antialias: true });
+await renderer.init();
+
+// 3. Create a GPU-accelerated particle system
+import { createParticleSystem, SimulationBackend } from "@newkrok/three-particles";
+const system = createParticleSystem({
+  simulationBackend: SimulationBackend.AUTO, // GPU if WebGPU available, else CPU
+  maxParticles: 100000,
+  // ... rest of your config (same API as CPU)
+});
+
+scene.add(system.instance);
+
+// 4. In your render loop — dispatch compute before rendering
+function animate() {
+  system.update({ now: performance.now(), delta, elapsed });
+
+  if (system.computeNode) {
+    renderer.compute(system.computeNode);
+  }
+  renderer.render(scene, camera);
+}
+```
+
+For fine-grained control, you can also use `registerTSLMaterialFactory()` to selectively register individual WebGPU functions — see the full API reference.
+
+## SimulationBackend
+
+| Value | Behavior |
+|-------|----------|
+| `AUTO` (default) | GPU compute if WebGPU renderer detected, else CPU |
+| `CPU` | Always JavaScript update loop (works with any renderer) |
+| `GPU` | Request GPU compute; falls back to CPU if renderer lacks compute support |
+
+## What Runs on GPU
+
+- **Core physics:** gravity, velocity integration, position update, lifetime tracking
+- **All 7 modifiers:** size/opacity/color over lifetime, rotation, linear velocity, orbital velocity, noise (3D simplex FBM)
+- **Force fields:** point attractors/repulsors and directional forces with falloff (up to 16 per system)
+- **Curves:** baked into 256-sample lookup arrays for fast GPU evaluation (<0.4% error)
+
+## What Stays on CPU
+
+- **Emission** — particle activation, burst scheduling, rate-over-distance
+- **Sub-emitters** — birth/death trigger spawning
+- **Configuration changes** — `updateConfig()` applies on the next frame
+- **Trail renderer** — TRAIL type always uses CPU simulation (other renderer types work with GPU)
+
+## Fallback Behavior
+
+WebGPU is fully opt-in and non-breaking:
+- If `enableWebGPU()` not called (or no TSL factory registered), the library uses GLSL shaders (WebGL path)
+- If `simulationBackend: 'GPU'` but WebGPU is unavailable, it silently falls back to CPU
+- The same particle config works identically on both backends
 
 # Documentation
 

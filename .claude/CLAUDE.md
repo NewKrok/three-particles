@@ -21,9 +21,24 @@ src/js/effects/three-particles/
 ├── three-particles-utils.ts          # Shape generators, value resolution, texture
 ├── three-particles-enums.ts          # SimulationSpace, Shape, EmitFrom, etc.
 ├── three-particles-forces.ts         # Force fields and attractors
+├── three-particles-collision.ts      # CPU collision plane logic
+├── three-particles-renderer-detect.ts # WebGPU renderer detection
 ├── three-particles-serialization.ts  # Config save/load serialization
 ├── types.ts                          # Complete TypeScript type definitions
-└── shaders/                          # GLSL shaders (points, instanced, trail, mesh)
+├── shaders/                          # GLSL shaders (points, instanced, trail, mesh)
+└── webgpu/                           # WebGPU compute + TSL materials
+    ├── tsl-materials.ts              # TSL material factory
+    ├── tsl-shared.ts                 # Shared TSL nodes (texture animation, soft particles)
+    ├── tsl-point-sprite-material.ts  # POINTS renderer TSL material
+    ├── tsl-instanced-billboard-material.ts # INSTANCED renderer TSL material
+    ├── tsl-mesh-particle-material.ts # MESH renderer TSL material
+    ├── tsl-trail-ribbon-material.ts  # TRAIL renderer TSL material
+    ├── compute-particle-update.ts    # Core physics compute shader
+    ├── compute-modifiers.ts          # All 7 modifiers compute shader
+    ├── compute-force-fields.ts       # Force field GPU compute
+    ├── compute-collision-planes.ts   # Collision plane GPU compute
+    ├── curve-bake.ts                 # Curve baking (bezier/easing → Float32Array)
+    └── tsl-noise.ts                  # 3D simplex noise in TSL
 ```
 
 **Tests:** `src/__tests__/*.test.ts`
@@ -103,16 +118,42 @@ See [Development Workflow](doc/workflow.md) for the full step-by-step guide.
 
 ---
 
+## WebGPU Compute — Development Guide
+
+The library supports a **dual-path architecture**: WebGL (CPU simulation + GLSL) and WebGPU (GPU compute simulation + TSL materials). See [Architecture](doc/architecture.md) for the full technical deep-dive.
+
+### Key Design Decisions
+
+- **Additive, non-breaking:** All WebGPU code is in `webgpu/` and the separate `src/webgpu.ts` entry point. The WebGL path is never modified.
+- **Opt-in registration:** Users call `registerTSLMaterialFactory()` to enable WebGPU. If not called, only GLSL shaders are used.
+- **Duck-typed detection:** `isComputeCapableRenderer()` checks for `.compute()` and `.hasFeature()` methods — no hard dependency on `THREE.WebGPURenderer`.
+- **Single compute dispatch:** All modifiers run in one GPU compute pass (compile-time branching via TSL, not runtime branching).
+- **Collision planes on GPU:** Collision planes use the same dual-path pattern as force fields — CPU logic in `three-particles-collision.ts`, GPU compute in `webgpu/compute-collision-planes.ts`. Plane data is encoded into a packed Float32Array and uploaded as a uniform buffer.
+- **Curve baking:** Lifetime curves are pre-baked to 256-sample Float32Arrays at system creation, stored in the `curveData` buffer.
+- **Sub-emitters forced to CPU:** Sub-emitters always use `SimulationBackend.CPU` because they need CPU-side death detection callbacks.
+- **Trail always CPU:** `RendererType.TRAIL` uses CPU simulation regardless of backend setting.
+
+### When Working on WebGPU Code
+
+- **TSL materials** (`webgpu/tsl-*.ts`): Each renderer type has its own TSL material. They detect GPU compute via the `gpuCompute` flag — when true, data comes from packed vec4 storage buffers; when false, from individual float attributes.
+- **Compute shaders** (`webgpu/compute-*.ts`): Written in TSL (compiles to WGSL). Core physics, all 7 modifiers, and force fields run in a single dispatch.
+- **Storage buffers:** 8 vec4 bindings per system. Layout documented in [Architecture](doc/architecture.md#storage-buffer-layout).
+- **Testing:** WebGPU-specific tests are in `src/__tests__/three-particles-webgpu-integration.test.ts`. Use mock factories (no real WebGPU context in Jest).
+- **Imports:** `three/tsl` and `three/webgpu` are external — never imported from the main entry point. They're only used inside `webgpu/` files.
+
+---
+
 ## Detailed Documentation
 
 Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into every conversation:
 
 | Document | When to read |
 |----------|-------------|
-| [Architecture](doc/architecture.md) | Understanding internal data flow, shader pipeline, module responsibilities |
+| [Architecture](doc/architecture.md) | Understanding internal data flow, shader pipeline, WebGPU dual-path architecture, storage buffer layout |
 | [CI/CD Pipeline](doc/ci-cd.md) | Release process, workflow troubleshooting, version bump logic |
 | [Development Workflow](doc/workflow.md) | Step-by-step workflow, agent orchestration pattern, pre-commit checks |
 | [Testing Guide](doc/testing.md) | Mocking patterns, test helpers, coverage targets, writing effective tests |
+| [WebGPU Compute Plan](doc/webgpu-compute-plan.md) | Original implementation plan (all 6 phases completed) — useful as historical reference for design decisions |
 
 ---
 
@@ -125,6 +166,7 @@ Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into 
 | Enums & constants | `src/js/effects/three-particles/three-particles-enums.ts` |
 | Modifiers | `src/js/effects/three-particles/three-particles-modifiers.ts` |
 | Force fields | `src/js/effects/three-particles/three-particles-forces.ts` |
+| Collision planes | `src/js/effects/three-particles/three-particles-collision.ts` |
 | Serialization | `src/js/effects/three-particles/three-particles-serialization.ts` |
 | Curves / Bezier | `three-particles-curves.ts`, `three-particles-bezier.ts` |
 | Utilities | `src/js/effects/three-particles/three-particles-utils.ts` |
@@ -138,8 +180,8 @@ Detailed guides are in `.claude/doc/` — read these on-demand, not loaded into 
 
 ## Project Status
 
-Completed: Core system, all shape emitters, lifetime modifiers, noise, burst/distance emission, texture sheet animation, world/local space, sub-emitters, force fields, GPU instancing, trail renderer (with smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons), mesh renderer, soft particles, serialization, TypeDoc, visual editor, examples page, CI/CD, benchmark suite, React Three Fiber docs, llms.txt, real-time config updates (`updateConfig`).
+Completed: Core system, all shape emitters, lifetime modifiers, noise, burst/distance emission, texture sheet animation, world/local space, sub-emitters, force fields, collision planes (kill/clamp/bounce), GPU instancing, trail renderer (with smoothing, adaptive sampling, maxTime, twist prevention, connected ribbons), mesh renderer, soft particles, serialization, TypeDoc, visual editor, examples page, CI/CD, benchmark suite, React Three Fiber docs, llms.txt, real-time config updates (`updateConfig`), WebGPU compute support (TSL shaders, GPU physics, modifiers, force fields, collision planes, noise, curve baking).
 
-**Planned:** Trail Phase 2 (UV texture modes, UV scrolling, width by speed), WebGPU compute, preset system.
+**Planned:** Trail Phase 2 (UV texture modes, UV scrolling, width by speed), preset system.
 
 **Coverage target:** >=90% statement, >=80% branch.

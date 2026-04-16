@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 import {
+  CollisionPlaneMode,
   EmitFrom,
   ForceFieldFalloff,
   ForceFieldType,
   LifeTimeCurve,
   RendererType,
   Shape,
+  SimulationBackend,
   SimulationSpace,
   SubEmitterTrigger,
   TimeMode,
@@ -758,9 +760,12 @@ export type Noise = {
   isActive: boolean;
   strength: number;
   noisePower: number;
+  frequency: number;
   positionAmount: number;
   rotationAmount: number;
   sizeAmount: number;
+  /** Pre-computed FBM normalisation divisor: `2 - 2^(-octaves)`. */
+  fbmMax: number;
   sampler?: FBM;
   offsets?: Array<number>;
 };
@@ -942,6 +947,78 @@ export type NormalizedForceFieldConfig = {
   strength: Constant | RandomBetweenTwoConstants | LifetimeCurve;
   range: number;
   falloff: ForceFieldFalloff;
+};
+
+/**
+ * Configuration for a collision plane that constrains particle positions.
+ * Collision planes define infinite planes in 3D space. When a particle crosses
+ * from the front side (positive normal direction) to the back side, the
+ * configured response mode is triggered.
+ *
+ * @example
+ * ```typescript
+ * // Water surface — kill bubbles when they reach y=5
+ * const waterSurface: CollisionPlaneConfig = {
+ *   position: { x: 0, y: 5, z: 0 },
+ *   normal: { x: 0, y: -1, z: 0 },
+ *   mode: CollisionPlaneMode.KILL,
+ * };
+ *
+ * // Bouncy floor
+ * const floor: CollisionPlaneConfig = {
+ *   position: { x: 0, y: 0, z: 0 },
+ *   normal: { x: 0, y: 1, z: 0 },
+ *   mode: CollisionPlaneMode.BOUNCE,
+ *   dampen: 0.6,
+ * };
+ *
+ * // Invisible wall clamp
+ * const wall: CollisionPlaneConfig = {
+ *   position: { x: 5, y: 0, z: 0 },
+ *   normal: { x: -1, y: 0, z: 0 },
+ *   mode: CollisionPlaneMode.CLAMP,
+ * };
+ * ```
+ */
+export type CollisionPlaneConfig = {
+  /** Whether this collision plane is active. @default true */
+  isActive?: boolean;
+  /** A point on the plane surface. @default (0,0,0) */
+  position?: Point3D;
+  /**
+   * The plane normal vector (will be normalized internally).
+   * Defines the "front" side of the plane. Particles crossing from front
+   * to back trigger the collision response.
+   * @default (0,1,0)
+   */
+  normal?: Point3D;
+  /** The collision response mode. @default CollisionPlaneMode.KILL */
+  mode?: CollisionPlaneMode;
+  /**
+   * Energy retention factor for BOUNCE mode (0–1).
+   * 0 = no bounce (all energy absorbed), 1 = perfect bounce (no energy loss).
+   * @default 0.5
+   */
+  dampen?: number;
+  /**
+   * Fraction of the particle's start lifetime to subtract on collision (0–1).
+   * Applied on each collision for BOUNCE mode; ignored for KILL and CLAMP.
+   * @default 0
+   */
+  lifetimeLoss?: number;
+};
+
+/**
+ * Internal normalized collision plane configuration where all properties are required.
+ * Created during particle system initialization from user-provided {@link CollisionPlaneConfig}.
+ */
+export type NormalizedCollisionPlaneConfig = {
+  isActive: boolean;
+  position: THREE.Vector3;
+  normal: THREE.Vector3;
+  mode: CollisionPlaneMode;
+  dampen: number;
+  lifetimeLoss: number;
 };
 
 /**
@@ -1188,6 +1265,19 @@ export type ParticleSystemConfig = {
    * simulationSpace: SimulationSpace.WORLD;
    */
   simulationSpace?: SimulationSpace;
+
+  /**
+   * Selects the simulation backend for particle updates.
+   *
+   * - `AUTO` (default): Uses GPU compute when a WebGPU-capable renderer is
+   *   detected, otherwise falls back to CPU.
+   * - `CPU`: Always uses the JavaScript update loop (works with any renderer).
+   * - `GPU`: Requests GPU compute simulation. Falls back to CPU if the renderer
+   *   does not support compute shaders.
+   *
+   * @default SimulationBackend.AUTO
+   */
+  simulationBackend?: SimulationBackend;
 
   /**
    * Defines the maximum number of particles allowed in the system.
@@ -1493,6 +1583,32 @@ export type ParticleSystemConfig = {
   forceFields?: Array<ForceFieldConfig>;
 
   /**
+   * Collision planes that constrain particle positions.
+   *
+   * Each plane defines an infinite surface in 3D space. When a particle crosses
+   * from the front side (positive normal direction) to the back side, the
+   * configured response mode is triggered: KILL (remove), CLAMP (stop at surface),
+   * or BOUNCE (reflect with energy loss).
+   *
+   * Plane positions and normals are in world space. Multiple planes are checked
+   * in order; for KILL mode, the first collision deactivates the particle.
+   *
+   * @default []
+   *
+   * @example
+   * ```typescript
+   * collisionPlanes: [
+   *   {
+   *     position: { x: 0, y: 5, z: 0 },
+   *     normal: { x: 0, y: -1, z: 0 },
+   *     mode: CollisionPlaneMode.KILL,
+   *   },
+   * ]
+   * ```
+   */
+  collisionPlanes?: Array<CollisionPlaneConfig>;
+
+  /**
    * Called on every update frame with particle system data.
    */
   onUpdate?: (data: {
@@ -1614,10 +1730,8 @@ export type MappedAttributes = {
   startFrame: AnyBufferAttribute;
   size: AnyBufferAttribute;
   rotation: AnyBufferAttribute;
-  colorR: AnyBufferAttribute;
-  colorG: AnyBufferAttribute;
-  colorB: AnyBufferAttribute;
-  colorA: AnyBufferAttribute;
+  /** Packed RGBA color (vec4). */
+  color: AnyBufferAttribute;
   /** Packed quaternion vec4 for 3D mesh rotation (only present for RendererType.MESH). */
   quat?: AnyBufferAttribute;
 };
@@ -1626,6 +1740,10 @@ export type ParticleSystemInstance = {
   particleSystem: THREE.Points | THREE.Mesh;
   wrapper?: Gyroscope;
   mappedAttributes: MappedAttributes;
+  /** Shared interleaved Float32Array backing all scalar per-particle attributes. */
+  scalarArray: Float32Array;
+  /** The InterleavedBuffer (or InstancedInterleavedBuffer) for scalar attributes. */
+  scalarInterleavedBuffer: THREE.InterleavedBuffer;
   elapsedUniform: { value: number };
   generalData: GeneralData;
   onUpdate: (data: {
@@ -1644,6 +1762,7 @@ export type ParticleSystemInstance = {
   simulationSpace: SimulationSpace;
   gravity: number;
   normalizedForceFields: Array<NormalizedForceFieldConfig>;
+  normalizedCollisionPlanes: Array<NormalizedCollisionPlaneConfig>;
   emission: Emission;
   normalizedConfig: NormalizedParticleSystemConfig;
   iterationCount: number;
@@ -1704,6 +1823,17 @@ export type ParticleSystemInstance = {
     twistPrevention: boolean;
     ribbonId?: number;
   };
+  /** GPU compute pipeline for WebGPU simulation. Opaque type to avoid pulling TSL types into DTS. */
+  computePipeline?: {
+    computeNode: unknown;
+    uniforms: Record<string, unknown>;
+    buffers: Record<string, unknown>;
+    forceFieldInfo: { offset: number; countUniform: unknown } | null;
+  };
+  /** Whether this system uses GPU compute for simulation. */
+  useGPUCompute?: boolean;
+  /** Flag set by update loop, consumed by onBeforeRender to dispatch compute. */
+  computeDispatchReady?: boolean;
 };
 
 /**
@@ -1732,6 +1862,8 @@ export type ParticleSystem = {
   pauseEmitter: () => void;
   dispose: () => void;
   update: (cycleData: CycleData) => void;
+  /** GPU compute node for WebGPU dispatch. Call `renderer.compute(computeNode)` before `renderer.render()`. Null when CPU simulation. */
+  computeNode: unknown | null;
   /**
    * Updates the particle system configuration at runtime without recreating the system.
    *

@@ -235,7 +235,61 @@ export const enum ForceFieldFalloff {
 
   /**
    * Force decreases with the square of distance: `1 - (d/range)²`.
-   * More physically realistic than linear falloff.
+   * More physically realistic than linear fallback.
    */
   QUADRATIC = 'QUADRATIC',
+}
+
+/**
+ * Defines the behavior when a particle crosses a collision plane.
+ *
+ * @enum {string}
+ */
+export const enum CollisionPlaneMode {
+  /**
+   * Kill the particle immediately when it crosses the plane.
+   * The particle is deactivated and returned to the free list.
+   * Ideal for boundaries like water surfaces where bubbles pop.
+   */
+  KILL = 'KILL',
+
+  /**
+   * Clamp the particle's position to the plane surface.
+   * The velocity component along the plane normal is zeroed.
+   * The particle stays alive and slides along the plane.
+   */
+  CLAMP = 'CLAMP',
+
+  /**
+   * Bounce the particle off the plane.
+   * The velocity is reflected across the plane normal and dampened.
+   * Use `dampen` to control energy loss on bounce.
+   */
+  BOUNCE = 'BOUNCE',
+}
+
+/**
+ * Defines the simulation backend used for particle updates.
+ *
+ * @enum {string}
+ */
+export const enum SimulationBackend {
+  /**
+   * Automatically select the best backend based on the renderer type.
+   * Uses GPU compute when a WebGPU-capable renderer is detected, otherwise falls back to CPU.
+   */
+  AUTO = 'AUTO',
+
+  /**
+   * Force CPU-based simulation (JavaScript update loop).
+   * Always available regardless of renderer type.
+   */
+  CPU = 'CPU',
+
+  /**
+   * Force GPU compute shader simulation.
+   * Requires a WebGPU-capable renderer (e.g. `THREE.WebGPURenderer`).
+   * Falls back to CPU if the renderer does not support compute.
+   */
+  GPU = 'GPU',
 }

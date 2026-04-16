@@ -108,9 +108,9 @@ describe('integration — updateConfig with global updateParticleSystems', () =>
     const attrs = getAttributes(ps);
     const posArr = attrs.position.array as Float32Array;
     let hasGravityEffect = false;
-    const isActiveArr = attrs.isActive.array;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i] && Math.abs(posArr[i * 3 + 1]) > 1.5) {
+    const isActiveAttr = attrs.isActive;
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i) && Math.abs(posArr[i * 3 + 1]) > 1.5) {
         hasGravityEffect = true;
         break;
       }
@@ -140,10 +140,10 @@ describe('integration — updateConfig force field position effects', () => {
     // Record positions before force field
     const attrs = getAttributes(ps);
     const posArr = attrs.position.array as Float32Array;
-    const isActiveArr = attrs.isActive.array;
+    const isActiveAttr = attrs.isActive;
     const xBefore: number[] = [];
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) xBefore.push(posArr[i * 3]);
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) xBefore.push(posArr[i * 3]);
     }
 
     // Add a strong directional force field pushing +X
@@ -166,8 +166,8 @@ describe('integration — updateConfig force field position effects', () => {
     // Check that active particles have moved in +X direction
     let movedCount = 0;
     let activeIdx = 0;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
         if (
           activeIdx < xBefore.length &&
           posArr[i * 3] > xBefore[activeIdx] + 0.1
@@ -202,12 +202,12 @@ describe('integration — updateConfig force field position effects', () => {
 
     const attrs = getAttributes(ps);
     const posArr = attrs.position.array as Float32Array;
-    const isActiveArr = attrs.isActive.array;
+    const isActiveAttr = attrs.isActive;
 
     // Record Y velocities (approximated by Y positions)
     const yBefore: number[] = [];
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) yBefore.push(posArr[i * 3 + 1]);
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) yBefore.push(posArr[i * 3 + 1]);
     }
 
     // Remove force fields
@@ -240,15 +240,14 @@ describe('integration — updateConfig color changes on new particles', () => {
     // Emit white particles
     step(100);
     const attrs = getAttributes(ps);
-    const colorRArr = attrs.colorR.array as Float32Array;
-    const colorGArr = attrs.colorG.array as Float32Array;
-    const isActiveArr = attrs.isActive.array;
+    const colorAttr = attrs.color;
+    const isActiveAttr = attrs.isActive;
 
     // Verify initial particles are white (R=1, G=1)
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
-        expect(colorRArr[i]).toBeCloseTo(1, 1);
-        expect(colorGArr[i]).toBeCloseTo(1, 1);
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
+        expect(colorAttr.getX(i)).toBeCloseTo(1, 1);
+        expect(colorAttr.getY(i)).toBeCloseTo(1, 1);
       }
     }
 
@@ -266,9 +265,9 @@ describe('integration — updateConfig color changes on new particles', () => {
 
     // Check that newly spawned particles are red (R=1, G=0)
     let hasRedParticle = false;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
-        if (colorRArr[i] > 0.9 && colorGArr[i] < 0.1) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
+        if (colorAttr.getX(i) > 0.9 && colorAttr.getY(i) < 0.1) {
           hasRedParticle = true;
           break;
         }
@@ -332,22 +331,23 @@ describe('integration — multiple systems with independent config updates', () 
 
     const attrs1 = getAttributes(ps1);
     const posArr1 = attrs1.position.array as Float32Array;
-    const isActive1 = attrs1.isActive.array;
+    const isActive1Attr = attrs1.isActive;
 
     const attrs2 = getAttributes(ps2);
     const posArr2 = attrs2.position.array as Float32Array;
-    const isActive2 = attrs2.isActive.array;
+    const isActive2Attr = attrs2.isActive;
 
     // ps1 particles should have moved down significantly
     let ps1MinY = Infinity;
-    for (let i = 0; i < isActive1.length; i++) {
-      if (isActive1[i]) ps1MinY = Math.min(ps1MinY, posArr1[i * 3 + 1]);
+    for (let i = 0; i < isActive1Attr.count; i++) {
+      if (isActive1Attr.getX(i))
+        ps1MinY = Math.min(ps1MinY, posArr1[i * 3 + 1]);
     }
 
     // ps2 particles should stay near origin (no gravity, no speed) — sphere emitter radius is 1
     let ps2MaxAbsY = 0;
-    for (let i = 0; i < isActive2.length; i++) {
-      if (isActive2[i])
+    for (let i = 0; i < isActive2Attr.count; i++) {
+      if (isActive2Attr.getX(i))
         ps2MaxAbsY = Math.max(ps2MaxAbsY, Math.abs(posArr2[i * 3 + 1]));
     }
 
@@ -402,10 +402,11 @@ describe('integration — updateConfig gravity verification', () => {
     const getMaxAbsY = (ps: ParticleSystem) => {
       const a = getAttributes(ps);
       const pos = a.position.array as Float32Array;
-      const isAct = a.isActive.array;
+      const isActAttr = a.isActive;
       let maxAbsY = 0;
-      for (let i = 0; i < isAct.length; i++) {
-        if (isAct[i]) maxAbsY = Math.max(maxAbsY, Math.abs(pos[i * 3 + 1]));
+      for (let i = 0; i < isActAttr.count; i++) {
+        if (isActAttr.getX(i))
+          maxAbsY = Math.max(maxAbsY, Math.abs(pos[i * 3 + 1]));
       }
       return maxAbsY;
     };
@@ -546,13 +547,13 @@ describe('integration — updateConfig startColor with value verification', () =
     // Emit white particles
     step(100);
     const attrs = getAttributes(ps);
-    const isActiveArr = attrs.isActive.array;
-    const colorGArr = attrs.colorG.array as Float32Array;
+    const isActiveAttr = attrs.isActive;
+    const colorAttr = attrs.color;
 
     // Verify all active particles are white (G=1)
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
-        expect(colorGArr[i]).toBeCloseTo(1, 1);
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
+        expect(colorAttr.getY(i)).toBeCloseTo(1, 1);
       }
     }
 
@@ -571,10 +572,10 @@ describe('integration — updateConfig startColor with value verification', () =
     // All active particles should now be red (G=0)
     let allRed = true;
     let activeCount = 0;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
         activeCount++;
-        if (colorGArr[i] > 0.01) allRed = false;
+        if (colorAttr.getY(i) > 0.01) allRed = false;
       }
     }
     expect(activeCount).toBeGreaterThan(0);
@@ -598,12 +599,12 @@ describe('integration — updateConfig startSize with value verification', () =>
     // Emit size-1 particles
     step(100);
     const attrs = getAttributes(ps);
-    const sizeArr = attrs.size.array as Float32Array;
-    const isActiveArr = attrs.isActive.array;
+    const sizeAttr = attrs.size;
+    const isActiveAttr = attrs.isActive;
 
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
-        expect(sizeArr[i]).toBeCloseTo(1, 1);
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
+        expect(sizeAttr.getX(i)).toBeCloseTo(1, 1);
       }
     }
 
@@ -616,10 +617,10 @@ describe('integration — updateConfig startSize with value verification', () =>
 
     let allLarge = true;
     let activeCount = 0;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
         activeCount++;
-        if (sizeArr[i] < 4) allLarge = false;
+        if (sizeAttr.getX(i) < 4) allLarge = false;
       }
     }
     expect(activeCount).toBeGreaterThan(0);
@@ -647,12 +648,12 @@ describe('integration — updateConfig startSpeed with position verification', (
 
     const attrs = getAttributes(ps);
     const posArr = attrs.position.array as Float32Array;
-    const isActiveArr = attrs.isActive.array;
+    const isActiveAttr = attrs.isActive;
 
     // Record max distance from origin for slow particles
     let maxDistSlow = 0;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
         const px = posArr[i * 3],
           py = posArr[i * 3 + 1],
           pz = posArr[i * 3 + 2];
@@ -671,8 +672,8 @@ describe('integration — updateConfig startSpeed with position verification', (
     step(1000, 400);
 
     let maxDistFast = 0;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
         const px = posArr[i * 3],
           py = posArr[i * 3 + 1],
           pz = posArr[i * 3 + 2];
@@ -742,11 +743,11 @@ describe('integration — updateConfig shape change', () => {
     step(100);
     const attrs = getAttributes(ps);
     const posArr = attrs.position.array as Float32Array;
-    const isActiveArr = attrs.isActive.array;
+    const isActiveAttr = attrs.isActive;
 
     let maxDist1 = 0;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
         const px = posArr[i * 3],
           py = posArr[i * 3 + 1],
           pz = posArr[i * 3 + 2];
@@ -768,8 +769,8 @@ describe('integration — updateConfig shape change', () => {
     step(800, 300);
 
     let maxDist2 = 0;
-    for (let i = 0; i < isActiveArr.length; i++) {
-      if (isActiveArr[i]) {
+    for (let i = 0; i < isActiveAttr.count; i++) {
+      if (isActiveAttr.getX(i)) {
         const px = posArr[i * 3],
           py = posArr[i * 3 + 1],
           pz = posArr[i * 3 + 2];
