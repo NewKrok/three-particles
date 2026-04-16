@@ -1,4 +1,4 @@
-import { registerTSLMaterialFactory } from './js/effects/three-particles/three-particles.js';
+import { registerTSLMaterialFactory } from '@newkrok/three-particles';
 import { encodeCollisionPlanesForGPU } from './js/effects/three-particles/webgpu/compute-collision-planes.js';
 import { encodeForceFieldsForGPU } from './js/effects/three-particles/webgpu/compute-force-fields.js';
 import {

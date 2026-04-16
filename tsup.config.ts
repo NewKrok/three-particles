@@ -28,6 +28,13 @@ export default defineConfig([
   // WebGPU entry point (TSL material factories)
   // DTS is hand-written (webgpu.d.ts) because TSL node types resolve to
   // `unknown` which breaks automatic declaration generation.
+  //
+  // '@newkrok/three-particles' (self-reference) MUST be external so that
+  // `registerTSLMaterialFactory` resolves to the same module instance as the
+  // main entry point at runtime. Without this, the webgpu bundle gets its own
+  // copy of `_tslMaterialFactory` — writes from `enableWebGPU()` would never
+  // be visible to `createParticleSystem` in the main bundle, AND Rollup
+  // treeshake correctly removes the body as dead code within the isolated bundle.
   {
     entry: { webgpu: 'src/webgpu.ts' },
     format: ['esm'],
