@@ -8,7 +8,6 @@ import {
   Fn,
   attribute,
   vec2,
-  vec3,
   vec4,
   float,
   modelViewMatrix,
@@ -17,16 +16,8 @@ import {
   texture,
   cos,
   sin,
-  floor,
-  max,
-  min,
-  smoothstep,
-  round,
-  mod,
-  screenUV,
   Discard,
   If,
-  abs,
   length,
   varyingProperty,
   type ShaderNodeObject,
@@ -35,9 +26,16 @@ import {
 import { PointsNodeMaterial } from 'three/webgpu';
 
 import {
+  POINT_SIZE_SCALE,
+  ALPHA_DISCARD_THRESHOLD,
+} from '../three-particles-constants.js';
+import {
   type SharedUniforms,
   createParticleUniforms,
-  linearizeDepth,
+  computeFrameIndex,
+  computeSpriteSheetUV,
+  computeSoftParticleFade,
+  applyBackgroundDiscard,
   compensateOutputSRGB,
 } from './tsl-shared.js';
 import type * as THREE from 'three';
@@ -77,7 +75,9 @@ export function createPointSpriteTSLMaterial(
   // Compute model-view position and distance-based point size
   const mvPos = modelViewMatrix.mul(vec4(positionLocal, 1.0));
   const sizeVal = gpuCompute ? aParticleState!.y : aSize!;
-  const sizeNode = sizeVal.mul(100.0).div(length(mvPos.xyz));
+  const sizeNode = aColor.w
+    .greaterThan(0.0)
+    .select(sizeVal.mul(POINT_SIZE_SCALE).div(length(mvPos.xyz)), float(0.0));
 
   // Pass varyings to fragment
   const vColor = varyingProperty('vec4', 'vColor');
@@ -89,20 +89,23 @@ export function createPointSpriteTSLMaterial(
 
   // Assign varyings in vertex
   const vertexSetup = Fn(() => {
-    vColor.assign(aColor.toVar());
-    if (gpuCompute) {
-      // particleState: x=lifetime, y=size, z=rotation, w=startFrame
-      vLifetime.assign(aParticleState!.x);
-      vStartLifetime.assign(aStartValues!.x);
-      vRotation.assign(aParticleState!.z);
-      vStartFrame.assign(aParticleState!.w);
-    } else {
-      vLifetime.assign(aLifetime!);
-      vStartLifetime.assign(aStartLifetime!);
-      vRotation.assign(aRotation!);
-      vStartFrame.assign(aStartFrame!);
-    }
-    vViewZ.assign(mvPos.z.negate());
+    // Early-out for dead particles: set size to 0 (produces zero-area points)
+    // and skip all varying assignments to save vertex shader work.
+    If(aColor.w.greaterThan(0.0), () => {
+      vColor.assign(aColor.toVar());
+      if (gpuCompute) {
+        vLifetime.assign(aParticleState!.x);
+        vStartLifetime.assign(aStartValues!.x);
+        vRotation.assign(aParticleState!.z);
+        vStartFrame.assign(aParticleState!.w);
+      } else {
+        vLifetime.assign(aLifetime!);
+        vStartLifetime.assign(aStartLifetime!);
+        vRotation.assign(aRotation!);
+        vStartFrame.assign(aStartFrame!);
+      }
+      vViewZ.assign(mvPos.z.negate());
+    });
     return positionLocal;
   })();
 
@@ -113,23 +116,14 @@ export function createPointSpriteTSLMaterial(
     const outColor = vColor.toVar();
 
     // Compute frame index (texture sheet animation)
-    const totalFrames = u.uTiles.x.mul(u.uTiles.y);
-    const lifePercent = min(vLifetime.div(vStartLifetime), float(1.0));
-
-    const fpsBased = max(vLifetime.div(1000.0).mul(u.uFps), float(0.0));
-    const lifetimeBased = max(
-      min(floor(lifePercent.mul(totalFrames)), totalFrames.sub(1.0)),
-      float(0.0)
-    );
-    const fpsResult = u.uFps.equal(0.0).select(float(0.0), fpsBased);
-    const frameOffset = u.uUseFPSForFrameIndex
-      .greaterThan(0.5)
-      .select(fpsResult, lifetimeBased);
-    const frameIndex = round(vStartFrame).add(frameOffset);
-
-    // Sprite sheet coordinates
-    const spriteX = floor(mod(frameIndex, u.uTiles.x));
-    const spriteY = floor(mod(frameIndex.div(u.uTiles.x), u.uTiles.y));
+    const frameIndex = computeFrameIndex({
+      vLifetime,
+      vStartLifetime,
+      vStartFrame,
+      uFps: u.uFps,
+      uUseFPSForFrameIndex: u.uUseFPSForFrameIndex,
+      uTiles: u.uTiles,
+    });
 
     // Apply 2D rotation to pointUV
     const center = vec2(0.5, 0.5);
@@ -147,40 +141,34 @@ export function createPointSpriteTSLMaterial(
     Discard(dist.greaterThan(0.5));
 
     // Compute sprite-sheet UV
-    const uvPoint = vec2(
-      rotatedUV.x.div(u.uTiles.x).add(spriteX.div(u.uTiles.x)),
-      rotatedUV.y.div(u.uTiles.y).add(spriteY.div(u.uTiles.y))
-    );
+    const uvPoint = computeSpriteSheetUV({
+      baseUV: rotatedUV,
+      frameIndex,
+      uTiles: u.uTiles,
+    });
 
     // Sample texture
     const texColor = texture(u.uMap, uvPoint);
     outColor.assign(outColor.mul(texColor));
 
     // Background color discard
-    const bgDiff = vec3(
-      texColor.x.sub(u.uBgColor.x),
-      texColor.y.sub(u.uBgColor.y),
-      texColor.z.sub(u.uBgColor.z)
-    );
-    Discard(
-      u.uDiscardBg
-        .greaterThan(0.5)
-        .and(abs(length(bgDiff)).lessThan(u.uBgTolerance))
-    );
+    applyBackgroundDiscard({
+      texColor,
+      uDiscardBg: u.uDiscardBg,
+      uBgColor: u.uBgColor,
+      uBgTolerance: u.uBgTolerance,
+    });
 
     // Soft particles
-    If(u.uSoftEnabled.greaterThan(0.5), () => {
-      const depthSample = texture(u.uSceneDepthTex, screenUV).x;
-      const sceneDepthLinear = linearizeDepth({
-        depthSample,
-        near: u.uCameraNearFar.x,
-        far: u.uCameraNearFar.y,
-      });
-      const depthDiff = sceneDepthLinear.sub(vViewZ);
-      const softFade = smoothstep(float(0.0), u.uSoftIntensity, depthDiff);
-      outColor.assign(vec4(outColor.xyz, outColor.w.mul(softFade)));
+    const softFade = computeSoftParticleFade({
+      viewZ: vViewZ,
+      uSoftEnabled: u.uSoftEnabled,
+      uSoftIntensity: u.uSoftIntensity,
+      uSceneDepthTex: u.uSceneDepthTex,
+      uCameraNearFar: u.uCameraNearFar,
     });
-    Discard(outColor.w.lessThan(0.001));
+    outColor.assign(vec4(outColor.xyz, outColor.w.mul(softFade)));
+    Discard(outColor.w.lessThan(ALPHA_DISCARD_THRESHOLD));
 
     return compensateOutputSRGB({ color: outColor });
   })();

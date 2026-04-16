@@ -54,6 +54,9 @@ export const MAX_COLLISION_PLANES = 16;
 /** Total floats reserved for collision plane data in the curveData buffer. */
 export const COLLISION_PLANE_DATA_SIZE = MAX_COLLISION_PLANES * PLANE_STRIDE;
 
+/** Pre-allocated encoding buffer, reused every frame to avoid GC pressure. */
+let _encodeBuf: Float32Array | null = null;
+
 // ─── CPU-side Encoding ───────────────────────────────────────────────────────
 
 /**
@@ -65,7 +68,11 @@ export const COLLISION_PLANE_DATA_SIZE = MAX_COLLISION_PLANES * PLANE_STRIDE;
 export function encodeCollisionPlanesForGPU(
   planes: ReadonlyArray<NormalizedCollisionPlaneConfig>
 ): Float32Array {
-  const data = new Float32Array(COLLISION_PLANE_DATA_SIZE);
+  if (!_encodeBuf || _encodeBuf.length !== COLLISION_PLANE_DATA_SIZE) {
+    _encodeBuf = new Float32Array(COLLISION_PLANE_DATA_SIZE);
+  }
+  const data = _encodeBuf;
+  data.fill(0);
 
   const count = Math.min(planes.length, MAX_COLLISION_PLANES);
   for (let i = 0; i < count; i++) {

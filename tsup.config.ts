@@ -26,6 +26,8 @@ export default defineConfig([
     treeshake: true,
   },
   // WebGPU entry point (TSL material factories)
+  // DTS is hand-written (webgpu.d.ts) because TSL node types resolve to
+  // `unknown` which breaks automatic declaration generation.
   {
     entry: { webgpu: 'src/webgpu.ts' },
     format: ['esm'],

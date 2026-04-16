@@ -49,6 +49,7 @@ import {
   createForceFieldTSL,
   FORCE_FIELD_DATA_SIZE,
 } from './compute-force-fields.js';
+import { CURVE_RESOLUTION } from './curve-bake.js';
 import { snoise3D } from './tsl-noise.js';
 import type { BakedCurveMap } from './curve-bake.js';
 
@@ -265,6 +266,8 @@ const _emitCounts = new WeakMap<StorageBufferAttribute, number>();
 const _curveDataLengths = new WeakMap<StorageBufferAttribute, number>();
 /** Particle indices emitted this frame. */
 const _currentEmitIndices = new WeakMap<StorageBufferAttribute, number[]>();
+/** Particle indices emitted in the previous frame (need their initFlags cleared). */
+const _previousEmitIndices = new WeakMap<StorageBufferAttribute, number[]>();
 
 /**
  * Writes init data for a newly emitted particle into its per-particle slot
@@ -396,38 +399,32 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
   const curveLen = _curveDataLengths.get(buffers.curveData) ?? 0;
   const arr = buffers.curveData.array as Float32Array;
 
-  // Before ANY upload, clear ALL initFlags in the CPU array except
-  // those belonging to particles emitted THIS frame (which need to
-  // be uploaded with initFlag=1 so the GPU compute shader initialises
-  // them).
+  // Clear initFlags for particles emitted in the PREVIOUS frame that are
+  // NOT being re-emitted this frame.  This is O(emittedLastFrame) instead
+  // of the old O(maxParticles) full-scan approach, while preserving the
+  // same correctness guarantee:
   //
-  // Why clear everything rather than tracking individual indices?
-  // The previous approach (delayed "pending clear" list) suffered from
-  // a race condition: when a particle died and was re-emitted within a
-  // single frame, the delayed clear from the first emission would
-  // overwrite the fresh initFlag=1 from the re-emission in the NEXT
-  // frame's upload — causing the GPU to never initialise the particle,
-  // which then rendered with stale data (wrong color/position).
-  //
-  // By clearing all non-current initFlags before every upload we
-  // guarantee no stale flags survive across frames, regardless of how
-  // quickly particles are recycled.
+  // A particle that dies and is re-emitted within a single frame keeps its
+  // fresh initFlag=1 because it appears in the current set and is excluded
+  // from clearing.  This avoids the race condition where a delayed clear
+  // from the first emission would overwrite the fresh initFlag=1 from the
+  // re-emission — causing the GPU to never initialise the particle, which
+  // then rendered with stale data (wrong color/position).
   const current = _currentEmitIndices.get(buffers.curveData);
-  const currentSet = current && current.length > 0 ? new Set(current) : null;
+  const previous = _previousEmitIndices.get(buffers.curveData);
 
-  // Derive actual particle count from the position buffer (vec4 per particle).
-  // Do NOT use (arr.length - curveLen) / INIT_STRIDE — when force fields are
-  // enabled the curveData buffer has extra data appended after the init slots,
-  // which would inflate the count and cause the scan to overwrite force field data.
   let clearedAny = false;
-  const maxParticles = buffers.position.array.length / 4;
-  for (let p = 0; p < maxParticles; p++) {
-    const flagOffset = curveLen + p * INIT_STRIDE + 3;
-    if (arr[flagOffset] > 0.5) {
-      // Keep initFlag=1 only for particles emitted this frame
+
+  if (previous && previous.length > 0) {
+    const currentSet = current && current.length > 0 ? new Set(current) : null;
+    for (let i = 0; i < previous.length; i++) {
+      const p = previous[i];
       if (!currentSet || !currentSet.has(p)) {
-        arr[flagOffset] = 0;
-        clearedAny = true;
+        const flagOffset = curveLen + p * INIT_STRIDE + 3;
+        if (arr[flagOffset] > 0.5) {
+          arr[flagOffset] = 0;
+          clearedAny = true;
+        }
       }
     }
   }
@@ -435,6 +432,7 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
   if (count > 0 || clearedAny) {
     buffers.curveData.needsUpdate = true;
   }
+
   // NOTE: startValues and startColorsExt are NO LONGER uploaded via
   // needsUpdate here.  Their init data is now carried inside each
   // particle's curveData init slot and scattered to the GPU storage
@@ -443,7 +441,26 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
   // are still alive on the GPU but have already been recycled on the
   // CPU (due to CPU/GPU death-timing desync).
 
-  if (current) current.length = 0;
+  // Rotate: current becomes previous for next frame
+  if (current && current.length > 0) {
+    // Copy current into previous (reuse array if possible)
+    let prevArr = _previousEmitIndices.get(buffers.curveData);
+    if (!prevArr) {
+      prevArr = [];
+      _previousEmitIndices.set(buffers.curveData, prevArr);
+    }
+    prevArr.length = current.length;
+    for (let i = 0; i < current.length; i++) {
+      prevArr[i] = current[i];
+    }
+    current.length = 0;
+  } else {
+    // No emissions this frame — clear previous
+    const prevArr = _previousEmitIndices.get(buffers.curveData);
+    if (prevArr) prevArr.length = 0;
+    if (current) current.length = 0;
+  }
+
   _emitCounts.set(buffers.curveData, 0);
   return count;
 }
@@ -466,8 +483,6 @@ export function deactivateParticleInModifierBuffers(
 }
 
 // ─── Curve Lookup Helper ─────────────────────────────────────────────────────
-
-const CURVE_RESOLUTION = 256;
 
 /**
  * Creates a TSL function that performs a linear-interpolated lookup into the

@@ -42,6 +42,7 @@ import {
   type Node,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { ALPHA_DISCARD_THRESHOLD } from '../three-particles-constants.js';
 import {
   getDummyTexture,
   linearizeDepth,
@@ -271,7 +272,7 @@ export function createTrailRibbonTSLMaterial(
     outColor.a.assign(outColor.a.mul(vAlpha).mul(edgeFade));
 
     // Early discard for fully transparent fragments
-    Discard(outColor.a.lessThan(0.001));
+    Discard(outColor.a.lessThan(ALPHA_DISCARD_THRESHOLD));
 
     // Soft particles — depth-difference fade
     If(u.uSoftEnabled.greaterThan(0.5), () => {
@@ -285,7 +286,7 @@ export function createTrailRibbonTSLMaterial(
       const softFade = smoothstep(float(0.0), u.uSoftIntensity, depthDiff);
       outColor.a.assign(outColor.a.mul(softFade));
     });
-    Discard(outColor.a.lessThan(0.001));
+    Discard(outColor.a.lessThan(ALPHA_DISCARD_THRESHOLD));
 
     // Background color discard
     const diff = vec3(

@@ -8,6 +8,7 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist/",
+    "webgpu.d.ts",
     "README.md",
     "LICENSE",
     "llms.txt",
@@ -21,7 +22,8 @@
       "types": "./dist/index.d.ts"
     },
     "./webgpu": {
-      "import": "./dist/webgpu.js"
+      "import": "./dist/webgpu.js",
+      "types": "./webgpu.d.ts"
     }
   },
   "repository": {

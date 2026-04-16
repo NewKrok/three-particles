@@ -324,12 +324,10 @@ describe('collision plane mode encoding', () => {
     const clampPlane = createPlane({ mode: CollisionPlaneMode.CLAMP });
     const bouncePlane = createPlane({ mode: CollisionPlaneMode.BOUNCE });
 
-    const killData = encodeCollisionPlanesForGPU([killPlane]);
-    const clampData = encodeCollisionPlanesForGPU([clampPlane]);
-    const bounceData = encodeCollisionPlanesForGPU([bouncePlane]);
-
-    expect(killData[1]).toBe(0);
-    expect(clampData[1]).toBe(1);
-    expect(bounceData[1]).toBe(2);
+    // The encode function reuses an internal buffer, so read the mode value
+    // immediately after each call before the next call overwrites it.
+    expect(encodeCollisionPlanesForGPU([killPlane])[1]).toBe(0);
+    expect(encodeCollisionPlanesForGPU([clampPlane])[1]).toBe(1);
+    expect(encodeCollisionPlanesForGPU([bouncePlane])[1]).toBe(2);
   });
 });

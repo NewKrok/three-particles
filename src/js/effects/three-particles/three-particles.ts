@@ -109,6 +109,23 @@ export {
 let _particleSystemId = 0;
 let createdParticleSystems: Array<ParticleSystemInstance> = [];
 
+// ─── GPU Compute Uniform Helpers ────────────────────────────────────────────
+// Centralise the `as unknown as` casts for setting TSL uniform values.
+// The TSL uniform nodes expose `.value` at runtime but their TypeScript
+// type (`ShaderNodeObject<Node>`) does not declare it.
+
+/** Sets a TSL float uniform's value. */
+const setUniformFloat = (u: unknown, v: number): void => {
+  (u as { value: number }).value = v;
+};
+
+/** Sets a TSL vec3 uniform's value. */
+const setUniformVec3 = (u: unknown, x: number, y: number, z: number): void => {
+  (
+    u as { value: { set: (x: number, y: number, z: number) => void } }
+  ).value.set(x, y, z);
+};
+
 // ─── WebGPU TSL Material Support (opt-in via registerTSLMaterialFactory) ─────
 
 type TSLMaterialFactory = {
@@ -661,6 +678,7 @@ export const createParticleSystem = (
       positionAmount: 0,
       rotationAmount: 0,
       sizeAmount: 0,
+      fbmMax: 1,
     },
     isEnabled: true,
   };
@@ -879,6 +897,10 @@ export const createParticleSystem = (
       );
   });
 
+  // Pre-compute FBM normalisation divisor once (avoids recalculating every frame).
+  // fbmMax = 1 + 0.5 + 0.25 + ... = 2 - 2^(-octaves)
+  const fbmMax = 2 - Math.pow(2, -noise.octaves);
+
   generalData.noise = {
     isActive: noise.isActive,
     strength: noise.strength,
@@ -887,6 +909,7 @@ export const createParticleSystem = (
     positionAmount: noise.positionAmount,
     rotationAmount: noise.rotationAmount,
     sizeAmount: noise.sizeAmount,
+    fbmMax,
     sampler: noise.isActive
       ? new FBM({
           seed: Math.random(),
@@ -2087,6 +2110,7 @@ export const createParticleSystem = (
         positionAmount: n.positionAmount,
         rotationAmount: n.rotationAmount,
         sizeAmount: n.sizeAmount,
+        fbmMax: 2 - Math.pow(2, -n.octaves),
         sampler: n.isActive
           ? new FBM({
               seed: Math.random(),
@@ -2367,48 +2391,38 @@ const updateParticleSystemInstance = (
     const cp = computePipeline as ModifierComputePipeline;
 
     // Core physics uniforms
-    (cp.uniforms.delta as unknown as { value: number }).value = delta;
-    (cp.uniforms.deltaMs as unknown as { value: number }).value = delta * 1000;
-    const gv = cp.uniforms.gravityVelocity as unknown as {
-      value: { set: (x: number, y: number, z: number) => void };
-    };
-    gv.value.set(gravityVelocity.x, gravityVelocity.y, gravityVelocity.z);
-    const wpc = cp.uniforms.worldPositionChange as unknown as {
-      value: { set: (x: number, y: number, z: number) => void };
-    };
-    wpc.value.set(
+    setUniformFloat(cp.uniforms.delta, delta);
+    setUniformFloat(cp.uniforms.deltaMs, delta * 1000);
+    setUniformVec3(
+      cp.uniforms.gravityVelocity,
+      gravityVelocity.x,
+      gravityVelocity.y,
+      gravityVelocity.z
+    );
+    setUniformVec3(
+      cp.uniforms.worldPositionChange,
       generalData.worldPositionChange.x,
       generalData.worldPositionChange.y,
       generalData.worldPositionChange.z
     );
-    (cp.uniforms.simulationSpaceWorld as unknown as { value: number }).value =
-      simulationSpace === SimulationSpace.WORLD ? 1 : 0;
+    setUniformFloat(
+      cp.uniforms.simulationSpaceWorld,
+      simulationSpace === SimulationSpace.WORLD ? 1 : 0
+    );
 
     // Noise uniforms
     // GPU simplex noise output is not normalised by FBM's octave accumulator,
-    // so we scale noisePower by the same divisor the CPU FBM applies:
-    //   max = 1; for each octave: amplitude *= persistance; max += amplitude
-    // Default persistance = 0.5.
+    // so we scale noisePower by the pre-computed divisor (fbmMax).
     const noiseData = generalData.noise;
-    const noiseCfg = normalizedConfig.noise;
-    let fbmMax = 1;
-    let fbmAmp = 1;
-    for (let o = 0; o < noiseCfg.octaves; o++) {
-      fbmAmp *= 0.5; // persistance
-      fbmMax += fbmAmp;
-    }
-    (cp.uniforms.noiseStrength as unknown as { value: number }).value =
-      noiseData.strength;
-    (cp.uniforms.noisePower as unknown as { value: number }).value =
-      noiseData.noisePower / fbmMax;
-    (cp.uniforms.noiseFrequency as unknown as { value: number }).value =
-      noiseData.frequency;
-    (cp.uniforms.noisePositionAmount as unknown as { value: number }).value =
-      noiseData.positionAmount;
-    (cp.uniforms.noiseRotationAmount as unknown as { value: number }).value =
-      noiseData.rotationAmount;
-    (cp.uniforms.noiseSizeAmount as unknown as { value: number }).value =
-      noiseData.sizeAmount;
+    setUniformFloat(cp.uniforms.noiseStrength, noiseData.strength);
+    setUniformFloat(
+      cp.uniforms.noisePower,
+      noiseData.noisePower / noiseData.fbmMax
+    );
+    setUniformFloat(cp.uniforms.noiseFrequency, noiseData.frequency);
+    setUniformFloat(cp.uniforms.noisePositionAmount, noiseData.positionAmount);
+    setUniformFloat(cp.uniforms.noiseRotationAmount, noiseData.rotationAmount);
+    setUniformFloat(cp.uniforms.noiseSizeAmount, noiseData.sizeAmount);
 
     // Force field buffer update — write encoded data into curveData tail
     if (
@@ -2424,8 +2438,10 @@ const updateParticleSystemInstance = (
       const curveArr = cp.buffers.curveData.array as Float32Array;
       curveArr.set(encodedFF, cp.forceFieldInfo.offset);
       cp.buffers.curveData.needsUpdate = true;
-      (cp.forceFieldInfo.countUniform as unknown as { value: number }).value =
-        normalizedForceFields.length;
+      setUniformFloat(
+        cp.forceFieldInfo.countUniform,
+        normalizedForceFields.length
+      );
     }
 
     // Collision plane buffer update — write encoded data into curveData tail
@@ -2440,9 +2456,10 @@ const updateParticleSystemInstance = (
       const curveArr = cp.buffers.curveData.array as Float32Array;
       curveArr.set(encodedCP, cp.collisionPlaneInfo.offset);
       cp.buffers.curveData.needsUpdate = true;
-      (
-        cp.collisionPlaneInfo.countUniform as unknown as { value: number }
-      ).value = normalizedCollisionPlanes.length;
+      setUniformFloat(
+        cp.collisionPlaneInfo.countUniform,
+        normalizedCollisionPlanes.length
+      );
     }
 
     // Flush emit queue — uploads queued particle data to GPU and sets the

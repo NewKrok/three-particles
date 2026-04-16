@@ -764,6 +764,8 @@ export type Noise = {
   positionAmount: number;
   rotationAmount: number;
   sizeAmount: number;
+  /** Pre-computed FBM normalisation divisor: `2 - 2^(-octaves)`. */
+  fbmMax: number;
   sampler?: FBM;
   offsets?: Array<number>;
 };

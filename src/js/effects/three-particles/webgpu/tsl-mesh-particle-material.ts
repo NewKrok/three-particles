@@ -26,17 +26,9 @@ import {
   texture,
   cos,
   sin,
-  floor,
-  max,
-  min,
-  smoothstep,
-  round,
-  mod,
-  screenUV,
   Discard,
   If,
-  abs,
-  length,
+  max,
   cross,
   dot,
   varyingProperty,
@@ -46,10 +38,14 @@ import {
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 
+import { ALPHA_DISCARD_THRESHOLD } from '../three-particles-constants.js';
 import {
   type SharedUniforms,
   createParticleUniforms,
-  linearizeDepth,
+  computeFrameIndex,
+  computeSpriteSheetUV,
+  computeSoftParticleFade,
+  applyBackgroundDiscard,
   compensateOutputSRGB,
 } from './tsl-shared.js';
 
@@ -211,34 +207,22 @@ export function createMeshParticleTSLMaterial(
 
     // Texture sheet animation — only applied when tiles > 1×1
     If(u.uTiles.x.greaterThan(1.0).or(u.uTiles.y.greaterThan(1.0)), () => {
-      const totalFrames = u.uTiles.x.mul(u.uTiles.y);
-      const lifePercent = min(vLifetime.div(vStartLifetime), float(1.0));
-
-      // FPS-based frame index
-      const fpsBased = max(vLifetime.div(1000.0).mul(u.uFps), float(0.0));
-
-      // Lifetime-based frame index (clamped to valid range)
-      const lifetimeBased = max(
-        min(floor(lifePercent.mul(totalFrames)), totalFrames.sub(1.0)),
-        float(0.0)
-      );
-
-      const fpsResult = u.uFps.equal(0.0).select(float(0.0), fpsBased);
-      const frameOffset = u.uUseFPSForFrameIndex
-        .greaterThan(0.5)
-        .select(fpsResult, lifetimeBased);
-      const frameIndex = round(vStartFrame).add(frameOffset);
-
-      // Sprite-sheet tile coordinates
-      const spriteX = floor(mod(frameIndex, u.uTiles.x));
-      const spriteY = floor(mod(frameIndex.div(u.uTiles.x), u.uTiles.y));
+      const frameIndex = computeFrameIndex({
+        vLifetime,
+        vStartLifetime,
+        vStartFrame,
+        uFps: u.uFps,
+        uUseFPSForFrameIndex: u.uUseFPSForFrameIndex,
+        uTiles: u.uTiles,
+      });
 
       // Remap mesh UV into the selected tile
       uvPoint.assign(
-        vec2(
-          uv().x.div(u.uTiles.x).add(spriteX.div(u.uTiles.x)),
-          uv().y.div(u.uTiles.y).add(spriteY.div(u.uTiles.y))
-        )
+        computeSpriteSheetUV({
+          baseUV: uv(),
+          frameIndex,
+          uTiles: u.uTiles,
+        })
       );
     });
 
@@ -247,16 +231,12 @@ export function createMeshParticleTSLMaterial(
     outColor.assign(outColor.mul(texColor));
 
     // Background color discard
-    const bgDiff = vec3(
-      texColor.x.sub(u.uBgColor.x),
-      texColor.y.sub(u.uBgColor.y),
-      texColor.z.sub(u.uBgColor.z)
-    );
-    Discard(
-      u.uDiscardBg
-        .greaterThan(0.5)
-        .and(abs(length(bgDiff)).lessThan(u.uBgTolerance))
-    );
+    applyBackgroundDiscard({
+      texColor,
+      uDiscardBg: u.uDiscardBg,
+      uBgColor: u.uBgColor,
+      uBgTolerance: u.uBgTolerance,
+    });
 
     // Simple directional lighting from camera direction (+Z in view space).
     // lightIntensity = 0.5 + 0.5 * max(dot(vNormal, vec3(0,0,1)), 0.0)
@@ -266,18 +246,15 @@ export function createMeshParticleTSLMaterial(
     outColor.assign(vec4(outColor.xyz.mul(lightIntensity), outColor.w));
 
     // Soft particles — fade out fragments that are close to opaque scene geometry
-    If(u.uSoftEnabled.greaterThan(0.5), () => {
-      const depthSample = texture(u.uSceneDepthTex, screenUV).x;
-      const sceneDepthLinear = linearizeDepth({
-        depthSample,
-        near: u.uCameraNearFar.x,
-        far: u.uCameraNearFar.y,
-      });
-      const depthDiff = sceneDepthLinear.sub(vViewZ);
-      const softFade = smoothstep(float(0.0), u.uSoftIntensity, depthDiff);
-      outColor.assign(vec4(outColor.xyz, outColor.w.mul(softFade)));
+    const softFade = computeSoftParticleFade({
+      viewZ: vViewZ,
+      uSoftEnabled: u.uSoftEnabled,
+      uSoftIntensity: u.uSoftIntensity,
+      uSceneDepthTex: u.uSceneDepthTex,
+      uCameraNearFar: u.uCameraNearFar,
     });
-    Discard(outColor.w.lessThan(0.001));
+    outColor.assign(vec4(outColor.xyz, outColor.w.mul(softFade)));
+    Discard(outColor.w.lessThan(ALPHA_DISCARD_THRESHOLD));
 
     return compensateOutputSRGB({ color: outColor });
   })();

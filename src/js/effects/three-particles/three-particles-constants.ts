@@ -43,3 +43,11 @@ export const S_COLOR_B = 8;
 
 /** Offset for the alpha (opacity) channel (0..1). */
 export const S_COLOR_A = 9;
+
+// ─── Shared rendering constants ─────────────────────────────────────────────
+
+/** Scale factor converting particle size to pixel-equivalent point size. */
+export const POINT_SIZE_SCALE = 100.0;
+
+/** Minimum alpha below which fragments are discarded. */
+export const ALPHA_DISCARD_THRESHOLD = 0.001;

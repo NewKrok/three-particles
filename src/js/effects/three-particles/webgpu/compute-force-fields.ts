@@ -63,6 +63,9 @@ export const FORCE_FIELD_DATA_SIZE = MAX_FORCE_FIELDS * FIELD_STRIDE;
 /** Sentinel value for "infinite" range on GPU (avoids Infinity in Float32). */
 const GPU_INFINITY = 1e10;
 
+/** Pre-allocated encoding buffer, reused every frame to avoid GC pressure. */
+let _encodeBuf: Float32Array | null = null;
+
 // ─── CPU-side Encoding ───────────────────────────────────────────────────────
 
 /**
@@ -78,7 +81,11 @@ export function encodeForceFieldsForGPU(
   particleSystemId: number,
   systemLifetimePercentage: number
 ): Float32Array {
-  const data = new Float32Array(FORCE_FIELD_DATA_SIZE);
+  if (!_encodeBuf || _encodeBuf.length !== FORCE_FIELD_DATA_SIZE) {
+    _encodeBuf = new Float32Array(FORCE_FIELD_DATA_SIZE);
+  }
+  const data = _encodeBuf;
+  data.fill(0);
 
   const count = Math.min(forceFields.length, MAX_FORCE_FIELDS);
   for (let i = 0; i < count; i++) {
