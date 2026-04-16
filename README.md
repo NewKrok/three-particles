@@ -169,37 +169,17 @@ Optional GPU-accelerated particle simulation via Three.js WebGPU renderer and TS
 ## Setup
 
 ```typescript
-// 1. Import from the WebGPU sub-module
-import { registerTSLMaterialFactory, SimulationBackend } from "@newkrok/three-particles";
-import {
-  createTSLParticleMaterial,
-  createTSLTrailMaterial,
-  createComputePipeline,
-  writeParticleToModifierBuffers,
-  deactivateParticleInModifierBuffers,
-  flushEmitQueue,
-  registerCurveDataLength,
-  encodeForceFieldsForGPU,
-} from "@newkrok/three-particles/webgpu";
+// 1. Enable WebGPU support (once, before creating any particle system)
+import { enableWebGPU } from "@newkrok/three-particles/webgpu";
+enableWebGPU();
 
-// 2. Register the TSL material factory (once, before creating any particle system)
-registerTSLMaterialFactory({
-  createTSLParticleMaterial,
-  createTSLTrailMaterial,
-  createComputePipeline,
-  writeParticleToModifierBuffers,
-  deactivateParticleInModifierBuffers,
-  flushEmitQueue,
-  registerCurveDataLength,
-  encodeForceFieldsForGPU,
-});
-
-// 3. Create a WebGPU renderer
+// 2. Create a WebGPU renderer
 import * as THREE from "three/webgpu";
 const renderer = new THREE.WebGPURenderer({ antialias: true });
 await renderer.init();
 
-// 4. Create a GPU-accelerated particle system
+// 3. Create a GPU-accelerated particle system
+import { createParticleSystem, SimulationBackend } from "@newkrok/three-particles";
 const system = createParticleSystem({
   simulationBackend: SimulationBackend.AUTO, // GPU if WebGPU available, else CPU
   maxParticles: 100000,
@@ -208,7 +188,7 @@ const system = createParticleSystem({
 
 scene.add(system.instance);
 
-// 5. In your render loop — dispatch compute before rendering
+// 4. In your render loop — dispatch compute before rendering
 function animate() {
   system.update({ now: performance.now(), delta, elapsed });
 
@@ -218,6 +198,8 @@ function animate() {
   renderer.render(scene, camera);
 }
 ```
+
+For fine-grained control, you can also use `registerTSLMaterialFactory()` to selectively register individual WebGPU functions — see the full API reference.
 
 ## SimulationBackend
 
@@ -244,7 +226,7 @@ function animate() {
 ## Fallback Behavior
 
 WebGPU is fully opt-in and non-breaking:
-- If no TSL factory is registered, the library uses GLSL shaders (WebGL path)
+- If `enableWebGPU()` not called (or no TSL factory registered), the library uses GLSL shaders (WebGL path)
 - If `simulationBackend: 'GPU'` but WebGPU is unavailable, it silently falls back to CPU
 - The same particle config works identically on both backends
 

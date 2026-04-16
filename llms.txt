@@ -219,49 +219,34 @@ Optional GPU-accelerated particle simulation via Three.js WebGPU renderer and TS
 ### Setup
 
 ```typescript
-import { createParticleSystem, registerTSLMaterialFactory, SimulationBackend } from "@newkrok/three-particles";
-import {
-  createTSLParticleMaterial,
-  createTSLTrailMaterial,
-  createComputePipeline,
-  writeParticleToModifierBuffers,
-  deactivateParticleInModifierBuffers,
-  flushEmitQueue,
-  registerCurveDataLength,
-  encodeForceFieldsForGPU,
-} from "@newkrok/three-particles/webgpu";
+// 1. Enable WebGPU support (once, before creating any particle system)
+import { enableWebGPU } from "@newkrok/three-particles/webgpu";
+enableWebGPU();
 
-// Register TSL materials + GPU compute functions (once, before creating systems)
-registerTSLMaterialFactory({
-  createTSLParticleMaterial,
-  createTSLTrailMaterial,
-  createComputePipeline,
-  writeParticleToModifierBuffers,
-  deactivateParticleInModifierBuffers,
-  flushEmitQueue,
-  registerCurveDataLength,
-  encodeForceFieldsForGPU,
-});
-
-// Create WebGPU renderer
+// 2. Create a WebGPU renderer
 import * as THREE from "three/webgpu";
 const renderer = new THREE.WebGPURenderer({ antialias: true });
 await renderer.init();
 
-// Create system with GPU backend
+// 3. Create a GPU-accelerated particle system
+import { createParticleSystem, SimulationBackend } from "@newkrok/three-particles";
 const system = createParticleSystem({
   simulationBackend: SimulationBackend.AUTO, // GPU if WebGPU available, else CPU
   maxParticles: 100000,
   // ... rest of config (same API as CPU)
 });
 
-// In render loop — dispatch compute BEFORE rendering
+scene.add(system.instance);
+
+// 4. In your render loop — dispatch compute before rendering
 system.update({ now: performance.now(), delta, elapsed });
 if (system.computeNode) {
   renderer.compute(system.computeNode);
 }
 renderer.render(scene, camera);
 ```
+
+For fine-grained control, you can also use `registerTSLMaterialFactory()` to selectively register individual WebGPU functions — see the full API reference.
 
 ### SimulationBackend
 
@@ -298,7 +283,7 @@ if (system.computeNode) {
 
 ### Fallback behavior
 
-- If no TSL factory registered: uses GLSL shaders (WebGL path)
+- If `enableWebGPU()` not called (or no TSL factory registered): uses GLSL shaders (WebGL path)
 - If `GPU` requested but renderer lacks compute: silently falls back to CPU
 - Same `ParticleSystemConfig` works on both backends — no config changes needed
 
