@@ -2,5 +2,6 @@
   "entryPoints": ["src/js/effects/three-particles/three-particles.ts"],
   "out": "docs/api",
   "excludePrivate": true,
-  "includeVersion": true
+  "includeVersion": true,
+  "skipErrorChecking": true
 }
