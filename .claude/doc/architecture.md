@@ -177,7 +177,8 @@ updateParticleSystems({ now, delta, elapsed })
       │     │
       │     ├─ Update position:
       │     │   position += velocity * delta
-      │     │   (+ worldPositionChange compensation for WORLD space)
+      │     │   (WORLD space: positions are stored in world coords,
+      │     │    so no per-frame emitter-motion compensation is needed)
       │     │
       │     ├─ Apply modifiers (if active):
       │     │   ├─ Linear velocity
