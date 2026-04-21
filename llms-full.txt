@@ -524,7 +524,10 @@ const system = createParticleSystem({
   held at identity. New particles spawn from the emitter's current world
   pose (parent chain + `instance.position` / `instance.rotation`), so
   moving the emitter only affects future emissions, not existing
-  particles. Matches Unity's world simulation space.
+  particles. The shape-emission offset is scaled by the emitter's world
+  scale at spawn time (matching Unity's Shape module with `Scaling Mode =
+  Local/Hierarchy`); live particles are unaffected by later scale
+  changes. Matches Unity's world simulation space.
 
 ### TimeMode
 `LIFETIME` | `FPS`

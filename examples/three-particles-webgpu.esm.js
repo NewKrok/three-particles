@@ -17095,8 +17095,6 @@ var _subEmitterPosition = new __WEBPACK_EXTERNAL_MODULE_three_Vector3__();
 var _subLocalPosition = new __WEBPACK_EXTERNAL_MODULE_three_Vector3__();
 var _shadowOrbitalEuler = new __WEBPACK_EXTERNAL_MODULE_three_Euler__(0, 0, 0, "XYZ");
 var _lastWorldPositionSnapshot = new __WEBPACK_EXTERNAL_MODULE_three_Vector3__();
-var _tmpVec3A = new __WEBPACK_EXTERNAL_MODULE_three_Vector3__();
-new __WEBPACK_EXTERNAL_MODULE_three_Vector3__();
 var _localForceFieldPos = new __WEBPACK_EXTERNAL_MODULE_three_Vector3__();
 var _localForceFieldDir = new __WEBPACK_EXTERNAL_MODULE_three_Vector3__();
 var _inverseQuat = new __WEBPACK_EXTERNAL_MODULE_three_Quaternion__();
@@ -17393,7 +17391,7 @@ var createParticleSystem = (config = DEFAULT_PARTICLE_SYSTEM_CONFIG, externalNow
     sourceWorldMatrix: new THREE5.Matrix4(),
     worldQuaternion: new THREE5.Quaternion(),
     wrapperQuaternion: new THREE5.Quaternion(),
-    lastWorldQuaternion: new THREE5.Quaternion(-99999),
+    worldScale: new THREE5.Vector3(1, 1, 1),
     worldEuler: new THREE5.Euler(),
     gravityVelocity: new THREE5.Vector3(0, 0, 0),
     startValues: {},
@@ -17989,14 +17987,20 @@ var createParticleSystem = (config = DEFAULT_PARTICLE_SYSTEM_CONFIG, externalNow
     );
     {
       const positionIndex = particleIndex * 3;
-      aPosition.array[positionIndex] = position.x + startPositions[particleIndex].x;
-      aPosition.array[positionIndex + 1] = position.y + startPositions[particleIndex].y;
-      aPosition.array[positionIndex + 2] = position.z + startPositions[particleIndex].z;
-      if (normalizedConfig.simulationSpace === "WORLD" /* WORLD */) {
+      const isWorld = normalizedConfig.simulationSpace === "WORLD" /* WORLD */;
+      const ox = startPositions[particleIndex].x;
+      const oy = startPositions[particleIndex].y;
+      const oz = startPositions[particleIndex].z;
+      if (isWorld) {
         const m = generalData.sourceWorldMatrix.elements;
-        aPosition.array[positionIndex] += m[12];
-        aPosition.array[positionIndex + 1] += m[13];
-        aPosition.array[positionIndex + 2] += m[14];
+        const s = generalData.worldScale;
+        aPosition.array[positionIndex] = position.x + ox * s.x + m[12];
+        aPosition.array[positionIndex + 1] = position.y + oy * s.y + m[13];
+        aPosition.array[positionIndex + 2] = position.z + oz * s.z + m[14];
+      } else {
+        aPosition.array[positionIndex] = position.x + ox;
+        aPosition.array[positionIndex + 1] = position.y + oy;
+        aPosition.array[positionIndex + 2] = position.z + oz;
       }
       if (!useGPUCompute) {
         aPosition.needsUpdate = true;
@@ -18049,14 +18053,18 @@ var createParticleSystem = (config = DEFAULT_PARTICLE_SYSTEM_CONFIG, externalNow
     if (useGPUCompute && gpuPipeline) {
       const isWorld = normalizedConfig.simulationSpace === "WORLD" /* WORLD */;
       const m = generalData.sourceWorldMatrix.elements;
+      const s = generalData.worldScale;
+      const ox = startPositions[particleIndex].x;
+      const oy = startPositions[particleIndex].y;
+      const oz = startPositions[particleIndex].z;
       _tslMaterialFactory.writeParticleToModifierBuffers(
         gpuPipeline.buffers,
         particleIndex,
         {
           position: {
-            x: position.x + startPositions[particleIndex].x + (isWorld ? m[12] : 0),
-            y: position.y + startPositions[particleIndex].y + (isWorld ? m[13] : 0),
-            z: position.z + startPositions[particleIndex].z + (isWorld ? m[14] : 0)
+            x: position.x + (isWorld ? ox * s.x + m[12] : ox),
+            y: position.y + (isWorld ? oy * s.y + m[13] : oy),
+            z: position.z + (isWorld ? oz * s.z + m[14] : oz)
           },
           velocity: {
             x: velocities[particleIndex].x,
@@ -18360,6 +18368,7 @@ var createParticleSystem = (config = DEFAULT_PARTICLE_SYSTEM_CONFIG, externalNow
       positionArr[posIdx + 2]
     );
     if (simulationSpace === "LOCAL" /* LOCAL */) {
+      particleSystem.updateMatrixWorld();
       particleSystem.localToWorld(_subEmitterPosition);
     }
     spawnSubEmitters(
@@ -18377,6 +18386,7 @@ var createParticleSystem = (config = DEFAULT_PARTICLE_SYSTEM_CONFIG, externalNow
       positionArr[posIdx + 2]
     );
     if (simulationSpace === "LOCAL" /* LOCAL */) {
+      particleSystem.updateMatrixWorld();
       particleSystem.localToWorld(_subEmitterPosition);
     }
     spawnSubEmitters(
@@ -18572,13 +18582,15 @@ var updateParticleSystemInstance = (props, { now, delta, elapsed }) => {
     sourceWorldMatrix.decompose(
       currentWorldPosition,
       worldQuaternion,
-      _tmpVec3A
+      generalData.worldScale
     );
     generalData.wrapperQuaternion.copy(worldQuaternion);
     particleSystem.matrixWorld.identity();
   } else {
+    particleSystem.updateMatrixWorld();
     particleSystem.getWorldPosition(currentWorldPosition);
     particleSystem.getWorldQuaternion(worldQuaternion);
+    particleSystem.getWorldScale(generalData.worldScale);
     generalData.wrapperQuaternion.identity();
   }
   if (lastWorldPosition.x !== -99999) {
@@ -18601,6 +18613,12 @@ var updateParticleSystemInstance = (props, { now, delta, elapsed }) => {
     gravityVelocity.set(0, gravity, 0);
     _inverseQuat.copy(worldQuaternion).invert();
     gravityVelocity.applyQuaternion(_inverseQuat);
+    const sx = generalData.worldScale.x || 1;
+    const sy = generalData.worldScale.y || 1;
+    const sz = generalData.worldScale.z || 1;
+    gravityVelocity.x /= sx;
+    gravityVelocity.y /= sy;
+    gravityVelocity.z /= sz;
   }
   if (hasForceFields) {
     if (simulationSpace === "LOCAL" /* LOCAL */) {
@@ -18825,7 +18843,7 @@ var updateParticleSystemInstance = (props, { now, delta, elapsed }) => {
               systemLifetimePercentage: generalData.normalizedLifetimePercentage
             });
           }
-          if (gravity !== 0 || velocity.x !== 0 || velocity.y !== 0 || velocity.z !== 0 || worldPositionChange.x !== 0 || worldPositionChange.y !== 0 || worldPositionChange.z !== 0) {
+          if (gravity !== 0 || velocity.x !== 0 || velocity.y !== 0 || velocity.z !== 0) {
             const positionIndex = index * 3;
             positionArr[positionIndex] += velocity.x * delta;
             positionArr[positionIndex + 1] += velocity.y * delta;

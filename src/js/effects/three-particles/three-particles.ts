@@ -218,9 +218,6 @@ const _subEmitterPosition = new THREE.Vector3();
 const _subLocalPosition = new THREE.Vector3();
 const _shadowOrbitalEuler = new THREE.Euler(0, 0, 0, 'XYZ');
 const _lastWorldPositionSnapshot = new THREE.Vector3();
-// Helpers for decomposing sourceWorldMatrix (WORLD simulation space)
-const _tmpVec3A = new THREE.Vector3();
-const _tmpVec3B = new THREE.Vector3();
 // Force field local-space conversion helpers (reused across frames)
 const _localForceFieldPos = new THREE.Vector3();
 const _localForceFieldDir = new THREE.Vector3();
@@ -661,7 +658,7 @@ export const createParticleSystem = (
     sourceWorldMatrix: new THREE.Matrix4(),
     worldQuaternion: new THREE.Quaternion(),
     wrapperQuaternion: new THREE.Quaternion(),
-    lastWorldQuaternion: new THREE.Quaternion(-99999),
+    worldScale: new THREE.Vector3(1, 1, 1),
     worldEuler: new THREE.Euler(),
     gravityVelocity: new THREE.Vector3(0, 0, 0),
     startValues: {},
@@ -1455,22 +1452,31 @@ export const createParticleSystem = (
     // read the particle's approximate position without GPU readback.
     {
       const positionIndex = particleIndex * 3;
-      aPosition.array[positionIndex] =
-        position.x + startPositions[particleIndex].x;
-      aPosition.array[positionIndex + 1] =
-        position.y + startPositions[particleIndex].y;
-      aPosition.array[positionIndex + 2] =
-        position.z + startPositions[particleIndex].z;
-      // WORLD simulation space: the buffer stores world coordinates. Shape
-      // emission gave us a rotated offset (startPositions), and position
-      // already carries the distance-step world offset — now add the
-      // emitter's world translation so the particle starts at the correct
-      // world-space location.
-      if (normalizedConfig.simulationSpace === SimulationSpace.WORLD) {
+      // WORLD simulation space: the buffer stores world coordinates. The
+      // shape-emission offset (startPositions) is rotated by the emitter's
+      // world rotation AND scaled by the emitter's world scale, matching
+      // Unity's Shape module when Scaling Mode is Local/Hierarchy. The
+      // emitter's world translation is then added so the particle starts
+      // at the correct world-space location.
+      //
+      // LOCAL simulation space: the buffer is in the emitter's local
+      // frame; the shape offset is added as-is (parent scale affects the
+      // rendered size via particleSystem.matrixWorld at draw time).
+      const isWorld =
+        normalizedConfig.simulationSpace === SimulationSpace.WORLD;
+      const ox = startPositions[particleIndex].x;
+      const oy = startPositions[particleIndex].y;
+      const oz = startPositions[particleIndex].z;
+      if (isWorld) {
         const m = generalData.sourceWorldMatrix.elements;
-        aPosition.array[positionIndex] += m[12];
-        aPosition.array[positionIndex + 1] += m[13];
-        aPosition.array[positionIndex + 2] += m[14];
+        const s = generalData.worldScale;
+        aPosition.array[positionIndex] = position.x + ox * s.x + m[12];
+        aPosition.array[positionIndex + 1] = position.y + oy * s.y + m[13];
+        aPosition.array[positionIndex + 2] = position.z + oz * s.z + m[14];
+      } else {
+        aPosition.array[positionIndex] = position.x + ox;
+        aPosition.array[positionIndex + 1] = position.y + oy;
+        aPosition.array[positionIndex + 2] = position.z + oz;
       }
       if (!useGPUCompute) {
         aPosition.needsUpdate = true;
@@ -1539,28 +1545,26 @@ export const createParticleSystem = (
     if (useGPUCompute && gpuPipeline) {
       // Write all particle data to GPU storage buffers.
       //
-      // WORLD simulation space: the GPU buffer stores world coordinates, so
-      // emit positions include the emitter's world translation.
+      // WORLD simulation space: the GPU buffer stores world coordinates.
+      // The shape offset (startPositions) is scaled by the emitter's
+      // world scale (Unity Shape-module parity) and then offset by the
+      // emitter's world translation. LOCAL space uses the shape offset
+      // as-is since the buffer is in the emitter's local frame.
       const isWorld =
         normalizedConfig.simulationSpace === SimulationSpace.WORLD;
       const m = generalData.sourceWorldMatrix.elements;
+      const s = generalData.worldScale;
+      const ox = startPositions[particleIndex].x;
+      const oy = startPositions[particleIndex].y;
+      const oz = startPositions[particleIndex].z;
       _tslMaterialFactory!.writeParticleToModifierBuffers!(
         gpuPipeline.buffers,
         particleIndex,
         {
           position: {
-            x:
-              position.x +
-              startPositions[particleIndex].x +
-              (isWorld ? m[12] : 0),
-            y:
-              position.y +
-              startPositions[particleIndex].y +
-              (isWorld ? m[13] : 0),
-            z:
-              position.z +
-              startPositions[particleIndex].z +
-              (isWorld ? m[14] : 0),
+            x: position.x + (isWorld ? ox * s.x + m[12] : ox),
+            y: position.y + (isWorld ? oy * s.y + m[13] : oy),
+            z: position.z + (isWorld ? oz * s.z + m[14] : oz),
           },
           velocity: {
             x: velocities[particleIndex].x,
@@ -1984,7 +1988,11 @@ export const createParticleSystem = (
         );
         // Convert local particle position to world space so the sub-emitter
         // spawns at the correct scene position regardless of transform offset.
+        // updateMatrixWorld() guarantees the transform is fresh — otherwise a
+        // parent moved after the last scene traversal would place the spawn
+        // at a stale position.
         if (simulationSpace === SimulationSpace.LOCAL) {
+          particleSystem.updateMatrixWorld();
           particleSystem.localToWorld(_subEmitterPosition);
         }
         spawnSubEmitters(
@@ -2011,7 +2019,11 @@ export const createParticleSystem = (
         );
         // Convert local particle position to world space so the sub-emitter
         // spawns at the correct scene position regardless of transform offset.
+        // updateMatrixWorld() guarantees the transform is fresh — otherwise a
+        // parent moved after the last scene traversal would place the spawn
+        // at a stale position.
         if (simulationSpace === SimulationSpace.LOCAL) {
+          particleSystem.updateMatrixWorld();
           particleSystem.localToWorld(_subEmitterPosition);
         }
         spawnSubEmitters(
@@ -2325,13 +2337,15 @@ const updateParticleSystemInstance = (
     sourceWorldMatrix.decompose(
       currentWorldPosition,
       worldQuaternion,
-      _tmpVec3A
+      generalData.worldScale
     );
     generalData.wrapperQuaternion.copy(worldQuaternion);
     particleSystem.matrixWorld.identity();
   } else {
+    particleSystem.updateMatrixWorld();
     particleSystem.getWorldPosition(currentWorldPosition);
     particleSystem.getWorldQuaternion(worldQuaternion);
+    particleSystem.getWorldScale(generalData.worldScale);
     generalData.wrapperQuaternion.identity();
   }
 
@@ -2350,17 +2364,26 @@ const updateParticleSystemInstance = (
   lastWorldPosition.copy(currentWorldPosition);
   worldEuler.setFromQuaternion(worldQuaternion);
 
-  // Gravity is always -Y in world space. In WORLD simulation it is applied
-  // directly (buffer is world-space). In LOCAL simulation the buffer is in
-  // the emitter's local frame, so gravity is transformed by the inverse
-  // of the emitter's world rotation — this keeps gravity pointing toward
-  // world -Y regardless of how the emitter is rotated.
+  // Gravity is always -Y in world space (Unity semantics). In WORLD
+  // simulation the buffer is world-space, so gravity is used directly.
+  //
+  // In LOCAL simulation the buffer is in the emitter's local frame, so
+  // gravity is rotated by the inverse of the emitter's world rotation AND
+  // divided by the emitter's world scale — this way the rendered fall
+  // matches -g m/s² in world units, independent of how the emitter is
+  // rotated or scaled by its parent chain.
   if (simulationSpace === SimulationSpace.WORLD) {
     gravityVelocity.set(0, gravity, 0);
   } else {
     gravityVelocity.set(0, gravity, 0);
     _inverseQuat.copy(worldQuaternion).invert();
     gravityVelocity.applyQuaternion(_inverseQuat);
+    const sx = generalData.worldScale.x || 1;
+    const sy = generalData.worldScale.y || 1;
+    const sz = generalData.worldScale.z || 1;
+    gravityVelocity.x /= sx;
+    gravityVelocity.y /= sy;
+    gravityVelocity.z /= sz;
   }
 
   // Force field positions/directions are user-authored in world space.
@@ -2672,10 +2695,7 @@ const updateParticleSystemInstance = (
             gravity !== 0 ||
             velocity.x !== 0 ||
             velocity.y !== 0 ||
-            velocity.z !== 0 ||
-            worldPositionChange.x !== 0 ||
-            worldPositionChange.y !== 0 ||
-            worldPositionChange.z !== 0
+            velocity.z !== 0
           ) {
             const positionIndex = index * 3;
 

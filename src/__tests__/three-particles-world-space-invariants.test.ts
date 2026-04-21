@@ -11,18 +11,13 @@ import { createParticleSystem } from '../js/effects/three-particles/three-partic
 import type { ParticleSystem } from '../js/effects/three-particles/types.js';
 
 // ---------------------------------------------------------------------------
-// Helpers — all helpers abstract over the current Gyroscope wrapper so the
-// same tests keep working after the WORLD-space refactor that removes the
-// wrapper and stores world coordinates directly in the particle buffer.
+// Helpers — `ps.instance` IS the renderable after the WORLD-space refactor
+// (no more Gyroscope wrapper). Kept as a named helper for clarity across the
+// many test cases below.
 // ---------------------------------------------------------------------------
 
-const getRenderedPoints = (ps: ParticleSystem): THREE.Points => {
-  const instance = ps.instance as THREE.Object3D;
-  if (instance instanceof THREE.Points || instance instanceof THREE.Mesh) {
-    return instance as unknown as THREE.Points;
-  }
-  return instance.children[0] as THREE.Points;
-};
+const getRenderedPoints = (ps: ParticleSystem): THREE.Points =>
+  ps.instance as unknown as THREE.Points;
 
 const forceMatrixUpdate = (ps: ParticleSystem) => {
   const instance = ps.instance as THREE.Object3D;
@@ -547,26 +542,16 @@ describe('WORLD simulation space — integration with subsystems', () => {
     const subInstance = parent.children.find((c) => c !== ps.instance);
     expect(subInstance).toBeDefined();
 
-    // Find the sub-emitter's inner Points object (it may be wrapped by a
-    // Gyroscope in the current implementation; after the WORLD-space
-    // refactor it will be a direct Points child).
-    const findPoints = (o: THREE.Object3D): THREE.Points | null => {
-      if (o instanceof THREE.Points) return o;
-      for (const c of o.children) {
-        const p = findPoints(c);
-        if (p) return p;
-      }
-      return null;
-    };
-    const subPoints = findPoints(subInstance!);
-    expect(subPoints).not.toBeNull();
+    // The sub-emitter's instance IS the Points object (no wrapper).
+    expect(subInstance).toBeInstanceOf(THREE.Points);
+    const subPoints = subInstance as THREE.Points;
 
     // Tick once more so the sub-emitter runs its t=0 burst.
     step(16);
     scene.updateMatrixWorld(true);
 
     // Find the first active sub-particle and compute its world position.
-    const subIsActive = subPoints!.geometry.attributes.isActive;
+    const subIsActive = subPoints.geometry.attributes.isActive;
     let firstActive = -1;
     for (let i = 0; i < subIsActive.count; i++) {
       if (subIsActive.getX(i)) {
@@ -576,13 +561,12 @@ describe('WORLD simulation space — integration with subsystems', () => {
     }
     expect(firstActive).toBeGreaterThanOrEqual(0);
 
-    const subArr = subPoints!.geometry.attributes.position
-      .array as Float32Array;
+    const subArr = subPoints.geometry.attributes.position.array as Float32Array;
     const subParticleWorld = new THREE.Vector3(
       subArr[firstActive * 3]!,
       subArr[firstActive * 3 + 1]!,
       subArr[firstActive * 3 + 2]!
-    ).applyMatrix4(subPoints!.matrixWorld);
+    ).applyMatrix4(subPoints.matrixWorld);
 
     // Must be at the parent particle's death world location (~origin),
     // not at the current emitter world position (20, 0, 0).
@@ -919,20 +903,10 @@ describe('WORLD simulation space — integration with subsystems', () => {
     scene.updateMatrixWorld(true);
 
     const subInstance = parent.children.find((c) => c !== ps.instance);
-    expect(subInstance).toBeDefined();
+    expect(subInstance).toBeInstanceOf(THREE.Points);
+    const subPoints = subInstance as THREE.Points;
 
-    const findPoints = (o: THREE.Object3D): THREE.Points | null => {
-      if (o instanceof THREE.Points) return o;
-      for (const c of o.children) {
-        const p = findPoints(c);
-        if (p) return p;
-      }
-      return null;
-    };
-    const subPoints = findPoints(subInstance!);
-    expect(subPoints).not.toBeNull();
-
-    const subIsActive = subPoints!.geometry.attributes.isActive;
+    const subIsActive = subPoints.geometry.attributes.isActive;
     let firstActive = -1;
     for (let i = 0; i < subIsActive.count; i++) {
       if (subIsActive.getX(i)) {
@@ -942,18 +916,300 @@ describe('WORLD simulation space — integration with subsystems', () => {
     }
     expect(firstActive).toBeGreaterThanOrEqual(0);
 
-    const subArr = subPoints!.geometry.attributes.position
-      .array as Float32Array;
+    const subArr = subPoints.geometry.attributes.position.array as Float32Array;
     const subParticleWorld = new THREE.Vector3(
       subArr[firstActive * 3]!,
       subArr[firstActive * 3 + 1]!,
       subArr[firstActive * 3 + 2]!
-    ).applyMatrix4(subPoints!.matrixWorld);
+    ).applyMatrix4(subPoints.matrixWorld);
 
     // BIRTH fired at the parent particle's spawn location (~origin);
     // despite the main emitter now sitting at x=25, the sub particle
     // must remain near the origin.
     expect(subParticleWorld.length()).toBeLessThan(1);
+
+    ps.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer 4 — Unity parent-scale parity
+//
+// Unity's ParticleSystem keeps gravity at a fixed world magnitude regardless
+// of parent scale (LOCAL simulation space stores it in local units and thus
+// divides by scale). The Shape module obeys parent scale when Scaling Mode
+// is Local/Hierarchy, so spawn offsets scale with the parent in WORLD space
+// too; live particles however are unaffected by subsequent scale changes.
+// ---------------------------------------------------------------------------
+
+describe('Unity parent-scale parity', () => {
+  it('LOCAL gravity falls at world -g regardless of parent scale', () => {
+    // Scaled parent (×2): a 0.96 s fall at g=9.81 m/s² (downward in the
+    // library's convention, since `velocity -= g·dt`) must move the
+    // rendered particle by -0.5·g·t² ≈ -4.52 m in world units,
+    // regardless of parent scale — Unity keeps gravity in world m/s².
+    const runFall = (scale: number): number => {
+      const parent = new THREE.Group();
+      parent.scale.setScalar(scale);
+      const ps = createParticleSystem(
+        {
+          maxParticles: 4,
+          duration: 10,
+          looping: false,
+          startLifetime: 10,
+          startSpeed: 0,
+          startSize: 1,
+          startOpacity: 1,
+          gravity: 9.81,
+          simulationSpace: SimulationSpace.LOCAL,
+          shape: {
+            shape: Shape.SPHERE,
+            sphere: { radius: 1e-6, radiusThickness: 1, arc: 360 },
+          },
+          emission: {
+            rateOverTime: 0,
+            rateOverDistance: 0,
+            bursts: [{ time: 0, count: 1 }],
+          },
+        } as unknown as Parameters<typeof createParticleSystem>[0],
+        1000
+      );
+      parent.add(ps.instance);
+      parent.updateMatrixWorld(true);
+      // 60 frames × 16ms ≈ 0.96 s; close enough to validate magnitude.
+      for (let i = 1; i <= 60; i++) {
+        parent.updateMatrixWorld(true);
+        ps.update({
+          now: 1000 + i * 16,
+          delta: 0.016,
+          elapsed: (i * 16) / 1000,
+        });
+      }
+      const y = getParticleWorldPosition(ps, 0).y;
+      ps.dispose();
+      return y;
+    };
+
+    const yUnscaled = runFall(1);
+    const yScaled = runFall(2);
+
+    // Expected world-y after 60 × 16ms ≈ 0.96 s: y = -0.5 · 9.81 · 0.96² ≈ -4.52.
+    // Allow ~15% tolerance for discrete integration.
+    expect(yUnscaled).toBeLessThan(-3.8);
+    expect(yUnscaled).toBeGreaterThan(-5.5);
+    // Scaled parent: world-y must match the unscaled fall within a few percent.
+    expect(Math.abs(yScaled - yUnscaled)).toBeLessThan(0.2);
+  });
+
+  it('WORLD spawn offset scales with parent (Shape module Local/Hierarchy)', () => {
+    // Spawn from a sphere of radius 1 centered at origin, under a ×3 parent.
+    // Unity would spawn particles on a sphere of radius 3 in world space.
+    const parent = new THREE.Group();
+    parent.scale.setScalar(3);
+    const ps = createParticleSystem(
+      {
+        maxParticles: 256,
+        duration: 1,
+        looping: false,
+        startLifetime: 10,
+        startSpeed: 0,
+        startSize: 1,
+        startOpacity: 1,
+        gravity: 0,
+        simulationSpace: SimulationSpace.WORLD,
+        shape: {
+          shape: Shape.SPHERE,
+          sphere: { radius: 1, radiusThickness: 0, arc: 360 },
+        },
+        emission: {
+          rateOverTime: 0,
+          rateOverDistance: 0,
+          bursts: [{ time: 0, count: 256 }],
+        },
+      } as unknown as Parameters<typeof createParticleSystem>[0],
+      1000
+    );
+    parent.add(ps.instance);
+    parent.updateMatrixWorld(true);
+    parent.updateMatrixWorld(true);
+    ps.update({ now: 1016, delta: 0.016, elapsed: 0.016 });
+
+    const points = getRenderedPoints(ps);
+    const arr = points.geometry.attributes.position.array as Float32Array;
+    const isActive = points.geometry.attributes.isActive;
+    let maxLen = 0;
+    let count = 0;
+    for (let i = 0; i < isActive.count; i++) {
+      if (!isActive.getX(i)) continue;
+      count++;
+      const v = new THREE.Vector3(
+        arr[i * 3]!,
+        arr[i * 3 + 1]!,
+        arr[i * 3 + 2]!
+      ).applyMatrix4(points.matrixWorld);
+      maxLen = Math.max(maxLen, v.length());
+    }
+    expect(count).toBeGreaterThan(16);
+    // Particles must lie on the scaled sphere surface (r ≈ 3), not r ≈ 1.
+    expect(maxLen).toBeGreaterThan(2.5);
+    expect(maxLen).toBeLessThan(3.2);
+
+    ps.dispose();
+  });
+
+  it('WORLD live particles are unaffected by a parent scale change after spawn', () => {
+    const { ps, step, parent } = createBareWorldSystem();
+    step(16); // one particle spawned at world origin
+    const idx = getActiveIndex(ps);
+    const before = getParticleWorldPosition(ps, idx);
+
+    // Double the parent scale after spawn. The live particle must not move.
+    parent.scale.setScalar(2);
+    step(16);
+    const after = getParticleWorldPosition(ps, idx);
+
+    expect(after.distanceTo(before)).toBeLessThan(1e-3);
+    ps.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer 5 — Sub-emitter freshness
+//
+// The parent emitter's matrixWorld must be current when sub-emitters read it
+// to compute their spawn position. Without an explicit updateMatrixWorld()
+// call before localToWorld(), a parent transform change between the last
+// scene traversal and the particle death/birth callback would silently
+// place the sub-emitter at a stale location.
+// ---------------------------------------------------------------------------
+
+describe('Sub-emitter world-matrix freshness', () => {
+  it('LOCAL-mode sub-emitter spawns at the current parent world position', () => {
+    const scene = new THREE.Scene();
+    const parent = new THREE.Group();
+    scene.add(parent);
+    const ps = createParticleSystem(
+      {
+        maxParticles: 2,
+        duration: 10,
+        looping: false,
+        startLifetime: 0.05,
+        startSpeed: 0,
+        startSize: 1,
+        startOpacity: 1,
+        gravity: 0,
+        simulationSpace: SimulationSpace.LOCAL,
+        shape: {
+          shape: Shape.SPHERE,
+          sphere: { radius: 1e-6, radiusThickness: 1, arc: 360 },
+        },
+        emission: {
+          rateOverTime: 0,
+          rateOverDistance: 0,
+          bursts: [{ time: 0, count: 1 }],
+        },
+        subEmitters: [
+          {
+            trigger: SubEmitterTrigger.DEATH,
+            config: {
+              maxParticles: 2,
+              duration: 10,
+              looping: false,
+              startLifetime: 10,
+              startSpeed: 0,
+              startSize: 1,
+              startOpacity: 1,
+              gravity: 0,
+              simulationSpace: SimulationSpace.WORLD,
+              shape: {
+                shape: Shape.SPHERE,
+                sphere: { radius: 1e-6, radiusThickness: 1, arc: 360 },
+              },
+              emission: {
+                rateOverTime: 0,
+                rateOverDistance: 0,
+                bursts: [{ time: 0, count: 1 }],
+              },
+            },
+          },
+        ],
+      } as unknown as Parameters<typeof createParticleSystem>[0],
+      1000
+    );
+    parent.add(ps.instance);
+    scene.updateMatrixWorld(true);
+
+    let elapsedMs = 0;
+    const step = (deltaMs = 16) => {
+      elapsedMs += deltaMs;
+      ps.update({
+        now: 1000 + elapsedMs,
+        delta: deltaMs / 1000,
+        elapsed: elapsedMs / 1000,
+      });
+    };
+
+    step(16); // spawn parent particle
+    // Move the grandparent AFTER the last scene traversal, then step the
+    // main system so the parent particle dies and fires the sub-emitter.
+    // No scene.updateMatrixWorld — the fix relies on the sub-emitter
+    // callback calling updateMatrixWorld itself.
+    parent.position.set(10, 5, -3);
+    step(100); // parent particle dies (lifetime 50 ms); DEATH fires sub-emitter
+    step(16); // sub-emitter t=0 burst resolves
+    scene.updateMatrixWorld(true);
+
+    const subInstance = parent.children.find((c) => c !== ps.instance);
+    expect(subInstance).toBeInstanceOf(THREE.Points);
+    const subPoints = subInstance as THREE.Points;
+    const subIsActive = subPoints.geometry.attributes.isActive;
+    let firstActive = -1;
+    for (let i = 0; i < subIsActive.count; i++) {
+      if (subIsActive.getX(i)) {
+        firstActive = i;
+        break;
+      }
+    }
+    expect(firstActive).toBeGreaterThanOrEqual(0);
+    const subArr = subPoints.geometry.attributes.position.array as Float32Array;
+    const subWorld = new THREE.Vector3(
+      subArr[firstActive * 3]!,
+      subArr[firstActive * 3 + 1]!,
+      subArr[firstActive * 3 + 2]!
+    ).applyMatrix4(subPoints.matrixWorld);
+
+    // Sub-emitter must appear near the parent's CURRENT world position
+    // (10, 5, -3), not the stale origin.
+    expect(subWorld.distanceTo(new THREE.Vector3(10, 5, -3))).toBeLessThan(0.5);
+
+    ps.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer 6 — positionNeedsUpdate upload guard
+//
+// When gravity is 0 and all particles are stationary (velocity = 0), the
+// position array is never written, so needsUpdate must stay false to avoid
+// a pointless CPU→GPU re-upload every frame when the emitter moves.
+// ---------------------------------------------------------------------------
+
+describe('GPU upload guard — stationary particles', () => {
+  it('does not bump position attribute version when emitter moves with stationary particles', () => {
+    const { ps, step, parent } = createBareWorldSystem();
+    step(16); // spawn one particle
+    const points = getRenderedPoints(ps);
+    const positionAttr = points.geometry.attributes
+      .position as THREE.BufferAttribute & { version: number };
+
+    // Move the emitter, then tick. With stationary particles (speed 0, no
+    // gravity), the buffer is unchanged — version must not increment.
+    const versionBefore = positionAttr.version;
+    for (let i = 1; i <= 5; i++) {
+      parent.position.set(i * 3, i * 2, i);
+      step(16);
+    }
+    expect(positionAttr.version).toBe(versionBefore);
 
     ps.dispose();
   });

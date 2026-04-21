@@ -1656,8 +1656,18 @@ export type GeneralData = {
    */
   sourceWorldMatrix: THREE.Matrix4;
   wrapperQuaternion: THREE.Quaternion;
-  lastWorldQuaternion: THREE.Quaternion;
   worldQuaternion: THREE.Quaternion;
+  /**
+   * Emitter world scale (decomposed from the full parent chain). Used to
+   * match Unity's parent-scale semantics:
+   *   - WORLD mode: scales the shape-emission offset at spawn time (the
+   *     Shape module in Unity obeys parent scale when Scaling Mode is
+   *     Local/Hierarchy). Live particles are unaffected.
+   *   - LOCAL mode: gravity is stored in local units, so it is divided by
+   *     this scale so the rendered fall matches world -g m/s² regardless
+   *     of parent scale.
+   */
+  worldScale: THREE.Vector3;
   worldEuler: THREE.Euler;
   gravityVelocity: THREE.Vector3;
   startValues: Record<string, Array<number>>;

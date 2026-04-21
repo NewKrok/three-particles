@@ -412,6 +412,30 @@ LifetimeCurve       → evaluate curve at time, multiply by scale
 - `instance.position` / `instance.rotation` (Option 2 semantics, matching Unity)
   offset the spawn origin under the parent but do not drag already-emitted particles
 
+### Parent-scale semantics (Unity Shape-module parity)
+- `generalData.worldScale` is decomposed from the emitter's full world
+  transform each frame (both WORLD and LOCAL modes).
+- **WORLD mode — spawn offsets scale with the parent.** The shape-emission
+  offset (`startPositions[i]`) is multiplied by `worldScale` before being
+  added to the emitter's world translation. This matches Unity's Shape
+  module with `Scaling Mode = Local/Hierarchy`: a sphere of radius 1 under
+  a ×3 parent spawns particles on a world-radius-3 sphere. **Already-emitted
+  particles are unaffected** by subsequent scale changes.
+- **LOCAL mode — gravity is divided by parent scale.** Gravity is authored
+  in world m/s² (`-9.81` fall etc.) but the LOCAL buffer stores velocity in
+  the emitter's local units. Dividing `gravityVelocity` by `worldScale`
+  keeps the rendered fall constant in world units regardless of how the
+  parent chain scales — matching Unity, whose `Physics.gravity` is a world
+  constant.
+- **Design rationale for `matrixWorldAutoUpdate = false` (WORLD mode).**
+  The alternative — re-parenting the `THREE.Points` to the scene root —
+  would hide the particle system from the user's `instance.parent`
+  references and break any scene traversal that expects the instance to
+  live under its intended parent. Forcing `matrixWorld = identity` keeps
+  the object tree intact (so Three.js frustum culling, raycasting, etc.
+  still see the particles under their owning parent) while decoupling the
+  particle render transform from the emitter's motion.
+
 ---
 
 ## Performance Design Decisions
