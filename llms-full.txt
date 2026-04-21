@@ -62,7 +62,7 @@ function animate() {
 
 | Property/Method | Type | Description |
 |-----------------|------|-------------|
-| `instance` | `THREE.Points \| THREE.Mesh \| Gyroscope` | The renderable object — add to scene (Mesh when using RendererType.INSTANCED) |
+| `instance` | `THREE.Points \| THREE.Mesh` | The renderable object — add to scene (Mesh when using RendererType.INSTANCED or RendererType.MESH) |
 | `pauseEmitter()` | `() => void` | Stop emitting new particles |
 | `resumeEmitter()` | `() => void` | Resume emitting particles |
 | `dispose()` | `() => void` | Destroy system, free resources |
@@ -515,6 +515,16 @@ const system = createParticleSystem({
 
 ### SimulationSpace
 `LOCAL` | `WORLD`
+
+- **`LOCAL`** (default): particles are children of the emitter in the scene
+  graph and move/rotate with it. The buffer stores positions in the
+  emitter's local frame.
+- **`WORLD`**: particles are decoupled from the emitter once spawned. The
+  buffer stores world coordinates directly and `instance.matrixWorld` is
+  held at identity. New particles spawn from the emitter's current world
+  pose (parent chain + `instance.position` / `instance.rotation`), so
+  moving the emitter only affects future emissions, not existing
+  particles. Matches Unity's world simulation space.
 
 ### TimeMode
 `LIFETIME` | `FPS`

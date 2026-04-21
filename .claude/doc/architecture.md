@@ -149,7 +149,8 @@ createParticleSystem(config, externalNow)
   │     ├─ Blending mode, depth settings, transparency
   │     └─ Texture (user-provided, default white circle for POINTS/INSTANCED, or solid white 1×1 for MESH)
   │
-  ├─ 5. Create THREE.Points / THREE.Mesh (INSTANCED/MESH) (+ Gyroscope wrapper for WORLD space)
+  ├─ 5. Create THREE.Points / THREE.Mesh (INSTANCED/MESH)
+  │      For WORLD mode: matrixWorldAutoUpdate = false, matrixWorld held at identity
   │
   └─ 6. Push to createdParticleSystems[], return ParticleSystem handle
 ```
@@ -394,16 +395,21 @@ LifetimeCurve       → evaluate curve at time, multiply by scale
 ## World vs Local Simulation Space
 
 ### Local Space (default)
-- Particles are children of the emitter
-- Moving the emitter moves all particles with it
-- No position compensation needed
-- Uses `THREE.Points` directly
+- Particles are children of the emitter in the Three.js scene graph
+- Moving or rotating the emitter moves/rotates all particles with it
+- Buffer stores positions in the emitter's local frame
+- Gravity and force field positions/directions are CPU-transformed into the emitter's local frame each frame so they stay world-aligned
 
 ### World Space
-- Particles stay fixed in world coordinates after emission
-- Emitter movement tracked via `Gyroscope` (from `@newkrok/three-utils`)
-- Each frame: `position -= worldPositionChange` to counteract emitter movement
-- Useful for: trails, smoke, fire that should persist in place
+- Buffer stores positions in **world coordinates** directly
+- `particleSystem.matrixWorld` is held at identity (via `matrixWorldAutoUpdate = false`) so the buffer renders as-is
+- `generalData.sourceWorldMatrix` captures the emitter pose each frame
+  (`parent.matrixWorld × particleSystem.matrix`) — used only to place new
+  particles and orient the emission shape; existing particles are not moved
+- No per-frame position compensation is required
+- Gravity is applied as a constant world vector; force field positions and directions flow through unchanged
+- `instance.position` / `instance.rotation` (Option 2 semantics, matching Unity)
+  offset the spawn origin under the parent but do not drag already-emitted particles
 
 ---
 
@@ -476,7 +482,7 @@ All fields optional — merged with defaults at creation:
 
 ```typescript
 {
-  instance: THREE.Points | THREE.Mesh | Gyroscope  // Add to scene (type depends on renderer + simulation space)
+  instance: THREE.Points | THREE.Mesh  // Add to scene (type depends on renderer)
   update(cycleData)                   // Call every frame
   dispose()                           // Cleanup
   pauseEmitter()                      // Stop emitting

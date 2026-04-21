@@ -45,7 +45,7 @@ function animate() {
 
 ### ParticleSystem Methods
 
-- `instance` — The Three.js Points or Gyroscope object (add to scene)
+- `instance` — The Three.js Points or Mesh object (add to scene)
 - `pauseEmitter()` — Pause particle emission
 - `resumeEmitter()` — Resume particle emission
 - `dispose()` — Clean up and free resources
