@@ -177,6 +177,10 @@ enableWebGPU();
 import * as THREE from "three/webgpu";
 const renderer = new THREE.WebGPURenderer({ antialias: true });
 await renderer.init();
+// Particle shaders output raw sRGB values (textures are sampled with
+// NoColorSpace). Disable the output pass sRGB conversion to avoid
+// double-gamma encoding and to match the WebGL/GLSL path.
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 
 // 3. Create a GPU-accelerated particle system
 import { createParticleSystem, SimulationBackend } from "@newkrok/three-particles";

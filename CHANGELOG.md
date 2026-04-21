@@ -13,6 +13,8 @@ This project adheres to [Semantic Versioning](https://semver.org/) and uses [Con
 - **Fixed** a directional force field bug in WORLD mode: field directions now stay world-aligned regardless of emitter rotation. Previously the direction was pre-rotated by `particleSystem.getWorldQuaternion()`, which did not invoke the Gyroscope's rotation cancellation and therefore picked up the parent rotation.
 - **Fixed** frame-lag jitter on fast-moving emitters (no more `worldPositionChange` subtraction in the integrator, on either the CPU or the GPU compute path).
 - **Fixed** death/birth sub-emitter spawn position on moving emitters: the sub-emitter now spawns at the parent particle's world location, not at the parent emitter's current world position.
+- **WebGPU TSL materials no longer apply an internal sRGB→linear compensation on the fragment output.** The previous implementation assumed `renderer.outputColorSpace = SRGBColorSpace` (the WebGPU default) and cancelled out the renderer's output pass. This conflicted with the WebGL/GLSL path, which writes raw sRGB directly to the framebuffer and requires `outputColorSpace = LinearSRGBColorSpace`. The two paths now behave identically.
+- **Fixed** `discardBackgroundColor` not firing in WebGPU TSL materials. `Discard()` was wrapped inside a TSL `Fn` helper, which prevented the fragment `discard` statement from propagating to the main shader — so black-background cutouts silently stopped working on the POINTS, INSTANCED, and MESH renderers (Shield, Fireworks, Magnetic Field, Implosion, Explosion with Smoke, etc.).
 
 ### Migration
 
@@ -21,6 +23,7 @@ This project adheres to [Semantic Versioning](https://semver.org/) and uses [Con
 - In WORLD mode, `instance.matrixWorld` is identity. The emitter's pose is still read from the parent chain for emission; `instance.position` / `instance.rotation` act as a spawn-origin offset under the parent and do **not** drag already-emitted particles (matches Unity).
 - The dependency on `three/examples/jsm/misc/Gyroscope.js` is removed.
 - WebGPU-internal uniforms `worldPositionChange` and `simulationSpaceWorld` on the compute pipeline are removed; this only affects code that reached into the compute uniform object directly.
+- **WebGPU users must set `renderer.outputColorSpace = THREE.LinearSRGBColorSpace`** after `renderer.init()`. Without this, particle colors will appear double-gamma-encoded (too bright / washed out). This matches the existing requirement for the WebGL/GLSL path. See the updated WebGPU setup snippet in `README.md`.
 
 ## [2.4.0] - 2025-05-20
 

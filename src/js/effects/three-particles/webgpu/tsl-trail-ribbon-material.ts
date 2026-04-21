@@ -43,11 +43,7 @@ import {
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { ALPHA_DISCARD_THRESHOLD } from '../three-particles-constants.js';
-import {
-  getDummyTexture,
-  linearizeDepth,
-  compensateOutputSRGB,
-} from './tsl-shared.js';
+import { getDummyTexture, linearizeDepth } from './tsl-shared.js';
 import type * as THREE from 'three';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -300,7 +296,7 @@ export function createTrailRibbonTSLMaterial(
         .and(abs(length(diff)).lessThan(u.uBgTolerance))
     );
 
-    return compensateOutputSRGB({ color: outColor });
+    return outColor;
   })();
 
   // ── Material assembly ─────────────────────────────────────────────────────
