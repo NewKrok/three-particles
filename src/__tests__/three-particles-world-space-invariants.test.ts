@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {
+  CollisionPlaneMode,
   ForceFieldFalloff,
   ForceFieldType,
   Shape,
@@ -654,6 +655,305 @@ describe('WORLD simulation space — integration with subsystems', () => {
     const p1 = getParticleWorldPosition(ps, idx);
     expect(p1.x - p0.x).toBeGreaterThan(0.1);
     expect(Math.abs(p1.z - p0.z)).toBeLessThan(0.1);
+
+    ps.dispose();
+  });
+
+  it('collision plane at world z=2 kills particle moving forward, regardless of emitter motion', () => {
+    // A CONE emitter at the origin fires a particle along its local +Z (the
+    // library's CONE default emission axis) at 10 u/s. A KILL-mode collision
+    // plane sits at world z=2 with front facing -Z, so the particle starts in
+    // front of the plane and must cross it to be killed. While the particle
+    // travels, we drag the emitter horizontally in world +X. In WORLD mode the
+    // particle buffer holds world coordinates, so the plane intersection
+    // check compares world-vs-world and the kill happens on schedule —
+    // emitter motion does not smear the check.
+    const parent = new THREE.Group();
+    const ps = createParticleSystem(
+      {
+        maxParticles: 2,
+        duration: 10,
+        looping: false,
+        startLifetime: 10, // long, so only the plane can kill
+        startSpeed: 10,
+        startSize: 1,
+        startOpacity: 1,
+        startRotation: 0,
+        gravity: 0,
+        simulationSpace: SimulationSpace.WORLD,
+        shape: {
+          shape: Shape.CONE,
+          cone: { angle: 0, radius: 1e-6, radiusThickness: 1, arc: 360 },
+        },
+        emission: {
+          rateOverTime: 0,
+          rateOverDistance: 0,
+          bursts: [{ time: 0, count: 1 }],
+        },
+        collisionPlanes: [
+          {
+            position: { x: 0, y: 0, z: 2 },
+            normal: { x: 0, y: 0, z: -1 },
+            mode: CollisionPlaneMode.KILL,
+          },
+        ],
+      } as unknown as Parameters<typeof createParticleSystem>[0],
+      1000
+    );
+    parent.add(ps.instance);
+    parent.updateMatrixWorld(true);
+
+    let elapsedMs = 0;
+    const step = (deltaMs = 16) => {
+      elapsedMs += deltaMs;
+      // Slide the emitter in +X at 30 u/s — fast enough that an incorrect
+      // coordinate-space mixing would push the particle past the plane early
+      // or miss it entirely.
+      parent.position.set((elapsedMs / 1000) * 30, 0, 0);
+      parent.updateMatrixWorld(true);
+      ps.update({
+        now: 1000 + elapsedMs,
+        delta: deltaMs / 1000,
+        elapsed: elapsedMs / 1000,
+      });
+    };
+
+    step(16); // emit at world origin
+    const idx = getActiveIndex(ps);
+    expect(idx).toBeGreaterThanOrEqual(0);
+
+    // At ~100 ms the particle is at world z=1 — below the plane, still alive.
+    for (let i = 0; i < 5; i++) step(16);
+    expect(getActiveIndex(ps)).toBe(idx);
+
+    // At ~300 ms the particle has crossed world z=2 and must be killed.
+    for (let i = 0; i < 13; i++) step(16);
+    expect(getActiveIndex(ps)).toBe(-1);
+
+    ps.dispose();
+  });
+
+  it('point (attractor) force field position stays world-anchored when emitter moves', () => {
+    // A POINT force field at world (5, 0, 0) should keep pulling the particle
+    // toward world +X regardless of emitter motion. If the field position
+    // were accidentally treated as emitter-local, moving the emitter would
+    // drag the attractor and reverse the particle's horizontal drift.
+    const parent = new THREE.Group();
+    const ps = createParticleSystem(
+      {
+        maxParticles: 2,
+        duration: 10,
+        looping: false,
+        startLifetime: 10,
+        startSpeed: 0,
+        startSize: 1,
+        startOpacity: 1,
+        startRotation: 0,
+        gravity: 0,
+        simulationSpace: SimulationSpace.WORLD,
+        shape: {
+          shape: Shape.SPHERE,
+          sphere: { radius: 1e-6, radiusThickness: 1, arc: 360 },
+        },
+        emission: {
+          rateOverTime: 0,
+          rateOverDistance: 0,
+          bursts: [{ time: 0, count: 1 }],
+        },
+        forceFields: [
+          {
+            type: ForceFieldType.POINT,
+            position: new THREE.Vector3(5, 0, 0),
+            strength: 20,
+            range: 100,
+            falloff: ForceFieldFalloff.LINEAR,
+          },
+        ],
+      } as unknown as Parameters<typeof createParticleSystem>[0],
+      1000
+    );
+    parent.add(ps.instance);
+    parent.updateMatrixWorld(true);
+
+    let elapsedMs = 0;
+    const step = (deltaMs = 16) => {
+      elapsedMs += deltaMs;
+      parent.updateMatrixWorld(true);
+      ps.update({
+        now: 1000 + elapsedMs,
+        delta: deltaMs / 1000,
+        elapsed: elapsedMs / 1000,
+      });
+    };
+
+    step(16); // emit at world origin
+    const idx = getActiveIndex(ps);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const p0 = getParticleWorldPosition(ps, idx);
+
+    // Move the emitter far in -X. If the attractor were emitter-local, it
+    // would follow to world (-15, 0, 0) and pull the particle toward -X.
+    parent.position.set(-20, 0, 0);
+    for (let i = 0; i < 30; i++) step(16);
+
+    const p1 = getParticleWorldPosition(ps, idx);
+    // Attractor at world (5,0,0) — particle must drift toward +X, never -X.
+    expect(p1.x - p0.x).toBeGreaterThan(0.1);
+    ps.dispose();
+  });
+
+  it('instance.rotation rotates the shape emission axis (Option 2)', () => {
+    // A CONE emits along its local +Z (per `calculateRandomPositionAndVelocityOnCone`).
+    // Rotating `instance` 90° around world X should redirect the emission to
+    // world -Y under an identity parent. If rotation were ignored the particle
+    // would drift in world +Z instead — so this test distinguishes the two.
+    const { ps, step } = createBareWorldSystem({
+      shape: {
+        shape: Shape.CONE,
+        cone: { angle: 0, radius: 1e-6, radiusThickness: 1, arc: 360 },
+      },
+      startSpeed: 5,
+      startLifetime: 10,
+    });
+    (ps.instance as THREE.Object3D).rotation.set(Math.PI / 2, 0, 0);
+
+    step(16); // emit
+    const idx = getActiveIndex(ps);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const p0 = getParticleWorldPosition(ps, idx);
+
+    // Let the particle fly ~100 ms — it should have moved ~0.5 u along the
+    // rotated emission axis (world -Y).
+    for (let i = 0; i < 6; i++) step(16);
+    const p1 = getParticleWorldPosition(ps, idx);
+
+    // Rotated axis maps local +Z -> world -Y.
+    expect(p1.y - p0.y).toBeLessThan(-0.1);
+    // And the un-rotated axis (world +Z) stays quiet.
+    expect(Math.abs(p1.z - p0.z)).toBeLessThan(0.05);
+
+    ps.dispose();
+  });
+
+  it('BIRTH sub-emitter in WORLD mode spawns children decoupled from the moving parent', () => {
+    // At t=0 the parent emits one particle; its BIRTH sub-emitter fires at
+    // the spawn world position. The sub-emitter's own particle is itself
+    // WORLD-simulated, so subsequent motion of the main emitter must not
+    // drag it along.
+    const scene = new THREE.Scene();
+    const parent = new THREE.Group();
+    scene.add(parent);
+
+    const subEmitterConfig = {
+      maxParticles: 2,
+      duration: 2,
+      looping: false,
+      startLifetime: 2,
+      startSpeed: 0,
+      startSize: 1,
+      startOpacity: 1,
+      startRotation: 0,
+      simulationSpace: SimulationSpace.WORLD,
+      shape: {
+        shape: Shape.SPHERE,
+        sphere: { radius: 1e-6, radiusThickness: 1, arc: 360 },
+      },
+      emission: {
+        rateOverTime: 0,
+        rateOverDistance: 0,
+        bursts: [{ time: 0, count: 1 }],
+      },
+    };
+
+    const ps = createParticleSystem(
+      {
+        maxParticles: 2,
+        duration: 10,
+        looping: false,
+        startLifetime: 10,
+        startSpeed: 0,
+        startSize: 1,
+        startOpacity: 1,
+        startRotation: 0,
+        gravity: 0,
+        simulationSpace: SimulationSpace.WORLD,
+        shape: {
+          shape: Shape.SPHERE,
+          sphere: { radius: 1e-6, radiusThickness: 1, arc: 360 },
+        },
+        emission: {
+          rateOverTime: 0,
+          rateOverDistance: 0,
+          bursts: [{ time: 0, count: 1 }],
+        },
+        subEmitters: [
+          {
+            trigger: SubEmitterTrigger.BIRTH,
+            config: subEmitterConfig,
+          },
+        ],
+      } as unknown as Parameters<typeof createParticleSystem>[0],
+      1000
+    );
+    parent.add(ps.instance);
+    scene.updateMatrixWorld(true);
+
+    let elapsedMs = 0;
+    const step = (deltaMs = 16) => {
+      elapsedMs += deltaMs;
+      scene.updateMatrixWorld(true);
+      ps.update({
+        now: 1000 + elapsedMs,
+        delta: deltaMs / 1000,
+        elapsed: elapsedMs / 1000,
+      });
+    };
+
+    // Emit parent particle at world origin — BIRTH fires immediately.
+    step(16);
+
+    // Drag the main emitter far away and tick the sub-emitter's t=0 burst.
+    parent.position.set(25, 0, 0);
+    step(16);
+    step(16);
+    scene.updateMatrixWorld(true);
+
+    const subInstance = parent.children.find((c) => c !== ps.instance);
+    expect(subInstance).toBeDefined();
+
+    const findPoints = (o: THREE.Object3D): THREE.Points | null => {
+      if (o instanceof THREE.Points) return o;
+      for (const c of o.children) {
+        const p = findPoints(c);
+        if (p) return p;
+      }
+      return null;
+    };
+    const subPoints = findPoints(subInstance!);
+    expect(subPoints).not.toBeNull();
+
+    const subIsActive = subPoints!.geometry.attributes.isActive;
+    let firstActive = -1;
+    for (let i = 0; i < subIsActive.count; i++) {
+      if (subIsActive.getX(i)) {
+        firstActive = i;
+        break;
+      }
+    }
+    expect(firstActive).toBeGreaterThanOrEqual(0);
+
+    const subArr = subPoints!.geometry.attributes.position
+      .array as Float32Array;
+    const subParticleWorld = new THREE.Vector3(
+      subArr[firstActive * 3]!,
+      subArr[firstActive * 3 + 1]!,
+      subArr[firstActive * 3 + 2]!
+    ).applyMatrix4(subPoints!.matrixWorld);
+
+    // BIRTH fired at the parent particle's spawn location (~origin);
+    // despite the main emitter now sitting at x=25, the sub particle
+    // must remain near the origin.
+    expect(subParticleWorld.length()).toBeLessThan(1);
 
     ps.dispose();
   });
