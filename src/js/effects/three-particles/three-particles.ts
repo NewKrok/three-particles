@@ -1,6 +1,5 @@
 import { ObjectUtils } from '@newkrok/three-utils';
 import * as THREE from 'three';
-import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 import InstancedParticleFragmentShader from './shaders/instanced-particle-fragment-shader.glsl.js';
 import InstancedParticleVertexShader from './shaders/instanced-particle-vertex-shader.glsl.js';
@@ -216,8 +215,12 @@ export const registerTSLMaterialFactory = (
 
 // Pre-allocated objects for updateParticleSystemInstance to avoid GC pressure
 const _subEmitterPosition = new THREE.Vector3();
+const _subLocalPosition = new THREE.Vector3();
 const _shadowOrbitalEuler = new THREE.Euler(0, 0, 0, 'XYZ');
 const _lastWorldPositionSnapshot = new THREE.Vector3();
+// Helpers for decomposing sourceWorldMatrix (WORLD simulation space)
+const _tmpVec3A = new THREE.Vector3();
+const _tmpVec3B = new THREE.Vector3();
 // Force field local-space conversion helpers (reused across frames)
 const _localForceFieldPos = new THREE.Vector3();
 const _localForceFieldDir = new THREE.Vector3();
@@ -555,14 +558,10 @@ const destroyParticleSystem = (particleSystem: THREE.Points | THREE.Mesh) => {
   createdParticleSystems = createdParticleSystems.filter(
     ({
       particleSystem: savedParticleSystem,
-      wrapper,
       trailMesh,
       generalData: { particleSystemId },
     }) => {
-      if (
-        savedParticleSystem !== particleSystem &&
-        wrapper !== particleSystem
-      ) {
+      if (savedParticleSystem !== particleSystem) {
         return true;
       }
 
@@ -584,7 +583,6 @@ const destroyParticleSystem = (particleSystem: THREE.Points | THREE.Mesh) => {
 
       if (savedParticleSystem.parent)
         savedParticleSystem.parent.remove(savedParticleSystem);
-      if (wrapper?.parent) wrapper.parent.remove(wrapper);
       return false;
     }
   );
@@ -660,6 +658,7 @@ export const createParticleSystem = (
     lastWorldPosition: new THREE.Vector3(-99999),
     currentWorldPosition: new THREE.Vector3(-99999),
     worldPositionChange: new THREE.Vector3(),
+    sourceWorldMatrix: new THREE.Matrix4(),
     worldQuaternion: new THREE.Quaternion(),
     wrapperQuaternion: new THREE.Quaternion(),
     lastWorldQuaternion: new THREE.Quaternion(-99999),
@@ -1462,6 +1461,17 @@ export const createParticleSystem = (
         position.y + startPositions[particleIndex].y;
       aPosition.array[positionIndex + 2] =
         position.z + startPositions[particleIndex].z;
+      // WORLD simulation space: the buffer stores world coordinates. Shape
+      // emission gave us a rotated offset (startPositions), and position
+      // already carries the distance-step world offset — now add the
+      // emitter's world translation so the particle starts at the correct
+      // world-space location.
+      if (normalizedConfig.simulationSpace === SimulationSpace.WORLD) {
+        const m = generalData.sourceWorldMatrix.elements;
+        aPosition.array[positionIndex] += m[12];
+        aPosition.array[positionIndex + 1] += m[13];
+        aPosition.array[positionIndex + 2] += m[14];
+      }
       if (!useGPUCompute) {
         aPosition.needsUpdate = true;
       }
@@ -1604,13 +1614,7 @@ export const createParticleSystem = (
   const cleanupCompletedInstances = (instances: Array<ParticleSystem>) => {
     for (let i = instances.length - 1; i >= 0; i--) {
       const sub = instances[i];
-      const obj3d =
-        sub.instance instanceof THREE.Points ||
-        sub.instance instanceof THREE.Mesh
-          ? sub.instance
-          : (sub.instance.children[0] as THREE.Points | THREE.Mesh | undefined);
-      const geomAttrs = (obj3d as THREE.Points | THREE.Mesh | undefined)
-        ?.geometry?.attributes;
+      const geomAttrs = sub.instance.geometry?.attributes;
       const isActiveAttr = geomAttrs
         ? (geomAttrs.isActive ?? geomAttrs.instanceIsActive)
         : undefined;
@@ -1639,6 +1643,16 @@ export const createParticleSystem = (
     velocity: THREE.Vector3,
     spawnNow: number
   ) => {
+    // The death/birth callbacks pass `position` in world coordinates. The
+    // sub-emitter becomes a child of particleSystem.parent, so its
+    // transform.position must be expressed in that parent's local frame.
+    const parentObj = particleSystem.parent;
+    _subLocalPosition.copy(position);
+    if (parentObj) {
+      parentObj.updateMatrixWorld();
+      parentObj.worldToLocal(_subLocalPosition);
+    }
+
     for (const subConfig of configs) {
       const instances = subEmitterInstancesMap.get(subConfig)!;
       const maxInst = subConfig.maxInstances ?? 32;
@@ -1657,7 +1671,11 @@ export const createParticleSystem = (
           simulationBackend: SimulationBackend.CPU,
           transform: {
             ...subConfig.config.transform,
-            position: new THREE.Vector3(position.x, position.y, position.z),
+            position: new THREE.Vector3(
+              _subLocalPosition.x,
+              _subLocalPosition.y,
+              _subLocalPosition.z
+            ),
           },
           renderer: {
             ...(subConfig.config.renderer ?? {}),
@@ -1688,7 +1706,6 @@ export const createParticleSystem = (
         spawnNow
       );
 
-      const parentObj = (wrapper || particleSystem).parent;
       if (parentObj) parentObj.add(subSystem.instance);
 
       instances.push(subSystem);
@@ -1924,10 +1941,14 @@ export const createParticleSystem = (
   const calculatedCreationTime =
     now + calculateValue(generalData.particleSystemId, startDelay) * 1000;
 
-  let wrapper: Gyroscope | undefined;
+  // WORLD simulation space: decouple rendering transform from the emitter.
+  // The particle buffer stores world-space coordinates, so matrixWorld is
+  // forced to identity each frame. The emitter's actual world transform is
+  // captured in generalData.sourceWorldMatrix for positioning new particles
+  // and orienting the emission shape.
   if (normalizedConfig.simulationSpace === SimulationSpace.WORLD) {
-    wrapper = new Gyroscope();
-    wrapper.add(particleSystem);
+    particleSystem.matrixWorldAutoUpdate = false;
+    particleSystem.matrixWorld.identity();
   }
 
   const hasDeathSubEmitters = deathSubEmitters.length > 0;
@@ -1989,7 +2010,6 @@ export const createParticleSystem = (
 
   const instanceData: ParticleSystemInstance = {
     particleSystem,
-    wrapper,
     mappedAttributes,
     scalarArray,
     scalarInterleavedBuffer,
@@ -2074,8 +2094,6 @@ export const createParticleSystem = (
     // Update instance-level cached scalars
     if (partialConfig.gravity !== undefined) {
       instanceData.gravity = cfg.gravity;
-      // Force gravityVelocity recalculation on next frame
-      generalData.lastWorldQuaternion.x = -99999;
     }
     if (partialConfig.duration !== undefined)
       instanceData.duration = cfg.duration;
@@ -2127,7 +2145,7 @@ export const createParticleSystem = (
   };
 
   return {
-    instance: wrapper || particleSystem,
+    instance: particleSystem,
     resumeEmitter,
     pauseEmitter,
     dispose,
@@ -2218,7 +2236,6 @@ const updateParticleSystemInstance = (
     generalData,
     onComplete,
     particleSystem,
-    wrapper,
     elapsedUniform,
     creationTime,
     lastEmissionTime,
@@ -2257,53 +2274,89 @@ const updateParticleSystemInstance = (
     lastWorldPosition,
     currentWorldPosition,
     worldPositionChange,
-    lastWorldQuaternion,
     worldQuaternion,
     worldEuler,
     gravityVelocity,
+    sourceWorldMatrix,
     isEnabled,
   } = generalData;
-
-  if (wrapper?.parent)
-    generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
 
   _lastWorldPositionSnapshot.copy(lastWorldPosition);
 
   elapsedUniform.value = elapsed;
 
-  particleSystem.getWorldPosition(currentWorldPosition);
+  // Emitter pose for this frame.
+  //
+  // WORLD: build sourceWorldMatrix explicitly (parent.matrixWorld × local).
+  //   The particle buffer stores world coordinates, so particleSystem's own
+  //   matrixWorld is held at identity (see matrixWorldAutoUpdate=false in
+  //   createParticleSystem). sourceWorldMatrix is used to place new
+  //   particles and orient the emission shape.
+  //
+  // LOCAL: standard Three.js — matrixWorld is fully parent-composed at
+  //   render time, particles live in the local frame, and emissions use
+  //   the identity quaternion (no rotation of the shape offset).
+  if (simulationSpace === SimulationSpace.WORLD) {
+    particleSystem.updateMatrix();
+    if (particleSystem.parent) {
+      particleSystem.parent.updateMatrixWorld();
+      sourceWorldMatrix.multiplyMatrices(
+        particleSystem.parent.matrixWorld,
+        particleSystem.matrix
+      );
+    } else {
+      sourceWorldMatrix.copy(particleSystem.matrix);
+    }
+    sourceWorldMatrix.decompose(
+      currentWorldPosition,
+      worldQuaternion,
+      _tmpVec3A
+    );
+    generalData.wrapperQuaternion.copy(worldQuaternion);
+    particleSystem.matrixWorld.identity();
+  } else {
+    particleSystem.getWorldPosition(currentWorldPosition);
+    particleSystem.getWorldQuaternion(worldQuaternion);
+    generalData.wrapperQuaternion.identity();
+  }
+
   if (lastWorldPosition.x !== -99999) {
     worldPositionChange.set(
       currentWorldPosition.x - lastWorldPosition.x,
       currentWorldPosition.y - lastWorldPosition.y,
       currentWorldPosition.z - lastWorldPosition.z
     );
+  } else {
+    worldPositionChange.set(0, 0, 0);
   }
   if (isEnabled) {
     generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
   }
-  particleSystem.getWorldPosition(lastWorldPosition);
-  particleSystem.getWorldQuaternion(worldQuaternion);
-  if (
-    lastWorldQuaternion.x === -99999 ||
-    lastWorldQuaternion.x !== worldQuaternion.x ||
-    lastWorldQuaternion.y !== worldQuaternion.y ||
-    lastWorldQuaternion.z !== worldQuaternion.z
-  ) {
-    worldEuler.setFromQuaternion(worldQuaternion);
-    lastWorldQuaternion.copy(worldQuaternion);
-    gravityVelocity.set(
-      lastWorldPosition.x,
-      lastWorldPosition.y + gravity,
-      lastWorldPosition.z
-    );
-    particleSystem.worldToLocal(gravityVelocity);
+  lastWorldPosition.copy(currentWorldPosition);
+  worldEuler.setFromQuaternion(worldQuaternion);
+
+  // Gravity is always -Y in world space. In WORLD simulation it is applied
+  // directly (buffer is world-space). In LOCAL simulation the buffer is in
+  // the emitter's local frame, so gravity is transformed by the inverse
+  // of the emitter's world rotation — this keeps gravity pointing toward
+  // world -Y regardless of how the emitter is rotated.
+  if (simulationSpace === SimulationSpace.WORLD) {
+    gravityVelocity.set(0, gravity, 0);
+  } else {
+    gravityVelocity.set(0, gravity, 0);
+    _inverseQuat.copy(worldQuaternion).invert();
+    gravityVelocity.applyQuaternion(_inverseQuat);
   }
 
-  // Transform force field positions/directions into local space once per frame
-  // (particle positions in the buffer are in local space, so force fields must match)
+  // Force field positions/directions are user-authored in world space.
+  //
+  // WORLD simulation: buffer is already in world space — copy through.
+  // LOCAL simulation: transform into the emitter's local frame so field
+  //   positions and directions match the particle buffer's frame.
   if (hasForceFields) {
-    _inverseQuat.copy(worldQuaternion).invert();
+    if (simulationSpace === SimulationSpace.LOCAL) {
+      _inverseQuat.copy(worldQuaternion).invert();
+    }
 
     _localForceFields.length = normalizedForceFields.length;
 
@@ -2328,19 +2381,26 @@ const updateParticleSystemInstance = (
       dst.range = src.range;
       dst.falloff = src.falloff;
 
-      _localForceFieldPos.copy(src.position);
-      particleSystem.worldToLocal(_localForceFieldPos);
-      dst.position.copy(_localForceFieldPos);
+      if (simulationSpace === SimulationSpace.WORLD) {
+        dst.position.copy(src.position);
+        dst.direction.copy(src.direction);
+      } else {
+        _localForceFieldPos.copy(src.position);
+        particleSystem.worldToLocal(_localForceFieldPos);
+        dst.position.copy(_localForceFieldPos);
 
-      _localForceFieldDir.copy(src.direction);
-      _localForceFieldDir.applyQuaternion(_inverseQuat);
-      dst.direction.copy(_localForceFieldDir);
+        _localForceFieldDir.copy(src.direction);
+        _localForceFieldDir.applyQuaternion(_inverseQuat);
+        dst.direction.copy(_localForceFieldDir);
+      }
     }
   }
 
-  // Transform collision plane positions/normals into local space once per frame
+  // Collision plane positions/normals — same policy as force fields.
   if (hasCollisionPlanes) {
-    if (!hasForceFields) _inverseQuat.copy(worldQuaternion).invert();
+    if (simulationSpace === SimulationSpace.LOCAL && !hasForceFields) {
+      _inverseQuat.copy(worldQuaternion).invert();
+    }
 
     _localCollisionPlanes.length = normalizedCollisionPlanes.length;
 
@@ -2363,13 +2423,18 @@ const updateParticleSystemInstance = (
       dst.dampen = src.dampen;
       dst.lifetimeLoss = src.lifetimeLoss;
 
-      _localCollisionPlanePos.copy(src.position);
-      particleSystem.worldToLocal(_localCollisionPlanePos);
-      dst.position.copy(_localCollisionPlanePos);
+      if (simulationSpace === SimulationSpace.WORLD) {
+        dst.position.copy(src.position);
+        dst.normal.copy(src.normal);
+      } else {
+        _localCollisionPlanePos.copy(src.position);
+        particleSystem.worldToLocal(_localCollisionPlanePos);
+        dst.position.copy(_localCollisionPlanePos);
 
-      _localCollisionPlaneNormal.copy(src.normal);
-      _localCollisionPlaneNormal.applyQuaternion(_inverseQuat);
-      dst.normal.copy(_localCollisionPlaneNormal);
+        _localCollisionPlaneNormal.copy(src.normal);
+        _localCollisionPlaneNormal.applyQuaternion(_inverseQuat);
+        dst.normal.copy(_localCollisionPlaneNormal);
+      }
     }
   }
 
@@ -2512,11 +2577,6 @@ const updateParticleSystemInstance = (
           }
 
           const positionIndex = index * 3;
-          if (simulationSpace === SimulationSpace.WORLD) {
-            positionArr[positionIndex] -= worldPositionChange.x;
-            positionArr[positionIndex + 1] -= worldPositionChange.y;
-            positionArr[positionIndex + 2] -= worldPositionChange.z;
-          }
           positionArr[positionIndex] += velocity.x * delta;
           positionArr[positionIndex + 1] += velocity.y * delta;
           positionArr[positionIndex + 2] += velocity.z * delta;
@@ -2613,12 +2673,6 @@ const updateParticleSystemInstance = (
             worldPositionChange.z !== 0
           ) {
             const positionIndex = index * 3;
-
-            if (simulationSpace === SimulationSpace.WORLD) {
-              positionArr[positionIndex] -= worldPositionChange.x;
-              positionArr[positionIndex + 1] -= worldPositionChange.y;
-              positionArr[positionIndex + 2] -= worldPositionChange.z;
-            }
 
             positionArr[positionIndex] += velocity.x * delta;
             positionArr[positionIndex + 1] += velocity.y * delta;

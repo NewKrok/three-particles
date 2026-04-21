@@ -697,13 +697,11 @@ describe('integration — simulation space', () => {
       startTime
     );
 
-    // LOCAL space: instance is directly a THREE.Points
+    // Both LOCAL and WORLD now expose the Points object directly. WORLD
+    // differs in that the buffer stores world coordinates and matrixWorld
+    // is held at identity so rendering is decoupled from the emitter.
     expect(localPs.instance).toBeInstanceOf(THREE.Points);
-
-    // WORLD space: instance is a Gyroscope wrapper containing the Points
-    expect(worldPs.instance).not.toBeInstanceOf(THREE.Points);
-    expect(worldPs.instance.children.length).toBeGreaterThan(0);
-    expect(worldPs.instance.children[0]).toBeInstanceOf(THREE.Points);
+    expect(worldPs.instance).toBeInstanceOf(THREE.Points);
 
     localPs.update({ now: startTime, delta: 0.016, elapsed: 0 });
     worldPs.update({ now: startTime, delta: 0.016, elapsed: 0 });

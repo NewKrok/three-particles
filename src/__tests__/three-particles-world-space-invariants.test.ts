@@ -226,72 +226,61 @@ describe('WORLD simulation space — invariants', () => {
     ps.dispose();
   });
 
-  // KNOWN BUG — currently gravity is evaluated in emitter-local space and drags
-  // particles in the (rotated) local-down direction rather than world-down. The
-  // WORLD-space refactor stores particles in world coordinates and applies
-  // gravity as a constant world vector, which will make this test pass.
-  it.failing(
-    'gravity is world-down (constant Y acceleration regardless of emitter rotation)',
-    () => {
-      const { ps, step, parent } = createBareWorldSystem({
-        gravity: -10,
-      });
+  it('gravity is world-down (constant Y acceleration regardless of emitter rotation)', () => {
+    // NOTE: the library's gravity sign convention is inverted from physics —
+    // positive `gravity` pulls particles down (see `velocity -= gravityVelocity`
+    // in the integrator). We preserve that convention here.
+    const { ps, step, parent } = createBareWorldSystem({
+      gravity: 10,
+    });
 
-      // Rotate parent 90° around Z before emission so that, if gravity were
-      // (incorrectly) evaluated in emitter-local space, it would pull the
-      // particle along world-X instead of world-Y.
-      parent.quaternion.setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
-      step(16); // emit
+    // Rotate parent 90° around Z before emission so that, if gravity were
+    // (incorrectly) evaluated in emitter-local space, it would pull the
+    // particle along world-X instead of world-Y.
+    parent.quaternion.setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
+    step(16); // emit
 
-      const idx = getActiveIndex(ps);
-      expect(idx).toBeGreaterThanOrEqual(0);
-      const p0 = getParticleWorldPosition(ps, idx);
+    const idx = getActiveIndex(ps);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const p0 = getParticleWorldPosition(ps, idx);
 
-      // Advance 500 ms (without any further parent movement).
-      for (let i = 0; i < 31; i++) step(16);
+    // Advance 500 ms (without any further parent movement).
+    for (let i = 0; i < 31; i++) step(16);
 
-      const p1 = getParticleWorldPosition(ps, idx);
-      const dx = p1.x - p0.x;
-      const dy = p1.y - p0.y;
-      const dz = p1.z - p0.z;
+    const p1 = getParticleWorldPosition(ps, idx);
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const dz = p1.z - p0.z;
 
-      // Particle should have fallen in world -Y only.
-      expect(dy).toBeLessThan(-0.5);
-      expect(Math.abs(dx)).toBeLessThan(0.05);
-      expect(Math.abs(dz)).toBeLessThan(0.05);
-      ps.dispose();
-    }
-  );
+    // Particle should have fallen in world -Y only.
+    expect(dy).toBeLessThan(-0.5);
+    expect(Math.abs(dx)).toBeLessThan(0.05);
+    expect(Math.abs(dz)).toBeLessThan(0.05);
+    ps.dispose();
+  });
 
-  // KNOWN BUG — the gravity recalculation at three-particles.ts:2295-2300 uses
-  // the emitter's world *position* as a direction vector, so moving the emitter
-  // horizontally causes gravity to tilt and pull particles sideways/up. The
-  // WORLD-space refactor removes this path entirely.
-  it.failing(
-    'gravity direction stays world-down when emitter translates horizontally',
-    () => {
-      const { ps, step, parent } = createBareWorldSystem({
-        gravity: -10,
-      });
+  it('gravity direction stays world-down when emitter translates horizontally', () => {
+    const { ps, step, parent } = createBareWorldSystem({
+      gravity: 10,
+    });
 
+    step(16);
+    const idx = getActiveIndex(ps);
+    const p0 = getParticleWorldPosition(ps, idx);
+
+    // Move emitter far away in X while letting the one existing particle
+    // fall. Its world-X should not drift — gravity is purely world-down.
+    for (let i = 1; i <= 30; i++) {
+      parent.position.set(i * 2, 0, 0);
       step(16);
-      const idx = getActiveIndex(ps);
-      const p0 = getParticleWorldPosition(ps, idx);
-
-      // Move emitter far away in X while letting the one existing particle
-      // fall. Its world-X should not drift — gravity is purely world-down.
-      for (let i = 1; i <= 30; i++) {
-        parent.position.set(i * 2, 0, 0);
-        step(16);
-      }
-
-      const p1 = getParticleWorldPosition(ps, idx);
-      expect(p1.y).toBeLessThan(p0.y - 0.3);
-      expect(Math.abs(p1.x - p0.x)).toBeLessThan(0.05);
-      expect(Math.abs(p1.z - p0.z)).toBeLessThan(0.05);
-      ps.dispose();
     }
-  );
+
+    const p1 = getParticleWorldPosition(ps, idx);
+    expect(p1.y).toBeLessThan(p0.y - 0.3);
+    expect(Math.abs(p1.x - p0.x)).toBeLessThan(0.05);
+    expect(Math.abs(p1.z - p0.z)).toBeLessThan(0.05);
+    ps.dispose();
+  });
 
   it('instance.position offsets the spawn origin under the parent (Option 2)', () => {
     const { ps, step, parent } = createBareWorldSystem();
@@ -601,82 +590,71 @@ describe('WORLD simulation space — integration with subsystems', () => {
     ps.dispose();
   });
 
-  // KNOWN BUG — the CPU update loop pre-rotates force field direction by
-  // particleSystem.getWorldQuaternion(), which in the current Gyroscope-based
-  // impl does NOT invoke the wrapper's rotation-cancellation override (that
-  // override is in updateMatrixWorld, but getWorldQuaternion calls
-  // updateWorldMatrix). As a result the direction ends up transformed by the
-  // parent rotation — the opposite of what the WORLD-space contract says.
-  // The refactor eliminates the Gyroscope and the _inverseQuat transform, so
-  // world-space directional fields stay world-aligned by construction.
-  it.failing(
-    'directional force field stays world-aligned when emitter rotates',
-    () => {
-      // A world-defined directional field pushing in world +X should keep
-      // pushing in world +X regardless of emitter rotation.
-      const parent = new THREE.Group();
-      const ps = createParticleSystem(
-        {
-          maxParticles: 4,
-          duration: 100,
-          looping: false,
-          startLifetime: 100,
-          startSpeed: 0,
-          startSize: 1,
-          startOpacity: 1,
-          startRotation: 0,
-          gravity: 0,
-          simulationSpace: SimulationSpace.WORLD,
-          shape: {
-            shape: Shape.SPHERE,
-            sphere: { radius: 1e-6, radiusThickness: 1, arc: 360 },
+  it('directional force field stays world-aligned when emitter rotates', () => {
+    // A world-defined directional field pushing in world +X should keep
+    // pushing in world +X regardless of emitter rotation.
+    const parent = new THREE.Group();
+    const ps = createParticleSystem(
+      {
+        maxParticles: 4,
+        duration: 100,
+        looping: false,
+        startLifetime: 100,
+        startSpeed: 0,
+        startSize: 1,
+        startOpacity: 1,
+        startRotation: 0,
+        gravity: 0,
+        simulationSpace: SimulationSpace.WORLD,
+        shape: {
+          shape: Shape.SPHERE,
+          sphere: { radius: 1e-6, radiusThickness: 1, arc: 360 },
+        },
+        emission: {
+          rateOverTime: 0,
+          rateOverDistance: 0,
+          bursts: [{ time: 0, count: 1 }],
+        },
+        forceFields: [
+          {
+            type: ForceFieldType.DIRECTIONAL,
+            direction: new THREE.Vector3(1, 0, 0),
+            strength: 5,
           },
-          emission: {
-            rateOverTime: 0,
-            rateOverDistance: 0,
-            bursts: [{ time: 0, count: 1 }],
-          },
-          forceFields: [
-            {
-              type: ForceFieldType.DIRECTIONAL,
-              direction: new THREE.Vector3(1, 0, 0),
-              strength: 5,
-            },
-          ],
-        } as unknown as Parameters<typeof createParticleSystem>[0],
-        1000
-      );
-      parent.add(ps.instance);
+        ],
+      } as unknown as Parameters<typeof createParticleSystem>[0],
+      1000
+    );
+    parent.add(ps.instance);
+    parent.updateMatrixWorld(true);
+
+    let elapsedMs = 0;
+    const step = (deltaMs = 16) => {
+      elapsedMs += deltaMs;
       parent.updateMatrixWorld(true);
+      ps.update({
+        now: 1000 + elapsedMs,
+        delta: deltaMs / 1000,
+        elapsed: elapsedMs / 1000,
+      });
+    };
 
-      let elapsedMs = 0;
-      const step = (deltaMs = 16) => {
-        elapsedMs += deltaMs;
-        parent.updateMatrixWorld(true);
-        ps.update({
-          now: 1000 + elapsedMs,
-          delta: deltaMs / 1000,
-          elapsed: elapsedMs / 1000,
-        });
-      };
+    step(16); // emit
+    const idx = getActiveIndex(ps);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const p0 = getParticleWorldPosition(ps, idx);
 
-      step(16); // emit
-      const idx = getActiveIndex(ps);
-      expect(idx).toBeGreaterThanOrEqual(0);
-      const p0 = getParticleWorldPosition(ps, idx);
+    // Rotate parent 90° around Y. If the field were stored in emitter-local
+    // space, this would redirect the force toward world -Z. In WORLD space,
+    // the force should still push world +X.
+    parent.quaternion.setFromEuler(new THREE.Euler(0, Math.PI / 2, 0));
 
-      // Rotate parent 90° around Y. If the field were stored in emitter-local
-      // space, this would redirect the force toward world -Z. In WORLD space,
-      // the force should still push world +X.
-      parent.quaternion.setFromEuler(new THREE.Euler(0, Math.PI / 2, 0));
+    for (let i = 0; i < 30; i++) step(16);
 
-      for (let i = 0; i < 30; i++) step(16);
+    const p1 = getParticleWorldPosition(ps, idx);
+    expect(p1.x - p0.x).toBeGreaterThan(0.1);
+    expect(Math.abs(p1.z - p0.z)).toBeLessThan(0.1);
 
-      const p1 = getParticleWorldPosition(ps, idx);
-      expect(p1.x - p0.x).toBeGreaterThan(0.1);
-      expect(Math.abs(p1.z - p0.z)).toBeLessThan(0.1);
-
-      ps.dispose();
-    }
-  );
+    ps.dispose();
+  });
 });

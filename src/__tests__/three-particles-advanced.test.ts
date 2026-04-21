@@ -723,9 +723,12 @@ describe('World space simulation extended', () => {
       1000
     );
 
-    // In world space, instance should be a Gyroscope wrapper
+    // After the WORLD-space refactor, instance is the Points/Mesh itself —
+    // no wrapper. matrixWorldAutoUpdate is held at false so rendering is
+    // decoupled from the emitter's parent transform.
     expect(ps.instance).toBeDefined();
-    expect(ps.instance.children.length).toBeGreaterThan(0);
+    expect(ps.instance).toBeInstanceOf(THREE.Points);
+    expect(ps.instance.matrixWorldAutoUpdate).toBe(false);
 
     ps.dispose();
   });
