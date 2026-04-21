@@ -120,8 +120,6 @@ describe('createParticleComputeUpdate', () => {
     expect(pipeline.uniforms.delta).toBeDefined();
     expect(pipeline.uniforms.deltaMs).toBeDefined();
     expect(pipeline.uniforms.gravityVelocity).toBeDefined();
-    expect(pipeline.uniforms.worldPositionChange).toBeDefined();
-    expect(pipeline.uniforms.simulationSpaceWorld).toBeDefined();
     expect(pipeline.buffers).toBe(buffers);
   });
 
@@ -148,37 +146,17 @@ describe('updateComputeUniforms', () => {
     updateComputeUniforms(pipeline.uniforms, {
       delta: 0.016,
       gravityVelocity: { x: 0, y: -9.8, z: 0 },
-      worldPositionChange: { x: 1, y: 0, z: 0 },
-      isWorldSpace: true,
     });
 
-    // Verify uniform values were set
     const delta = pipeline.uniforms.delta as unknown as { value: number };
     expect(delta.value).toBeCloseTo(0.016);
 
     const deltaMs = pipeline.uniforms.deltaMs as unknown as { value: number };
     expect(deltaMs.value).toBeCloseTo(16);
 
-    const simSpace = pipeline.uniforms.simulationSpaceWorld as unknown as {
-      value: number;
+    const gv = pipeline.uniforms.gravityVelocity as unknown as {
+      value: { x: number; y: number; z: number };
     };
-    expect(simSpace.value).toBe(1);
-  });
-
-  it('sets simulationSpaceWorld to 0 for local space', () => {
-    const buffers = createParticleStorageBuffers(10, false);
-    const pipeline = createParticleComputeUpdate(buffers, 10);
-
-    updateComputeUniforms(pipeline.uniforms, {
-      delta: 0.016,
-      gravityVelocity: { x: 0, y: 0, z: 0 },
-      worldPositionChange: { x: 0, y: 0, z: 0 },
-      isWorldSpace: false,
-    });
-
-    const simSpace = pipeline.uniforms.simulationSpaceWorld as unknown as {
-      value: number;
-    };
-    expect(simSpace.value).toBe(0);
+    expect(gv.value.y).toBeCloseTo(-9.8);
   });
 });

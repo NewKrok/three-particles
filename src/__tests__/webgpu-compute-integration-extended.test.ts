@@ -261,7 +261,7 @@ describe('GPU compute integration', () => {
   });
 
   it('handles world space simulation with GPU compute', () => {
-    const { factory, pipeline } = createFullGPUFactory(10);
+    const { factory } = createFullGPUFactory(10);
     registerTSLMaterialFactory(factory);
 
     const ps = createParticleSystem(
@@ -276,9 +276,14 @@ describe('GPU compute integration', () => {
       1000
     );
 
+    // WORLD-space GPU systems hold matrixWorld at identity — the buffer
+    // stores world coordinates directly, so no per-frame compensation
+    // uniform is needed.
+    expect(ps.instance.matrixWorldAutoUpdate).toBe(false);
     ps.update(1016);
-
-    expect(pipeline.uniforms.simulationSpaceWorld.value).toBe(1);
+    expect(ps.instance.matrixWorld.elements).toEqual(
+      new THREE.Matrix4().elements
+    );
     ps.dispose();
   });
 });

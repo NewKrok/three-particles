@@ -120,8 +120,6 @@ export type ModifierUniforms = {
   delta: ShaderNodeObject<Node>;
   deltaMs: ShaderNodeObject<Node>;
   gravityVelocity: ShaderNodeObject<Node>;
-  worldPositionChange: ShaderNodeObject<Node>;
-  simulationSpaceWorld: ShaderNodeObject<Node>;
   // Noise uniforms
   noiseStrength: ShaderNodeObject<Node>;
   noisePower: ShaderNodeObject<Node>;
@@ -535,8 +533,6 @@ export function createModifierComputeUpdate(
   const uDelta = uniform(float(0));
   const uDeltaMs = uniform(float(0));
   const uGravityVelocity = uniform(new Vector3(0, 0, 0));
-  const uWorldPositionChange = uniform(new Vector3(0, 0, 0));
-  const uSimSpaceWorld = uniform(float(0));
   const uNoiseStrength = uniform(float(0));
   const uNoisePower = uniform(float(0));
   const uNoiseFrequency = uniform(float(1));
@@ -722,12 +718,17 @@ export function createModifierComputeUpdate(
         forceFieldNodes.apply({ pos, vel, delta: uDelta });
       }
 
-      // World-space compensation
-      If(uSimSpaceWorld.greaterThan(0.5), () => {
-        pos.assign(pos.sub(vec3(uWorldPositionChange)));
-      });
-
       // Velocity integration
+      //
+      // WORLD simulation space: the particle buffer stores world-space
+      //   coordinates. Gravity is a world-space vector, force fields are
+      //   world-space, and emissions are pre-translated on the CPU.
+      // LOCAL simulation space: the buffer is in the emitter's local frame;
+      //   gravityVelocity is CPU-transformed into local space, and force
+      //   field positions / directions are likewise pre-transformed.
+      //
+      // Either way, the kernel integrates pos += vel * dt without any
+      // per-frame emitter-motion compensation.
       pos.assign(pos.add(vel.mul(uDelta)));
 
       // Collision planes — after position update, before modifiers
@@ -964,8 +965,6 @@ export function createModifierComputeUpdate(
       delta: uDelta,
       deltaMs: uDeltaMs,
       gravityVelocity: uGravityVelocity,
-      worldPositionChange: uWorldPositionChange,
-      simulationSpaceWorld: uSimSpaceWorld,
       noiseStrength: uNoiseStrength,
       noisePower: uNoisePower,
       noiseFrequency: uNoiseFrequency,

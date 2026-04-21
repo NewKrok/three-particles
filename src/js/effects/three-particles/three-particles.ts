@@ -1537,15 +1537,30 @@ export const createParticleSystem = (
     scalarArray[base + S_LIFETIME] = 0;
 
     if (useGPUCompute && gpuPipeline) {
-      // Write all particle data to GPU storage buffers
+      // Write all particle data to GPU storage buffers.
+      //
+      // WORLD simulation space: the GPU buffer stores world coordinates, so
+      // emit positions include the emitter's world translation.
+      const isWorld =
+        normalizedConfig.simulationSpace === SimulationSpace.WORLD;
+      const m = generalData.sourceWorldMatrix.elements;
       _tslMaterialFactory!.writeParticleToModifierBuffers!(
         gpuPipeline.buffers,
         particleIndex,
         {
           position: {
-            x: position.x + startPositions[particleIndex].x,
-            y: position.y + startPositions[particleIndex].y,
-            z: position.z + startPositions[particleIndex].z,
+            x:
+              position.x +
+              startPositions[particleIndex].x +
+              (isWorld ? m[12] : 0),
+            y:
+              position.y +
+              startPositions[particleIndex].y +
+              (isWorld ? m[13] : 0),
+            z:
+              position.z +
+              startPositions[particleIndex].z +
+              (isWorld ? m[14] : 0),
           },
           velocity: {
             x: velocities[particleIndex].x,
@@ -2463,16 +2478,6 @@ const updateParticleSystemInstance = (
       gravityVelocity.x,
       gravityVelocity.y,
       gravityVelocity.z
-    );
-    setUniformVec3(
-      cp.uniforms.worldPositionChange,
-      generalData.worldPositionChange.x,
-      generalData.worldPositionChange.y,
-      generalData.worldPositionChange.z
-    );
-    setUniformFloat(
-      cp.uniforms.simulationSpaceWorld,
-      simulationSpace === SimulationSpace.WORLD ? 1 : 0
     );
 
     // Noise uniforms
