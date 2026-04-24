@@ -43,7 +43,7 @@ export function enableWebGPU(): void {
   // (Record<string,…>) to avoid pulling WebGPU-specific imports into the
   // main DTS output. The concrete functions are fully type-safe at their
   // own definition sites; the cast here bridges the two type worlds.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const factory: Parameters<typeof registerTSLMaterialFactory>[0] = {
     createTSLParticleMaterial: createTSLParticleMaterial as any,
     createTSLTrailMaterial: createTSLTrailMaterial as any,

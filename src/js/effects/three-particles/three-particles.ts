@@ -1,6 +1,7 @@
 import { ObjectUtils } from '@newkrok/three-utils';
 import * as THREE from 'three';
 import { FBM } from 'three-noise/build/three-noise.module.js';
+import { rgbSRGBToLinear, sRGBToLinear } from './color-utils.js';
 import InstancedParticleFragmentShader from './shaders/instanced-particle-fragment-shader.glsl.js';
 import InstancedParticleVertexShader from './shaders/instanced-particle-vertex-shader.glsl.js';
 import MeshParticleFragmentShader from './shaders/mesh-particle-fragment-shader.glsl.js';
@@ -10,7 +11,6 @@ import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.
 import TrailFragmentShader from './shaders/trail-fragment-shader.glsl.js';
 import TrailVertexShader from './shaders/trail-vertex-shader.glsl.js';
 import { removeBezierCurveFunction } from './three-particles-bezier.js';
-import { rgbSRGBToLinear, sRGBToLinear } from './color-utils.js';
 import { applyCollisionPlanes } from './three-particles-collision.js';
 import {
   SCALAR_STRIDE,
