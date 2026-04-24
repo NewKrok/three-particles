@@ -86,6 +86,7 @@ const ParticleSystemFragmentShader = `
     }
 
     #include <logdepthbuf_fragment>
+    #include <colorspace_fragment>
   }
 `;
 

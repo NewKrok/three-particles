@@ -10,6 +10,7 @@ import ParticleSystemVertexShader from './shaders/particle-system-vertex-shader.
 import TrailFragmentShader from './shaders/trail-fragment-shader.glsl.js';
 import TrailVertexShader from './shaders/trail-vertex-shader.glsl.js';
 import { removeBezierCurveFunction } from './three-particles-bezier.js';
+import { rgbSRGBToLinear, sRGBToLinear } from './color-utils.js';
 import { applyCollisionPlanes } from './three-particles-collision.js';
 import {
   SCALAR_STRIDE,
@@ -222,6 +223,25 @@ const _lastWorldPositionSnapshot = new THREE.Vector3();
 const _localForceFieldPos = new THREE.Vector3();
 const _localForceFieldDir = new THREE.Vector3();
 const _inverseQuat = new THREE.Quaternion();
+
+/**
+ * Compares two typed-array slices for value equality.
+ * Used to gate GPU buffer `needsUpdate` flagging so we only re-upload when
+ * the encoded data actually changed. See the force-field / collision-plane
+ * upload block in `updateParticleSystemInstance` for the reasoning.
+ */
+const arraySlicesEqual = (
+  a: Float32Array,
+  aOffset: number,
+  b: Float32Array,
+  bOffset: number,
+  length: number
+): boolean => {
+  for (let i = 0; i < length; i++) {
+    if (a[aOffset + i] !== b[bOffset + i]) return false;
+  }
+  return true;
+};
 let _localForceFields: Array<NormalizedForceFieldConfig> = [];
 // Collision plane local-space conversion helpers (reused across frames)
 const _localCollisionPlanePos = new THREE.Vector3();
@@ -1019,7 +1039,9 @@ export const createParticleSystem = (
     useFPSForFrameIndex: {
       value: textureSheetAnimation.timeMode === TimeMode.FPS,
     },
-    backgroundColor: { value: renderer.backgroundColor },
+    // backgroundColor is authored in sRGB; convert to linear so the
+    // fragment comparison against the (now linear) texture sample is valid.
+    backgroundColor: { value: rgbSRGBToLinear(renderer.backgroundColor) },
     discardBackgroundColor: { value: renderer.discardBackgroundColor },
     backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
     ...(useInstancing ? { viewportHeight: { value: 1.0 } } : {}),
@@ -1176,16 +1198,22 @@ export const createParticleSystem = (
       : 0;
     scalarArray[base + S_SIZE] = generalData.startValues.startSize[i];
     scalarArray[base + S_ROTATION] = 0;
+    // User color inputs are sRGB; the buffer stores linear so that shader
+    // math, texture modulation, and the renderer's linear→sRGB output pass
+    // all agree. See docs/color-pipeline-standardization-plan.md.
     const colorRandomRatio = Math.random();
-    scalarArray[base + S_COLOR_R] =
+    scalarArray[base + S_COLOR_R] = sRGBToLinear(
       startColor.min!.r! +
-      colorRandomRatio * (startColor.max!.r! - startColor.min!.r!);
-    scalarArray[base + S_COLOR_G] =
+        colorRandomRatio * (startColor.max!.r! - startColor.min!.r!)
+    );
+    scalarArray[base + S_COLOR_G] = sRGBToLinear(
       startColor.min!.g! +
-      colorRandomRatio * (startColor.max!.g! - startColor.min!.g!);
-    scalarArray[base + S_COLOR_B] =
+        colorRandomRatio * (startColor.max!.g! - startColor.min!.g!)
+    );
+    scalarArray[base + S_COLOR_B] = sRGBToLinear(
       startColor.min!.b! +
-      colorRandomRatio * (startColor.max!.b! - startColor.min!.b!);
+        colorRandomRatio * (startColor.max!.b! - startColor.min!.b!)
+    );
     scalarArray[base + S_COLOR_A] = 0;
   }
 
@@ -1358,20 +1386,25 @@ export const createParticleSystem = (
     if (generalData.noise.offsets)
       generalData.noise.offsets[particleIndex] = Math.random() * 100;
 
+    // sRGB → linear on emit; buffer + startValues mirrors both store linear.
+    // See docs/color-pipeline-standardization-plan.md.
     const colorRandomRatio = Math.random();
     const cfgStartColor = normalizedConfig.startColor;
 
-    scalarArray[base + S_COLOR_R] =
+    scalarArray[base + S_COLOR_R] = sRGBToLinear(
       cfgStartColor.min!.r! +
-      colorRandomRatio * (cfgStartColor.max!.r! - cfgStartColor.min!.r!);
+        colorRandomRatio * (cfgStartColor.max!.r! - cfgStartColor.min!.r!)
+    );
 
-    scalarArray[base + S_COLOR_G] =
+    scalarArray[base + S_COLOR_G] = sRGBToLinear(
       cfgStartColor.min!.g! +
-      colorRandomRatio * (cfgStartColor.max!.g! - cfgStartColor.min!.g!);
+        colorRandomRatio * (cfgStartColor.max!.g! - cfgStartColor.min!.g!)
+    );
 
-    scalarArray[base + S_COLOR_B] =
+    scalarArray[base + S_COLOR_B] = sRGBToLinear(
       cfgStartColor.min!.b! +
-      colorRandomRatio * (cfgStartColor.max!.b! - cfgStartColor.min!.b!);
+        colorRandomRatio * (cfgStartColor.max!.b! - cfgStartColor.min!.b!)
+    );
 
     generalData.startValues.startColorR[particleIndex] =
       scalarArray[base + S_COLOR_R];
@@ -1817,7 +1850,9 @@ export const createParticleSystem = (
       map: { value: particleMap },
       useMap: { value: !!particleMap },
       discardBackgroundColor: { value: renderer.discardBackgroundColor },
-      backgroundColor: { value: renderer.backgroundColor },
+      // sRGB → linear so the trail fragment comparison matches the
+      // (now linear) texture sample and vertex color.
+      backgroundColor: { value: rgbSRGBToLinear(renderer.backgroundColor) },
       backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
       softParticlesEnabled: { value: softParticlesEnabled },
       softParticlesIntensity: {
@@ -2125,8 +2160,36 @@ export const createParticleSystem = (
     if (partialConfig.duration !== undefined)
       instanceData.duration = cfg.duration;
     if (partialConfig.looping !== undefined) instanceData.looping = cfg.looping;
-    if (partialConfig.simulationSpace !== undefined)
+    if (
+      partialConfig.simulationSpace !== undefined &&
+      instanceData.simulationSpace !== cfg.simulationSpace
+    ) {
+      // Switching simulation space live. The existing buffer of active
+      // particles is in the _old_ frame — rather than walk the buffer and
+      // convert every position (which still wouldn't reproduce the visual
+      // continuity the old frame had), we deactivate the live particles
+      // so the system re-emits from the new frame's origin cleanly. New
+      // emissions use the right frame because `simulationSpace` is also
+      // synced below.
+      //
+      // We also flip `matrixWorldAutoUpdate` + reset `lastWorldPosition`
+      // to match the state createParticleSystem would have set. Without
+      // this, particles rendered in the first few frames after the switch
+      // inherit the wrong world matrix and appear to jump between origins.
+      for (let i = 0; i < maxParticles; i++) {
+        if (scalarArray[i * SCALAR_STRIDE + S_IS_ACTIVE]) {
+          deactivateParticle(i);
+        }
+      }
+      generalData.lastWorldPosition.set(-99999, -99999, -99999);
+      if (cfg.simulationSpace === SimulationSpace.WORLD) {
+        particleSystem.matrixWorldAutoUpdate = false;
+        particleSystem.matrixWorld.identity();
+      } else {
+        particleSystem.matrixWorldAutoUpdate = true;
+      }
       instanceData.simulationSpace = cfg.simulationSpace;
+    }
     if (partialConfig.emission !== undefined)
       instanceData.emission = cfg.emission;
 
@@ -2517,7 +2580,15 @@ const updateParticleSystemInstance = (
     setUniformFloat(cp.uniforms.noiseRotationAmount, noiseData.rotationAmount);
     setUniformFloat(cp.uniforms.noiseSizeAmount, noiseData.sizeAmount);
 
-    // Force field buffer update — write encoded data into curveData tail
+    // Force-field and collision-plane uploads share the `curveData` storage
+    // buffer with the per-particle init slots. A blanket `needsUpdate = true`
+    // re-uploads the whole Float32Array, which stomps on init flags the
+    // compute shader already cleared on the GPU side but are still `1` in
+    // the CPU mirror (the `flushEmitQueue` logic only clears them a frame
+    // later). We therefore use `addUpdateRange()` so the WebGPU backend
+    // uploads just the force-field / collision-plane tail region, leaving
+    // the init-slot region intact on the GPU. `flushEmitQueue` does the
+    // same for its own region below.
     if (
       cp.forceFieldInfo &&
       hasForceFields &&
@@ -2529,7 +2600,9 @@ const updateParticleSystemInstance = (
         generalData.normalizedLifetimePercentage
       );
       const curveArr = cp.buffers.curveData.array as Float32Array;
-      curveArr.set(encodedFF, cp.forceFieldInfo.offset);
+      const offset = cp.forceFieldInfo.offset;
+      curveArr.set(encodedFF, offset);
+      cp.buffers.curveData.addUpdateRange(offset, encodedFF.length);
       cp.buffers.curveData.needsUpdate = true;
       setUniformFloat(
         cp.forceFieldInfo.countUniform,
@@ -2537,7 +2610,6 @@ const updateParticleSystemInstance = (
       );
     }
 
-    // Collision plane buffer update — write encoded data into curveData tail
     if (
       cp.collisionPlaneInfo &&
       hasCollisionPlanes &&
@@ -2547,7 +2619,9 @@ const updateParticleSystemInstance = (
         _localCollisionPlanes
       );
       const curveArr = cp.buffers.curveData.array as Float32Array;
-      curveArr.set(encodedCP, cp.collisionPlaneInfo.offset);
+      const offset = cp.collisionPlaneInfo.offset;
+      curveArr.set(encodedCP, offset);
+      cp.buffers.curveData.addUpdateRange(offset, encodedCP.length);
       cp.buffers.curveData.needsUpdate = true;
       setUniformFloat(
         cp.collisionPlaneInfo.countUniform,

@@ -6,7 +6,7 @@
  * - Soft particle depth fade
  * - Background color discard
  */
-import { DataTexture, NoColorSpace, Vector3, type Texture } from 'three';
+import { DataTexture, Vector3, type Texture } from 'three';
 import {
   Fn,
   vec2,
@@ -64,14 +64,10 @@ export type SharedUniforms = {
 export function createParticleUniforms(sharedUniforms: SharedUniforms) {
   const dummy = getDummyTexture();
 
-  // Disable automatic sRGB→linear hardware conversion on particle textures.
-  // The GLSL ShaderMaterial path reads raw sRGB values via texture2D() and
-  // writes them directly without output color-space conversion.  To match
-  // that behaviour in the TSL/WebGPU path (which applies a full-screen
-  // linear→sRGB output pass), we must feed raw values into the shader so
-  // the renderer's output transform produces identical results.
+  // Particle color maps are treated as sRGB (standard three.js convention).
+  // The renderer's output pass handles the final linear→sRGB conversion, so
+  // we let three.js apply the hardware sRGB→linear decode on sample.
   const map = (sharedUniforms.map.value ?? dummy) as Texture;
-  if (map) map.colorSpace = NoColorSpace;
 
   return {
     uMap: map,

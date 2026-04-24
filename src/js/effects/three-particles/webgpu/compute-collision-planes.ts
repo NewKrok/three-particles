@@ -182,43 +182,47 @@ export function createCollisionPlaneTSL(
         const toParticle = pos.sub(planePos);
         const signedDist = dot(toParticle, planeNormal);
 
-        // Only respond when particle is on the wrong side (signedDist < 0)
+        // Only respond when particle is on the wrong side (signedDist < 0).
+        // Mode dispatch uses If/ElseIf so only one branch writes to shared
+        // state (pos/vel/ps.x) in the generated WGSL — equivalent nested
+        // `If()` blocks on the same variables have been observed to emit
+        // WGSL that TSL cannot lower cleanly under some driver/runtime
+        // combinations, producing intermittent writes.
         If(signedDist.lessThan(0.0), () => {
-          // KILL mode (mode < 0.5)
-          // Set lifetime far past startLifetime so the death check at the end
-          // of the kernel deactivates the particle and zeroes color AFTER all
-          // modifiers have run (modifiers would otherwise overwrite our color).
+          // KILL mode (0). Set lifetime far past startLifetime so the
+          // death check at the end of the kernel deactivates the
+          // particle and zeroes color AFTER all modifiers have run
+          // (modifiers would otherwise overwrite our color).
           If(mode.lessThan(0.5), () => {
             ps.x.assign(startLife.add(float(1.0)));
-          });
+          })
+            // CLAMP mode (1)
+            .ElseIf(mode.lessThan(1.5), () => {
+              // Project position onto the plane surface
+              pos.assign(pos.sub(planeNormal.mul(signedDist)));
 
-          // CLAMP mode (mode >= 0.5 && mode < 1.5)
-          If(mode.greaterThanEqual(0.5).and(mode.lessThan(1.5)), () => {
-            // Project position onto plane surface
-            pos.assign(pos.sub(planeNormal.mul(signedDist)));
+              // Remove velocity component along the normal only when moving
+              // into the plane.
+              const velDotN = dot(vel, planeNormal);
+              If(velDotN.lessThan(0.0), () => {
+                vel.assign(vel.sub(planeNormal.mul(velDotN)));
+              });
+            })
+            // BOUNCE mode (2)
+            .Else(() => {
+              // Project position onto the plane surface
+              pos.assign(pos.sub(planeNormal.mul(signedDist)));
 
-            // Remove velocity component along normal (only if moving into the plane)
-            const velDotN = dot(vel, planeNormal);
-            If(velDotN.lessThan(0.0), () => {
-              vel.assign(vel.sub(planeNormal.mul(velDotN)));
+              // Reflect velocity: v' = (v - 2 * dot(v, n) * n) * dampen
+              const vDotN = dot(vel, planeNormal);
+              const reflected = vel.sub(planeNormal.mul(vDotN.mul(2.0)));
+              vel.assign(reflected.mul(dampen));
+
+              // Apply lifetime loss
+              If(lifetimeLoss.greaterThan(0.0), () => {
+                ps.x.assign(ps.x.add(lifetimeLoss.mul(startLife).mul(1000.0)));
+              });
             });
-          });
-
-          // BOUNCE mode (mode >= 1.5)
-          If(mode.greaterThanEqual(1.5), () => {
-            // Project position onto plane surface
-            pos.assign(pos.sub(planeNormal.mul(signedDist)));
-
-            // Reflect velocity: v' = (v - 2 * dot(v, n) * n) * dampen
-            const vDotN = dot(vel, planeNormal);
-            const reflected = vel.sub(planeNormal.mul(vDotN.mul(2.0)));
-            vel.assign(reflected.mul(dampen));
-
-            // Apply lifetime loss
-            If(lifetimeLoss.greaterThan(0.0), () => {
-              ps.x.assign(ps.x.add(lifetimeLoss.mul(startLife).mul(1000.0)));
-            });
-          });
         });
       });
     },

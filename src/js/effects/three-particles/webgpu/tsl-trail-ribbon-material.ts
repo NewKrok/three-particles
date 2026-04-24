@@ -13,7 +13,7 @@
  * - NO texture sheet animation
  * - Trail uniforms are completely separate from the main particle uniforms
  */
-import { DoubleSide, NoColorSpace } from 'three';
+import { DoubleSide } from 'three';
 import {
   Fn,
   attribute,
@@ -77,9 +77,9 @@ export type TrailUniforms = {
 
 function createTrailUniforms(trailUniforms: TrailUniforms) {
   const dummy = getDummyTexture();
-  // Disable sRGB→linear hardware conversion to match GLSL ShaderMaterial output
+  // Trail color maps are treated as sRGB (standard three.js convention);
+  // the renderer's output pass handles the final linear→sRGB conversion.
   const map = (trailUniforms.map.value ?? dummy) as THREE.Texture;
-  if (map) map.colorSpace = NoColorSpace;
 
   return {
     uMap: map,

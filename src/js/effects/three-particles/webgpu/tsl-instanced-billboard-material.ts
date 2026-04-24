@@ -174,9 +174,13 @@ export function createInstancedBillboardTSLMaterial(
    * clip-space position and expose it via the material's `vertexNode` property.
    */
   const vertexNode = Fn((): ShaderNodeObject<Node> => {
-    // Early-out for dead particles: skip all transforms and emit a degenerate
-    // clip-space position that produces zero-area triangles.
-    const clipPos = vec4(0.0, 0.0, 0.0, 0.0).toVar();
+    // Early-out for dead particles: push the vertex behind the camera
+    // (negative w) so it is clipped before rasterisation. A degenerate
+    // (0,0,0,0) position causes a NaN after perspective divide, which some
+    // WebGPU drivers rasterise at an indeterminate location instead of
+    // discarding cleanly — this was visible as rogue billboards snapping
+    // to the scene origin when particles transitioned to a dead state.
+    const clipPos = vec4(0.0, 0.0, 0.0, -1.0).toVar();
 
     If(aColor.w.greaterThan(0.0), () => {
       // Populate varyings

@@ -783,4 +783,102 @@ describe('integration — updateConfig shape change', () => {
 
     ps.dispose();
   });
+
+  // Helper: count actually-active particles via the stride-aware
+  // isActive attribute (the top-level `countActive` walks arr.length,
+  // which reads truthy values from unrelated scalar slots).
+  const countActiveStrict = (ps: ParticleSystem): number => {
+    const attrs = getAttributes(ps);
+    const isActive = attrs.isActive as THREE.InterleavedBufferAttribute;
+    let n = 0;
+    for (let i = 0; i < isActive.count; i++) {
+      if (isActive.getX(i)) n++;
+    }
+    return n;
+  };
+
+  it('handles simulationSpace LOCAL → WORLD transition via updateConfig', () => {
+    // Regression: switching simulationSpace at runtime used to leave the
+    // existing particle buffer interpreted under the old frame while the
+    // emission path started writing in the new frame. Combined with the
+    // forgotten `matrixWorldAutoUpdate` flag flip this caused particles
+    // to render at random positions and snap between origins.
+    const { ps, step } = createTestSystem({
+      simulationSpace: SimulationSpace.LOCAL,
+      gravity: 0,
+      emission: { rateOverTime: 30, rateOverDistance: 0 },
+    });
+
+    // Emit a few particles in LOCAL space.
+    step(200);
+    expect(countActiveStrict(ps)).toBeGreaterThan(0);
+
+    // Flip to WORLD via updateConfig.
+    ps.updateConfig({ simulationSpace: SimulationSpace.WORLD });
+
+    // All previously-emitted LOCAL-frame particles are deactivated so the
+    // system can repopulate cleanly in WORLD.
+    expect(countActiveStrict(ps)).toBe(0);
+
+    // matrixWorldAutoUpdate is now false (WORLD convention) and
+    // matrixWorld is identity — matching what createParticleSystem would
+    // have set up from the start for a WORLD system.
+    const instance = ps.instance as THREE.Object3D;
+    expect(instance.matrixWorldAutoUpdate).toBe(false);
+    const mwElements = instance.matrixWorld.elements;
+    expect(mwElements[0]).toBe(1);
+    expect(mwElements[5]).toBe(1);
+    expect(mwElements[10]).toBe(1);
+    expect(mwElements[15]).toBe(1);
+    expect(mwElements[12]).toBe(0);
+    expect(mwElements[13]).toBe(0);
+    expect(mwElements[14]).toBe(0);
+
+    // Re-emit in WORLD — new particles spawn from origin (no parent).
+    step(400);
+    expect(countActiveStrict(ps)).toBeGreaterThan(0);
+
+    ps.dispose();
+  });
+
+  it('handles simulationSpace WORLD → LOCAL transition via updateConfig', () => {
+    const { ps, step } = createTestSystem({
+      simulationSpace: SimulationSpace.WORLD,
+      gravity: 0,
+      emission: { rateOverTime: 30, rateOverDistance: 0 },
+    });
+
+    step(200);
+    expect(countActiveStrict(ps)).toBeGreaterThan(0);
+
+    ps.updateConfig({ simulationSpace: SimulationSpace.LOCAL });
+
+    expect(countActiveStrict(ps)).toBe(0);
+    const instance = ps.instance as THREE.Object3D;
+    expect(instance.matrixWorldAutoUpdate).toBe(true);
+
+    step(400);
+    expect(countActiveStrict(ps)).toBeGreaterThan(0);
+
+    ps.dispose();
+  });
+
+  it('does not touch particle state when simulationSpace update keeps the same value', () => {
+    // No-op guard: if the partial config echoes the current simulationSpace,
+    // the particle buffer should not be deactivated.
+    const { ps, step } = createTestSystem({
+      simulationSpace: SimulationSpace.LOCAL,
+      gravity: 0,
+      emission: { rateOverTime: 30, rateOverDistance: 0 },
+    });
+
+    step(200);
+    const activeBefore = countActiveStrict(ps);
+    expect(activeBefore).toBeGreaterThan(0);
+
+    ps.updateConfig({ simulationSpace: SimulationSpace.LOCAL });
+
+    expect(countActiveStrict(ps)).toBe(activeBefore);
+    ps.dispose();
+  });
 });

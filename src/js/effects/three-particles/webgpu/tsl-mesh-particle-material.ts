@@ -133,11 +133,12 @@ export function createMeshParticleTSLMaterial(
    * Also populates all varyings for the fragment stage.
    */
   const vertexSetup = Fn(() => {
-    // Early-out for dead particles: skip all expensive transforms and emit
-    // a degenerate clip-space position that produces zero-area triangles.
-    // This avoids quaternion rotation, scaling, normal transforms, and
-    // matrix multiplications for every vertex of inactive mesh instances.
-    const clipPos = vec4(0.0, 0.0, 0.0, 0.0).toVar();
+    // Early-out for dead particles: push the vertex behind the camera
+    // (negative w) so it is clipped before rasterisation. A degenerate
+    // (0,0,0,0) position causes a NaN after perspective divide, which some
+    // WebGPU drivers rasterise at an indeterminate location instead of
+    // discarding cleanly.
+    const clipPos = vec4(0.0, 0.0, 0.0, -1.0).toVar();
 
     If(aColor.w.greaterThan(0.0), () => {
       // Populate varyings

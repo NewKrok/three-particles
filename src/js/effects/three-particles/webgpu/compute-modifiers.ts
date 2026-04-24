@@ -408,6 +408,14 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
   // from the first emission would overwrite the fresh initFlag=1 from the
   // re-emission — causing the GPU to never initialise the particle, which
   // then rendered with stale data (wrong color/position).
+  //
+  // We use `addUpdateRange()` so the WebGPU backend only uploads the
+  // per-particle init slots that actually changed this frame. A blanket
+  // `needsUpdate = true` without ranges would re-upload the entire
+  // `curveData` buffer, stomping on init flags the compute shader has
+  // already cleared on the GPU side — which previously caused already-
+  // initialised particles to be re-initialised with stale data, producing
+  // visible jumps and resets on systems with live emission.
   const current = _currentEmitIndices.get(buffers.curveData);
   const previous = _previousEmitIndices.get(buffers.curveData);
 
@@ -421,9 +429,21 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
         const flagOffset = curveLen + p * INIT_STRIDE + 3;
         if (arr[flagOffset] > 0.5) {
           arr[flagOffset] = 0;
+          buffers.curveData.addUpdateRange(flagOffset, 1);
           clearedAny = true;
         }
       }
+    }
+  }
+
+  // Mark the freshly emitted slots as needing upload (their entire
+  // INIT_STRIDE worth of data was just filled in by
+  // writeParticleToModifierBuffers).
+  if (current && current.length > 0) {
+    for (let i = 0; i < current.length; i++) {
+      const p = current[i];
+      const slotStart = curveLen + p * INIT_STRIDE;
+      buffers.curveData.addUpdateRange(slotStart, INIT_STRIDE);
     }
   }
 
@@ -464,20 +484,43 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
 }
 
 /**
- * Deactivates a particle on the CPU side for freeList management.
+ * Deactivates a particle on both the CPU mirror and the GPU buffers.
  *
- * The GPU compute shader handles the actual deactivation (zeroing isActive
- * and color) via its death check. This function only updates CPU bookkeeping
- * arrays without triggering a buffer upload that would overwrite GPU state.
+ * The CPU runs its own lifetime tracking (wall-clock based) which may
+ * deactivate a particle one or more frames before the GPU-side death
+ * check (accumulated `delta` based) would. Between the CPU decision and
+ * the next compute dispatch, the particle is already on the free list and
+ * can be re-emitted into its old slot via `writeParticleToModifierBuffers`
+ * — if the GPU hadn't yet cleared `orbitalIsActive.w` and `color.w`, the
+ * compute shader would re-initialise an already-active slot and produce a
+ * visible teleport. To avoid that we zero the `isActive` and `colorA`
+ * entries for this slot directly on the CPU mirrors and submit narrow
+ * `addUpdateRange` upload regions, so the GPU state matches by the next
+ * dispatch.
  */
 export function deactivateParticleInModifierBuffers(
-  _buffers: ModifierStorageBuffers,
-  _index: number
+  buffers: ModifierStorageBuffers,
+  index: number
 ): void {
-  // No-op: GPU handles deactivation in the compute shader death check.
-  // Previously this wrote to orbitalIsActive and color buffers with
-  // needsUpdate = true, which caused full-buffer uploads that overwrote
-  // GPU-computed values for all particles.
+  // orbitalIsActive layout: (offsetX, offsetY, offsetZ, isActive). Zero the
+  // w component (last float of the vec4 slot).
+  const oiaArr = buffers.orbitalIsActive.array as Float32Array;
+  const oiaWOffset = index * 4 + 3;
+  if (oiaArr[oiaWOffset] !== 0) {
+    oiaArr[oiaWOffset] = 0;
+    buffers.orbitalIsActive.addUpdateRange(oiaWOffset, 1);
+    buffers.orbitalIsActive.needsUpdate = true;
+  }
+
+  // color layout: (r, g, b, a). Zero the alpha so the render-side
+  // `aColor.w > 0` dead-particle cull kicks in immediately.
+  const colorArr = buffers.color.array as Float32Array;
+  const colorAOffset = index * 4 + 3;
+  if (colorArr[colorAOffset] !== 0) {
+    colorArr[colorAOffset] = 0;
+    buffers.color.addUpdateRange(colorAOffset, 1);
+    buffers.color.needsUpdate = true;
+  }
 }
 
 // ─── Curve Lookup Helper ─────────────────────────────────────────────────────
@@ -597,6 +640,21 @@ export function createModifierComputeUpdate(
   const computeKernel = Fn(() => {
     const i = instanceIndex;
 
+    // Bounds check — the WebGPU compute dispatch rounds up to full workgroups
+    // (typically 64 threads), so when `maxParticles` is not a multiple of the
+    // workgroup size the last few threads run with indices i >= maxParticles.
+    // Without this guard those threads would:
+    //   1. Write out-of-bounds on the per-particle storage buffers (size =
+    //      maxParticles) — technically silently-clamped but wastes work.
+    //   2. Read/write at `curveLen + i * INIT_STRIDE + 3` which for
+    //      i == maxParticles lands exactly on the first collision plane's
+    //      position.y (since `collisionPlaneOffset = curveLen + maxParticles *
+    //      INIT_STRIDE`), corrupting the plane data on every frame.
+    //
+    // Using `If(i < maxParticles)` as a top-level guard is equivalent to an
+    // early-return in TSL (return inside Fn callbacks does not emit a WGSL
+    // return statement).
+    If(i.lessThan(float(maxParticles)), () => {
     // ── Per-particle init: O(1) lookup ──
     // Each particle has a fixed slot in curveData at:
     //   base = curveLen + i * INIT_STRIDE
@@ -955,6 +1013,7 @@ export function createModifierComputeUpdate(
         sColor.element(i).assign(vec4(0));
       });
     });
+    }); // end If(i < maxParticles) bounds check
   });
 
   const computeNode = compute(computeKernel(), maxParticles);

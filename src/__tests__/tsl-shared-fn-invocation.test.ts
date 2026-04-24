@@ -195,10 +195,13 @@ describe('createParticleUniforms', () => {
     expect(u.uMap).toBe(getDummyTexture());
   });
 
-  it('sets texture colorSpace to NoColorSpace to bypass hardware sRGB conversion', () => {
+  it('preserves the user-provided texture colorSpace (sRGB workflow)', () => {
+    // Standard three.js convention: color maps are sRGB, and the renderer
+    // applies the hardware sRGB→linear decode on sample. The library no
+    // longer overrides the caller's colorSpace setting.
     const tex = new DataTexture(new Uint8Array([255, 0, 0, 255]), 1, 1);
     tex.colorSpace = 'srgb';
     const u = createParticleUniforms(makeUniforms({ map: { value: tex } }));
-    expect(u.uMap.colorSpace).toBe('');
+    expect(u.uMap.colorSpace).toBe('srgb');
   });
 });
