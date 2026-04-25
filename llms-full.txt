@@ -62,7 +62,7 @@ function animate() {
 
 | Property/Method | Type | Description |
 |-----------------|------|-------------|
-| `instance` | `THREE.Points \| THREE.Mesh \| Gyroscope` | The renderable object — add to scene (Mesh when using RendererType.INSTANCED) |
+| `instance` | `THREE.Points \| THREE.Mesh` | The renderable object — add to scene (Mesh when using RendererType.INSTANCED or RendererType.MESH) |
 | `pauseEmitter()` | `() => void` | Stop emitting new particles |
 | `resumeEmitter()` | `() => void` | Resume emitting particles |
 | `dispose()` | `() => void` | Destroy system, free resources |
@@ -516,6 +516,19 @@ const system = createParticleSystem({
 ### SimulationSpace
 `LOCAL` | `WORLD`
 
+- **`LOCAL`** (default): particles are children of the emitter in the scene
+  graph and move/rotate with it. The buffer stores positions in the
+  emitter's local frame.
+- **`WORLD`**: particles are decoupled from the emitter once spawned. The
+  buffer stores world coordinates directly and `instance.matrixWorld` is
+  held at identity. New particles spawn from the emitter's current world
+  pose (parent chain + `instance.position` / `instance.rotation`), so
+  moving the emitter only affects future emissions, not existing
+  particles. The shape-emission offset is scaled by the emitter's world
+  scale at spawn time (matching Unity's Shape module with `Scaling Mode =
+  Local/Hierarchy`); live particles are unaffected by later scale
+  changes. Matches Unity's world simulation space.
+
 ### TimeMode
 `LIFETIME` | `FPS`
 
@@ -852,6 +865,8 @@ enableWebGPU();
 import * as THREE from "three/webgpu";
 const renderer = new THREE.WebGPURenderer({ antialias: true });
 await renderer.init();
+// No outputColorSpace override needed — the library uses the standard
+// three.js linear workflow and works with the default (SRGBColorSpace).
 
 // 3. Create a GPU-accelerated particle system
 import { createParticleSystem, SimulationBackend } from "@newkrok/three-particles";

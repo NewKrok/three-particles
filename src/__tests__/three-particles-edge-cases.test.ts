@@ -342,7 +342,7 @@ describe('Edge cases - first frame initialization', () => {
       gravity: -1,
     });
 
-    // First frame - lastWorldQuaternion is -99999
+    // First frame - lastWorldPosition is the -99999 sentinel
     step(1);
     step(16);
     expect(ps.instance).toBeDefined();

@@ -3,9 +3,8 @@
  *
  * Replaces the per-particle CPU update loop with a single GPU compute dispatch:
  *   1. Gravity: velocity -= gravityVelocity * delta
- *   2. World-space compensation: position -= worldPositionChange
- *   3. Velocity integration: position += velocity * delta
- *   4. Lifetime: lifetime += delta * 1000 (ms); deactivate when > startLifetime
+ *   2. Velocity integration: position += velocity * delta
+ *   3. Lifetime: lifetime += delta * 1000 (ms); deactivate when > startLifetime
  *
  * Emission and death callbacks remain CPU-side.
  *
@@ -38,8 +37,6 @@ export type ComputeUniforms = {
   delta: ShaderNodeObject<Node>;
   deltaMs: ShaderNodeObject<Node>;
   gravityVelocity: ShaderNodeObject<Node>;
-  worldPositionChange: ShaderNodeObject<Node>;
-  simulationSpaceWorld: ShaderNodeObject<Node>;
 };
 
 /** GPU storage buffer references returned by createParticleStorageBuffers. */
@@ -117,8 +114,6 @@ export function createParticleComputeUpdate(
   const uDelta = uniform(float(0));
   const uDeltaMs = uniform(float(0));
   const uGravityVelocity = uniform(new Vector3(0, 0, 0));
-  const uWorldPositionChange = uniform(new Vector3(0, 0, 0));
-  const uSimSpaceWorld = uniform(float(0)); // 1.0 = WORLD, 0.0 = LOCAL
 
   // ── Storage buffer nodes ──
 
@@ -147,17 +142,15 @@ export function createParticleComputeUpdate(
     const startLife = sStartLifetime.element(i);
 
     // 1. Gravity: velocity -= gravityVelocity * delta
+    //    In WORLD mode gravityVelocity is the world-space gravity vector;
+    //    in LOCAL mode it is the same vector transformed into the emitter's
+    //    local frame. The CPU sets it appropriately each frame.
     vel.assign(vel.sub(vec3(uGravityVelocity).mul(uDelta)));
 
-    // 2. World-space compensation: position -= worldPositionChange
-    If(uSimSpaceWorld.greaterThan(0.5), () => {
-      pos.assign(pos.sub(vec3(uWorldPositionChange)));
-    });
-
-    // 3. Velocity integration: position += velocity * delta
+    // 2. Velocity integration: position += velocity * delta
     pos.assign(pos.add(vel.mul(uDelta)));
 
-    // 4. Lifetime: lifetime += deltaMs; deactivate when > startLifetime
+    // 3. Lifetime: lifetime += deltaMs; deactivate when > startLifetime
     life.assign(life.add(uDeltaMs));
 
     // Write back
@@ -165,7 +158,7 @@ export function createParticleComputeUpdate(
     sVelocity.element(i).assign(vel);
     sLifetime.element(i).assign(life);
 
-    // 5. Death check: deactivate expired particles
+    // 4. Death check: deactivate expired particles
     If(life.greaterThan(startLife), () => {
       sIsActive.element(i).assign(float(0));
       sColorA.element(i).assign(float(0));
@@ -181,8 +174,6 @@ export function createParticleComputeUpdate(
       delta: uDelta,
       deltaMs: uDeltaMs,
       gravityVelocity: uGravityVelocity,
-      worldPositionChange: uWorldPositionChange,
-      simulationSpaceWorld: uSimSpaceWorld,
     },
     buffers,
   };
@@ -254,8 +245,6 @@ export function updateComputeUniforms(
   frameData: {
     delta: number;
     gravityVelocity: { x: number; y: number; z: number };
-    worldPositionChange: { x: number; y: number; z: number };
-    isWorldSpace: boolean;
   }
 ): void {
   (uniforms.delta as unknown as { value: number }).value = frameData.delta;
@@ -267,12 +256,4 @@ export function updateComputeUniforms(
     frameData.gravityVelocity.y,
     frameData.gravityVelocity.z
   );
-  const wpc = uniforms.worldPositionChange as unknown as { value: Vector3 };
-  wpc.value.set(
-    frameData.worldPositionChange.x,
-    frameData.worldPositionChange.y,
-    frameData.worldPositionChange.z
-  );
-  (uniforms.simulationSpaceWorld as unknown as { value: number }).value =
-    frameData.isWorldSpace ? 1 : 0;
 }

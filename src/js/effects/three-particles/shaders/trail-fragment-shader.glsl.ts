@@ -55,6 +55,7 @@ const TrailFragmentShader = `
     if (discardBackgroundColor && abs(length(gl_FragColor.rgb - backgroundColor.rgb)) < backgroundColorTolerance) discard;
 
     #include <logdepthbuf_fragment>
+    #include <colorspace_fragment>
   }
 `;
 

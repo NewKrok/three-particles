@@ -81,6 +81,7 @@ const InstancedParticleFragmentShader = `
     }
 
     #include <logdepthbuf_fragment>
+    #include <colorspace_fragment>
   }
 `;
 

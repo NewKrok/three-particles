@@ -6,12 +6,11 @@
  * - Soft particle depth fade
  * - Background color discard
  */
-import { DataTexture, NoColorSpace, Vector3, type Texture } from 'three';
+import { DataTexture, Vector3, type Texture } from 'three';
 import {
   Fn,
   vec2,
   vec3,
-  vec4,
   float,
   uniform,
   texture,
@@ -26,7 +25,6 @@ import {
   Discard,
   If,
   length,
-  sRGBTransferEOTF,
   type ShaderNodeObject,
   type Node,
 } from 'three/tsl';
@@ -66,14 +64,10 @@ export type SharedUniforms = {
 export function createParticleUniforms(sharedUniforms: SharedUniforms) {
   const dummy = getDummyTexture();
 
-  // Disable automatic sRGB→linear hardware conversion on particle textures.
-  // The GLSL ShaderMaterial path reads raw sRGB values via texture2D() and
-  // writes them directly without output color-space conversion.  To match
-  // that behaviour in the TSL/WebGPU path (which applies a full-screen
-  // linear→sRGB output pass), we must feed raw values into the shader so
-  // the renderer's output transform produces identical results.
+  // Particle color maps are treated as sRGB (standard three.js convention).
+  // The renderer's output pass handles the final linear→sRGB conversion, so
+  // we let three.js apply the hardware sRGB→linear decode on sample.
   const map = (sharedUniforms.map.value ?? dummy) as Texture;
-  if (map) map.colorSpace = NoColorSpace;
 
   return {
     uMap: map,
@@ -211,43 +205,23 @@ export const computeSoftParticleFade = Fn(
 
 /**
  * Discards fragments whose texture color is close to the background color.
- */
-export const applyBackgroundDiscard = Fn(
-  ({
-    texColor,
-    uDiscardBg,
-    uBgColor,
-    uBgTolerance,
-  }: Record<string, ShaderNodeObject<Node>>) => {
-    If(uDiscardBg.greaterThan(0.5), () => {
-      const diff = vec3(
-        texColor.x.sub(uBgColor.x),
-        texColor.y.sub(uBgColor.y),
-        texColor.z.sub(uBgColor.z)
-      );
-      If(abs(length(diff)).lessThan(uBgTolerance), () => {
-        Discard();
-      });
-    });
-  }
-);
-
-// ─── Output color-space compensation ────────────────────────────────────────
-
-/**
- * Applies sRGB→linear (EOTF) to the RGB channels of a vec4 color.
  *
- * The GLSL ShaderMaterial path writes raw sRGB texture values directly to
- * the framebuffer — no output color-space conversion is applied because the
- * custom fragment shader omits `#include <colorspace_fragment>`.
- *
- * The WebGPU renderer, however, always runs a full-screen output pass that
- * performs a linear→sRGB conversion on the entire framebuffer.  To produce
- * identical results we apply the *inverse* transform (sRGB→linear) on the
- * fragment output so the two cancel out:  sRGB → linear → sRGB ≡ sRGB.
+ * Emitted inline (not wrapped in `Fn`) so the `Discard()` call reaches the
+ * fragment main shader — `discard` is a fragment-specific statement and
+ * wrapping it inside a TSL `Fn` helper prevents it from firing correctly.
  */
-export const compensateOutputSRGB = Fn(
-  ({ color }: Record<string, ShaderNodeObject<Node>>) => {
-    return vec4(sRGBTransferEOTF(color.rgb), color.a);
-  }
-);
+export function applyBackgroundDiscard({
+  texColor,
+  uDiscardBg,
+  uBgColor,
+  uBgTolerance,
+}: Record<string, ShaderNodeObject<Node>>): void {
+  const diff = vec3(
+    texColor.x.sub(uBgColor.x),
+    texColor.y.sub(uBgColor.y),
+    texColor.z.sub(uBgColor.z)
+  );
+  Discard(
+    uDiscardBg.greaterThan(0.5).and(abs(length(diff)).lessThan(uBgTolerance))
+  );
+}

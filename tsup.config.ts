@@ -1,8 +1,17 @@
 import { defineConfig } from 'tsup';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const pkg = JSON.parse(
+  readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')
+) as { version: string };
+
+const defineConstants = {
+  __THREE_PARTICLES_VERSION__: JSON.stringify(pkg.version),
+};
 
 const libraryExternal = [
   'three',
@@ -24,6 +33,7 @@ export default defineConfig([
     outDir: 'dist',
     external: libraryExternal,
     treeshake: true,
+    define: defineConstants,
   },
   // WebGPU entry point (TSL material factories)
   // DTS is hand-written (webgpu.d.ts) because TSL node types resolve to
@@ -43,6 +53,7 @@ export default defineConfig([
     outDir: 'dist',
     external: [...libraryExternal, '@newkrok/three-particles'],
     treeshake: true,
+    define: defineConstants,
   },
   // Minified browser bundle — all deps except "three" are inlined so the
   // bundle works when loaded directly from a CDN without a bundler.
@@ -91,5 +102,6 @@ export default defineConfig([
         drop_console: true,
       },
     },
+    define: defineConstants,
   },
 ]);

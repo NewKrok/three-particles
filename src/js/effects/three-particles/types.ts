@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
 import {
   CollisionPlaneMode,
@@ -1648,9 +1647,27 @@ export type GeneralData = {
   lastWorldPosition: THREE.Vector3;
   currentWorldPosition: THREE.Vector3;
   worldPositionChange: THREE.Vector3;
+  /**
+   * For WORLD simulation space: the full world transform of the emitter
+   * (parent.matrixWorld × particleSystem.matrix). Used to position new
+   * particles in world coordinates at emit time and to orient the
+   * emission shape. The particleSystem's own matrixWorld is forced to
+   * identity so the buffer coordinates render as world coordinates.
+   */
+  sourceWorldMatrix: THREE.Matrix4;
   wrapperQuaternion: THREE.Quaternion;
-  lastWorldQuaternion: THREE.Quaternion;
   worldQuaternion: THREE.Quaternion;
+  /**
+   * Emitter world scale (decomposed from the full parent chain). Used to
+   * match Unity's parent-scale semantics:
+   *   - WORLD mode: scales the shape-emission offset at spawn time (the
+   *     Shape module in Unity obeys parent scale when Scaling Mode is
+   *     Local/Hierarchy). Live particles are unaffected.
+   *   - LOCAL mode: gravity is stored in local units, so it is divided by
+   *     this scale so the rendered fall matches world -g m/s² regardless
+   *     of parent scale.
+   */
+  worldScale: THREE.Vector3;
   worldEuler: THREE.Euler;
   gravityVelocity: THREE.Vector3;
   startValues: Record<string, Array<number>>;
@@ -1738,7 +1755,6 @@ export type MappedAttributes = {
 
 export type ParticleSystemInstance = {
   particleSystem: THREE.Points | THREE.Mesh;
-  wrapper?: Gyroscope;
   mappedAttributes: MappedAttributes;
   /** Shared interleaved Float32Array backing all scalar per-particle attributes. */
   scalarArray: Float32Array;
@@ -1839,7 +1855,7 @@ export type ParticleSystemInstance = {
 /**
  * Represents a particle system instance, providing methods to control and manage its lifecycle.
  *
- * @property instance - The underlying Three.js `Points` object or a `Gyroscope` used for particle rendering.
+ * @property instance - The underlying Three.js `Points` or `Mesh` object used for particle rendering.
  * @property resumeEmitter - Resumes the particle emitter, allowing particles to be emitted again.
  * @property pauseEmitter - Pauses the particle emitter, stopping any new particles from being emitted.
  * @property dispose - Disposes of the particle system, cleaning up resources to free memory.
@@ -1857,7 +1873,7 @@ export type ParticleSystemInstance = {
  * particleSystem.dispose(); // Cleanup the particle system
  */
 export type ParticleSystem = {
-  instance: THREE.Points | THREE.Mesh | Gyroscope;
+  instance: THREE.Points | THREE.Mesh;
   resumeEmitter: () => void;
   pauseEmitter: () => void;
   dispose: () => void;

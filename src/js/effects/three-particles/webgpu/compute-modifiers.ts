@@ -120,8 +120,6 @@ export type ModifierUniforms = {
   delta: ShaderNodeObject<Node>;
   deltaMs: ShaderNodeObject<Node>;
   gravityVelocity: ShaderNodeObject<Node>;
-  worldPositionChange: ShaderNodeObject<Node>;
-  simulationSpaceWorld: ShaderNodeObject<Node>;
   // Noise uniforms
   noiseStrength: ShaderNodeObject<Node>;
   noisePower: ShaderNodeObject<Node>;
@@ -410,6 +408,14 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
   // from the first emission would overwrite the fresh initFlag=1 from the
   // re-emission — causing the GPU to never initialise the particle, which
   // then rendered with stale data (wrong color/position).
+  //
+  // We use `addUpdateRange()` so the WebGPU backend only uploads the
+  // per-particle init slots that actually changed this frame. A blanket
+  // `needsUpdate = true` without ranges would re-upload the entire
+  // `curveData` buffer, stomping on init flags the compute shader has
+  // already cleared on the GPU side — which previously caused already-
+  // initialised particles to be re-initialised with stale data, producing
+  // visible jumps and resets on systems with live emission.
   const current = _currentEmitIndices.get(buffers.curveData);
   const previous = _previousEmitIndices.get(buffers.curveData);
 
@@ -423,9 +429,21 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
         const flagOffset = curveLen + p * INIT_STRIDE + 3;
         if (arr[flagOffset] > 0.5) {
           arr[flagOffset] = 0;
+          buffers.curveData.addUpdateRange(flagOffset, 1);
           clearedAny = true;
         }
       }
+    }
+  }
+
+  // Mark the freshly emitted slots as needing upload (their entire
+  // INIT_STRIDE worth of data was just filled in by
+  // writeParticleToModifierBuffers).
+  if (current && current.length > 0) {
+    for (let i = 0; i < current.length; i++) {
+      const p = current[i];
+      const slotStart = curveLen + p * INIT_STRIDE;
+      buffers.curveData.addUpdateRange(slotStart, INIT_STRIDE);
     }
   }
 
@@ -466,20 +484,43 @@ export function flushEmitQueue(buffers: ModifierStorageBuffers): number {
 }
 
 /**
- * Deactivates a particle on the CPU side for freeList management.
+ * Deactivates a particle on both the CPU mirror and the GPU buffers.
  *
- * The GPU compute shader handles the actual deactivation (zeroing isActive
- * and color) via its death check. This function only updates CPU bookkeeping
- * arrays without triggering a buffer upload that would overwrite GPU state.
+ * The CPU runs its own lifetime tracking (wall-clock based) which may
+ * deactivate a particle one or more frames before the GPU-side death
+ * check (accumulated `delta` based) would. Between the CPU decision and
+ * the next compute dispatch, the particle is already on the free list and
+ * can be re-emitted into its old slot via `writeParticleToModifierBuffers`
+ * — if the GPU hadn't yet cleared `orbitalIsActive.w` and `color.w`, the
+ * compute shader would re-initialise an already-active slot and produce a
+ * visible teleport. To avoid that we zero the `isActive` and `colorA`
+ * entries for this slot directly on the CPU mirrors and submit narrow
+ * `addUpdateRange` upload regions, so the GPU state matches by the next
+ * dispatch.
  */
 export function deactivateParticleInModifierBuffers(
-  _buffers: ModifierStorageBuffers,
-  _index: number
+  buffers: ModifierStorageBuffers,
+  index: number
 ): void {
-  // No-op: GPU handles deactivation in the compute shader death check.
-  // Previously this wrote to orbitalIsActive and color buffers with
-  // needsUpdate = true, which caused full-buffer uploads that overwrote
-  // GPU-computed values for all particles.
+  // orbitalIsActive layout: (offsetX, offsetY, offsetZ, isActive). Zero the
+  // w component (last float of the vec4 slot).
+  const oiaArr = buffers.orbitalIsActive.array as Float32Array;
+  const oiaWOffset = index * 4 + 3;
+  if (oiaArr[oiaWOffset] !== 0) {
+    oiaArr[oiaWOffset] = 0;
+    buffers.orbitalIsActive.addUpdateRange(oiaWOffset, 1);
+    buffers.orbitalIsActive.needsUpdate = true;
+  }
+
+  // color layout: (r, g, b, a). Zero the alpha so the render-side
+  // `aColor.w > 0` dead-particle cull kicks in immediately.
+  const colorArr = buffers.color.array as Float32Array;
+  const colorAOffset = index * 4 + 3;
+  if (colorArr[colorAOffset] !== 0) {
+    colorArr[colorAOffset] = 0;
+    buffers.color.addUpdateRange(colorAOffset, 1);
+    buffers.color.needsUpdate = true;
+  }
 }
 
 // ─── Curve Lookup Helper ─────────────────────────────────────────────────────
@@ -535,8 +576,6 @@ export function createModifierComputeUpdate(
   const uDelta = uniform(float(0));
   const uDeltaMs = uniform(float(0));
   const uGravityVelocity = uniform(new Vector3(0, 0, 0));
-  const uWorldPositionChange = uniform(new Vector3(0, 0, 0));
-  const uSimSpaceWorld = uniform(float(0));
   const uNoiseStrength = uniform(float(0));
   const uNoisePower = uniform(float(0));
   const uNoiseFrequency = uniform(float(1));
@@ -601,359 +640,382 @@ export function createModifierComputeUpdate(
   const computeKernel = Fn(() => {
     const i = instanceIndex;
 
-    // ── Per-particle init: O(1) lookup ──
-    // Each particle has a fixed slot in curveData at:
-    //   base = curveLen + i * INIT_STRIDE
-    // If initFlag (offset 3) is 1.0, copy init data into main buffers.
-    const initBase = i.mul(INIT_STRIDE).add(curveLen);
+    // Bounds check — the WebGPU compute dispatch rounds up to full workgroups
+    // (typically 64 threads), so when `maxParticles` is not a multiple of the
+    // workgroup size the last few threads run with indices i >= maxParticles.
+    // Without this guard those threads would:
+    //   1. Write out-of-bounds on the per-particle storage buffers (size =
+    //      maxParticles) — technically silently-clamped but wastes work.
+    //   2. Read/write at `curveLen + i * INIT_STRIDE + 3` which for
+    //      i == maxParticles lands exactly on the first collision plane's
+    //      position.y (since `collisionPlaneOffset = curveLen + maxParticles *
+    //      INIT_STRIDE`), corrupting the plane data on every frame.
+    //
+    // Using `If(i < maxParticles)` as a top-level guard is equivalent to an
+    // early-return in TSL (return inside Fn callbacks does not emit a WGSL
+    // return statement).
+    If(i.lessThan(float(maxParticles)), () => {
+      // ── Per-particle init: O(1) lookup ──
+      // Each particle has a fixed slot in curveData at:
+      //   base = curveLen + i * INIT_STRIDE
+      // If initFlag (offset 3) is 1.0, copy init data into main buffers.
+      const initBase = i.mul(INIT_STRIDE).add(curveLen);
 
-    const initFlag = sCurveData.element(initBase.add(3));
-    If(initFlag.greaterThan(0.5), () => {
-      // Position (vec4: xyz + padding)
-      sPosition
-        .element(i)
-        .assign(
-          vec4(
-            sCurveData.element(initBase),
-            sCurveData.element(initBase.add(1)),
-            sCurveData.element(initBase.add(2)),
-            0
-          )
-        );
-      // Velocity (vec4: xyz + padding)
-      sVelocity
-        .element(i)
-        .assign(
-          vec4(
-            sCurveData.element(initBase.add(4)),
-            sCurveData.element(initBase.add(5)),
-            sCurveData.element(initBase.add(6)),
-            0
-          )
-        );
-      // Color (vec4: RGBA)
-      sColor
-        .element(i)
-        .assign(
-          vec4(
-            sCurveData.element(initBase.add(8)),
-            sCurveData.element(initBase.add(9)),
-            sCurveData.element(initBase.add(10)),
-            sCurveData.element(initBase.add(11))
-          )
-        );
-      // particleState (vec4: lifetime=0, size, rotation, startFrame)
-      sParticleState
-        .element(i)
-        .assign(
-          vec4(
-            sCurveData.element(initBase.add(12)),
-            sCurveData.element(initBase.add(13)),
-            sCurveData.element(initBase.add(14)),
-            sCurveData.element(initBase.add(15))
-          )
-        );
-      // orbitalIsActive (vec4: offsetXYZ, isActive=1)
-      sOrbitalIsActive
-        .element(i)
-        .assign(
-          vec4(
-            sCurveData.element(initBase.add(16)),
-            sCurveData.element(initBase.add(17)),
-            sCurveData.element(initBase.add(18)),
-            sCurveData.element(initBase.add(19))
-          )
-        );
-      // startValues (vec4: startLifetime, startSize, startOpacity, startColorR)
-      sStartValues
-        .element(i)
-        .assign(
-          vec4(
-            sCurveData.element(initBase.add(20)),
-            sCurveData.element(initBase.add(21)),
-            sCurveData.element(initBase.add(22)),
-            sCurveData.element(initBase.add(23))
-          )
-        );
-      // startColorsExt (vec4: startColorG, startColorB, rotationSpeed, noiseOffset)
-      sStartColorsExt
-        .element(i)
-        .assign(
-          vec4(
-            sCurveData.element(initBase.add(24)),
-            sCurveData.element(initBase.add(25)),
-            sCurveData.element(initBase.add(26)),
-            sCurveData.element(initBase.add(27))
-          )
-        );
+      const initFlag = sCurveData.element(initBase.add(3));
+      If(initFlag.greaterThan(0.5), () => {
+        // Position (vec4: xyz + padding)
+        sPosition
+          .element(i)
+          .assign(
+            vec4(
+              sCurveData.element(initBase),
+              sCurveData.element(initBase.add(1)),
+              sCurveData.element(initBase.add(2)),
+              0
+            )
+          );
+        // Velocity (vec4: xyz + padding)
+        sVelocity
+          .element(i)
+          .assign(
+            vec4(
+              sCurveData.element(initBase.add(4)),
+              sCurveData.element(initBase.add(5)),
+              sCurveData.element(initBase.add(6)),
+              0
+            )
+          );
+        // Color (vec4: RGBA)
+        sColor
+          .element(i)
+          .assign(
+            vec4(
+              sCurveData.element(initBase.add(8)),
+              sCurveData.element(initBase.add(9)),
+              sCurveData.element(initBase.add(10)),
+              sCurveData.element(initBase.add(11))
+            )
+          );
+        // particleState (vec4: lifetime=0, size, rotation, startFrame)
+        sParticleState
+          .element(i)
+          .assign(
+            vec4(
+              sCurveData.element(initBase.add(12)),
+              sCurveData.element(initBase.add(13)),
+              sCurveData.element(initBase.add(14)),
+              sCurveData.element(initBase.add(15))
+            )
+          );
+        // orbitalIsActive (vec4: offsetXYZ, isActive=1)
+        sOrbitalIsActive
+          .element(i)
+          .assign(
+            vec4(
+              sCurveData.element(initBase.add(16)),
+              sCurveData.element(initBase.add(17)),
+              sCurveData.element(initBase.add(18)),
+              sCurveData.element(initBase.add(19))
+            )
+          );
+        // startValues (vec4: startLifetime, startSize, startOpacity, startColorR)
+        sStartValues
+          .element(i)
+          .assign(
+            vec4(
+              sCurveData.element(initBase.add(20)),
+              sCurveData.element(initBase.add(21)),
+              sCurveData.element(initBase.add(22)),
+              sCurveData.element(initBase.add(23))
+            )
+          );
+        // startColorsExt (vec4: startColorG, startColorB, rotationSpeed, noiseOffset)
+        sStartColorsExt
+          .element(i)
+          .assign(
+            vec4(
+              sCurveData.element(initBase.add(24)),
+              sCurveData.element(initBase.add(25)),
+              sCurveData.element(initBase.add(26)),
+              sCurveData.element(initBase.add(27))
+            )
+          );
 
-      // Clear the init flag so this particle isn't re-initialized next frame.
-      // The CPU array was already uploaded this frame; mutating the GPU copy
-      // here is fine because the CPU will only touch this slot again when
-      // the particle is re-emitted (at which point it writes initFlag=1 again).
-      sCurveData.element(initBase.add(3)).assign(float(0));
-    });
-
-    // Read orbitalIsActive to check isActive (w component).
-    // NOTE: TSL `return` inside an If callback only exits the JS callback,
-    // it does NOT generate a WGSL `return`.  We must wrap all active-particle
-    // logic inside a positive If guard instead.
-    const oiaVec = sOrbitalIsActive.element(i).toVar();
-    If(oiaVec.w.greaterThanEqual(float(0.5)), () => {
-      // Read packed state
-      // Position/velocity stored as vec4 (w=padding) for WebGPU alignment;
-      // operate on .xyz only.
-      const pos = sPosition.element(i).xyz.toVar();
-      const vel = sVelocity.element(i).xyz.toVar();
-      const ps = sParticleState.element(i).toVar();
-      const sv = sStartValues.element(i);
-
-      // Aliases for readability
-      const life = ps.x; // lifetime
-      const startLife = sv.x; // startLifetime
-
-      // === CORE PHYSICS ===
-
-      // Gravity
-      vel.assign(vel.sub(vec3(uGravityVelocity).mul(uDelta)));
-
-      // Force fields
-      if (forceFieldNodes) {
-        forceFieldNodes.apply({ pos, vel, delta: uDelta });
-      }
-
-      // World-space compensation
-      If(uSimSpaceWorld.greaterThan(0.5), () => {
-        pos.assign(pos.sub(vec3(uWorldPositionChange)));
+        // Clear the init flag so this particle isn't re-initialized next frame.
+        // The CPU array was already uploaded this frame; mutating the GPU copy
+        // here is fine because the CPU will only touch this slot again when
+        // the particle is re-emitted (at which point it writes initFlag=1 again).
+        sCurveData.element(initBase.add(3)).assign(float(0));
       });
 
-      // Velocity integration
-      pos.assign(pos.add(vel.mul(uDelta)));
+      // Read orbitalIsActive to check isActive (w component).
+      // NOTE: TSL `return` inside an If callback only exits the JS callback,
+      // it does NOT generate a WGSL `return`.  We must wrap all active-particle
+      // logic inside a positive If guard instead.
+      const oiaVec = sOrbitalIsActive.element(i).toVar();
+      If(oiaVec.w.greaterThanEqual(float(0.5)), () => {
+        // Read packed state
+        // Position/velocity stored as vec4 (w=padding) for WebGPU alignment;
+        // operate on .xyz only.
+        const pos = sPosition.element(i).xyz.toVar();
+        const vel = sVelocity.element(i).xyz.toVar();
+        const ps = sParticleState.element(i).toVar();
+        const sv = sStartValues.element(i);
 
-      // Collision planes — after position update, before modifiers
-      if (collisionPlaneNodes) {
-        collisionPlaneNodes.apply({
-          pos,
-          vel,
-          oiaVec,
-          sColorNode: sColor,
-          ps,
-          startLife,
-          particleIdx: i,
-          sOrbitalIsActiveNode: sOrbitalIsActive,
-        });
-      }
+        // Aliases for readability
+        const life = ps.x; // lifetime
+        const startLife = sv.x; // startLifetime
 
-      // Lifetime percentage for modifiers (computed before lifetime update
-      // to match the CPU path, which reads lifetime before incrementing it)
-      const lifePct = tslMin(ps.x.div(startLife), float(1.0));
+        // === CORE PHYSICS ===
 
-      // Lifetime update
-      ps.x.assign(ps.x.add(uDeltaMs));
+        // Gravity
+        vel.assign(vel.sub(vec3(uGravityVelocity).mul(uDelta)));
 
-      // === MODIFIERS ===
+        // Force fields
+        if (forceFieldNodes) {
+          forceFieldNodes.apply({ pos, vel, delta: uDelta });
+        }
 
-      // 1. Linear Velocity (curve-modulated)
-      if (flags.linearVelocity) {
-        const lvx =
-          curveMap.linearVelX >= 0
-            ? lookupCurve({
-                curveIndex: float(curveMap.linearVelX),
-                t: lifePct,
-              })
-            : float(0.0);
-        const lvy =
-          curveMap.linearVelY >= 0
-            ? lookupCurve({
-                curveIndex: float(curveMap.linearVelY),
-                t: lifePct,
-              })
-            : float(0.0);
-        const lvz =
-          curveMap.linearVelZ >= 0
-            ? lookupCurve({
-                curveIndex: float(curveMap.linearVelZ),
-                t: lifePct,
-              })
-            : float(0.0);
-        pos.assign(pos.add(vec3(lvx, lvy, lvz).mul(uDelta)));
-      }
+        // Velocity integration
+        //
+        // WORLD simulation space: the particle buffer stores world-space
+        //   coordinates. Gravity is a world-space vector, force fields are
+        //   world-space, and emissions are pre-translated on the CPU.
+        // LOCAL simulation space: the buffer is in the emitter's local frame;
+        //   gravityVelocity is CPU-transformed into local space, and force
+        //   field positions / directions are likewise pre-transformed.
+        //
+        // Either way, the kernel integrates pos += vel * dt without any
+        // per-frame emitter-motion compensation.
+        pos.assign(pos.add(vel.mul(uDelta)));
 
-      // 2. Orbital Velocity
-      if (flags.orbitalVelocity) {
-        const offset = vec3(oiaVec.x, oiaVec.y, oiaVec.z).toVar();
-        pos.assign(pos.sub(offset));
+        // Collision planes — after position update, before modifiers
+        if (collisionPlaneNodes) {
+          collisionPlaneNodes.apply({
+            pos,
+            vel,
+            oiaVec,
+            sColorNode: sColor,
+            ps,
+            startLife,
+            particleIdx: i,
+            sOrbitalIsActiveNode: sOrbitalIsActive,
+          });
+        }
 
-        const ovx =
-          curveMap.orbitalVelX >= 0
-            ? lookupCurve({
-                curveIndex: float(curveMap.orbitalVelX),
-                t: lifePct,
-              })
-            : float(0.0);
-        const ovy =
-          curveMap.orbitalVelY >= 0
-            ? lookupCurve({
-                curveIndex: float(curveMap.orbitalVelY),
-                t: lifePct,
-              })
-            : float(0.0);
-        const ovz =
-          curveMap.orbitalVelZ >= 0
-            ? lookupCurve({
-                curveIndex: float(curveMap.orbitalVelZ),
-                t: lifePct,
-              })
-            : float(0.0);
+        // Lifetime percentage for modifiers (computed before lifetime update
+        // to match the CPU path, which reads lifetime before incrementing it)
+        const lifePct = tslMin(ps.x.div(startLife), float(1.0));
 
-        // CPU uses Euler(speedX, speedZ, speedY, 'XYZ').  Intrinsic XYZ is
-        // equivalent to extrinsic Z→Y→X, so we apply:
-        //   1. Z rotation with angle = speedY (Euler.z)
-        //   2. Y rotation with angle = speedZ (Euler.y)
-        //   3. X rotation with angle = speedX (Euler.x)
-        // We compute the full rotation into fresh variables to avoid
-        // read-after-write hazards in TSL assign chains.
-        const ax = ovx.mul(uDelta); // speedX
-        const ay = ovz.mul(uDelta); // speedZ → Euler.y
-        const az = ovy.mul(uDelta); // speedY → Euler.z
+        // Lifetime update
+        ps.x.assign(ps.x.add(uDeltaMs));
 
-        // Step 1: Rotate around Z
-        const cosAz = cos(az);
-        const sinAz = sin(az);
-        const zx = offset.x.mul(cosAz).sub(offset.y.mul(sinAz));
-        const zy = offset.x.mul(sinAz).add(offset.y.mul(cosAz));
-        const zz = offset.z;
+        // === MODIFIERS ===
 
-        // Step 2: Rotate around Y (using Z-rotated values)
-        const cosAy = cos(ay);
-        const sinAy = sin(ay);
-        const yx = zx.mul(cosAy).add(zz.mul(sinAy));
-        const yy = zy;
-        const yz = zx.negate().mul(sinAy).add(zz.mul(cosAy));
+        // 1. Linear Velocity (curve-modulated)
+        if (flags.linearVelocity) {
+          const lvx =
+            curveMap.linearVelX >= 0
+              ? lookupCurve({
+                  curveIndex: float(curveMap.linearVelX),
+                  t: lifePct,
+                })
+              : float(0.0);
+          const lvy =
+            curveMap.linearVelY >= 0
+              ? lookupCurve({
+                  curveIndex: float(curveMap.linearVelY),
+                  t: lifePct,
+                })
+              : float(0.0);
+          const lvz =
+            curveMap.linearVelZ >= 0
+              ? lookupCurve({
+                  curveIndex: float(curveMap.linearVelZ),
+                  t: lifePct,
+                })
+              : float(0.0);
+          pos.assign(pos.add(vec3(lvx, lvy, lvz).mul(uDelta)));
+        }
 
-        // Step 3: Rotate around X (using Y-rotated values)
-        const cosAx = cos(ax);
-        const sinAx = sin(ax);
-        const fx = yx;
-        const fy = yy.mul(cosAx).sub(yz.mul(sinAx));
-        const fz = yy.mul(sinAx).add(yz.mul(cosAx));
+        // 2. Orbital Velocity
+        if (flags.orbitalVelocity) {
+          const offset = vec3(oiaVec.x, oiaVec.y, oiaVec.z).toVar();
+          pos.assign(pos.sub(offset));
 
-        offset.assign(vec3(fx, fy, fz));
+          const ovx =
+            curveMap.orbitalVelX >= 0
+              ? lookupCurve({
+                  curveIndex: float(curveMap.orbitalVelX),
+                  t: lifePct,
+                })
+              : float(0.0);
+          const ovy =
+            curveMap.orbitalVelY >= 0
+              ? lookupCurve({
+                  curveIndex: float(curveMap.orbitalVelY),
+                  t: lifePct,
+                })
+              : float(0.0);
+          const ovz =
+            curveMap.orbitalVelZ >= 0
+              ? lookupCurve({
+                  curveIndex: float(curveMap.orbitalVelZ),
+                  t: lifePct,
+                })
+              : float(0.0);
 
-        // Write back orbital offset (xyz), keep isActive (w)
-        oiaVec.x.assign(offset.x);
-        oiaVec.y.assign(offset.y);
-        oiaVec.z.assign(offset.z);
-        pos.assign(pos.add(offset));
-      }
+          // CPU uses Euler(speedX, speedZ, speedY, 'XYZ').  Intrinsic XYZ is
+          // equivalent to extrinsic Z→Y→X, so we apply:
+          //   1. Z rotation with angle = speedY (Euler.z)
+          //   2. Y rotation with angle = speedZ (Euler.y)
+          //   3. X rotation with angle = speedX (Euler.x)
+          // We compute the full rotation into fresh variables to avoid
+          // read-after-write hazards in TSL assign chains.
+          const ax = ovx.mul(uDelta); // speedX
+          const ay = ovz.mul(uDelta); // speedZ → Euler.y
+          const az = ovy.mul(uDelta); // speedY → Euler.z
 
-      // 3. Size Over Lifetime (ps.y = size, sv.y = startSize)
-      if (flags.sizeOverLifetime && curveMap.sizeOverLifetime >= 0) {
-        const multiplier = lookupCurve({
-          curveIndex: float(curveMap.sizeOverLifetime),
-          t: lifePct,
-        });
-        ps.y.assign(sv.y.mul(multiplier));
-      }
+          // Step 1: Rotate around Z
+          const cosAz = cos(az);
+          const sinAz = sin(az);
+          const zx = offset.x.mul(cosAz).sub(offset.y.mul(sinAz));
+          const zy = offset.x.mul(sinAz).add(offset.y.mul(cosAz));
+          const zz = offset.z;
 
-      // 4. Opacity Over Lifetime (sv.z = startOpacity)
-      if (flags.opacityOverLifetime && curveMap.opacityOverLifetime >= 0) {
-        const multiplier = lookupCurve({
-          curveIndex: float(curveMap.opacityOverLifetime),
-          t: lifePct,
-        });
-        const col = sColor.element(i).toVar();
-        col.w.assign(sv.z.mul(multiplier));
-        sColor.element(i).assign(col);
-      }
+          // Step 2: Rotate around Y (using Z-rotated values)
+          const cosAy = cos(ay);
+          const sinAy = sin(ay);
+          const yx = zx.mul(cosAy).add(zz.mul(sinAy));
+          const yy = zy;
+          const yz = zx.negate().mul(sinAy).add(zz.mul(cosAy));
 
-      // 5. Color Over Lifetime
-      //    sv.w = startColorR, startColorsExt.x = startColorG, .y = startColorB
-      if (flags.colorOverLifetime) {
-        const col = sColor.element(i).toVar();
-        const sce = sStartColorsExt.element(i);
-        if (curveMap.colorR >= 0) {
-          const rMul = lookupCurve({
-            curveIndex: float(curveMap.colorR),
+          // Step 3: Rotate around X (using Y-rotated values)
+          const cosAx = cos(ax);
+          const sinAx = sin(ax);
+          const fx = yx;
+          const fy = yy.mul(cosAx).sub(yz.mul(sinAx));
+          const fz = yy.mul(sinAx).add(yz.mul(cosAx));
+
+          offset.assign(vec3(fx, fy, fz));
+
+          // Write back orbital offset (xyz), keep isActive (w)
+          oiaVec.x.assign(offset.x);
+          oiaVec.y.assign(offset.y);
+          oiaVec.z.assign(offset.z);
+          pos.assign(pos.add(offset));
+        }
+
+        // 3. Size Over Lifetime (ps.y = size, sv.y = startSize)
+        if (flags.sizeOverLifetime && curveMap.sizeOverLifetime >= 0) {
+          const multiplier = lookupCurve({
+            curveIndex: float(curveMap.sizeOverLifetime),
             t: lifePct,
           });
-          col.x.assign(sv.w.mul(rMul));
+          ps.y.assign(sv.y.mul(multiplier));
         }
-        if (curveMap.colorG >= 0) {
-          const gMul = lookupCurve({
-            curveIndex: float(curveMap.colorG),
+
+        // 4. Opacity Over Lifetime (sv.z = startOpacity)
+        if (flags.opacityOverLifetime && curveMap.opacityOverLifetime >= 0) {
+          const multiplier = lookupCurve({
+            curveIndex: float(curveMap.opacityOverLifetime),
             t: lifePct,
           });
-          col.y.assign(sce.x.mul(gMul));
+          const col = sColor.element(i).toVar();
+          col.w.assign(sv.z.mul(multiplier));
+          sColor.element(i).assign(col);
         }
-        if (curveMap.colorB >= 0) {
-          const bMul = lookupCurve({
-            curveIndex: float(curveMap.colorB),
-            t: lifePct,
+
+        // 5. Color Over Lifetime
+        //    sv.w = startColorR, startColorsExt.x = startColorG, .y = startColorB
+        if (flags.colorOverLifetime) {
+          const col = sColor.element(i).toVar();
+          const sce = sStartColorsExt.element(i);
+          if (curveMap.colorR >= 0) {
+            const rMul = lookupCurve({
+              curveIndex: float(curveMap.colorR),
+              t: lifePct,
+            });
+            col.x.assign(sv.w.mul(rMul));
+          }
+          if (curveMap.colorG >= 0) {
+            const gMul = lookupCurve({
+              curveIndex: float(curveMap.colorG),
+              t: lifePct,
+            });
+            col.y.assign(sce.x.mul(gMul));
+          }
+          if (curveMap.colorB >= 0) {
+            const bMul = lookupCurve({
+              curveIndex: float(curveMap.colorB),
+              t: lifePct,
+            });
+            col.z.assign(sce.y.mul(bMul));
+          }
+          sColor.element(i).assign(col);
+        }
+
+        // 6. Rotation Over Lifetime (startColorsExt.z = rotationSpeed, ps.z = rotation)
+        if (flags.rotationOverLifetime) {
+          const sce = sStartColorsExt.element(i);
+          ps.z.assign(ps.z.add(sce.z.mul(uDelta).mul(float(0.02))));
+        }
+
+        // 7. Noise (startColorsExt.w = noiseOffset)
+        if (flags.noise) {
+          const sce = sStartColorsExt.element(i);
+          // Match CPU FBM input scaling: FBM internally multiplies by `this._scale = frequency`
+          const noisePos = lifePct
+            .add(sce.w)
+            .mul(10.0)
+            .mul(uNoiseStrength)
+            .mul(uNoiseFrequency);
+
+          const noiseX = snoise3D({ v: vec3(noisePos, float(0), float(0)) });
+          const noiseY = snoise3D({
+            v: vec3(noisePos, noisePos, float(0)),
           });
-          col.z.assign(sce.y.mul(bMul));
+          const noiseZ = snoise3D({
+            v: vec3(noisePos, noisePos, noisePos),
+          });
+
+          // Apply to position
+          pos.assign(
+            pos.add(
+              vec3(noiseX, noiseY, noiseZ).mul(uNoisePower).mul(uNoisePosAmount)
+            )
+          );
+
+          // Apply to rotation (ps.z)
+          If(uNoiseRotAmount.greaterThan(0.001), () => {
+            ps.z.assign(ps.z.add(noiseX.mul(uNoisePower).mul(uNoiseRotAmount)));
+          });
+
+          // Apply to size (ps.y)
+          If(uNoiseSizeAmount.greaterThan(0.001), () => {
+            ps.y.assign(
+              ps.y.add(noiseX.mul(uNoisePower).mul(uNoiseSizeAmount))
+            );
+          });
         }
-        sColor.element(i).assign(col);
-      }
 
-      // 6. Rotation Over Lifetime (startColorsExt.z = rotationSpeed, ps.z = rotation)
-      if (flags.rotationOverLifetime) {
-        const sce = sStartColorsExt.element(i);
-        ps.z.assign(ps.z.add(sce.z.mul(uDelta).mul(float(0.02))));
-      }
+        // === WRITE BACK ===
 
-      // 7. Noise (startColorsExt.w = noiseOffset)
-      if (flags.noise) {
-        const sce = sStartColorsExt.element(i);
-        // Match CPU FBM input scaling: FBM internally multiplies by `this._scale = frequency`
-        const noisePos = lifePct
-          .add(sce.w)
-          .mul(10.0)
-          .mul(uNoiseStrength)
-          .mul(uNoiseFrequency);
+        sPosition.element(i).assign(vec4(pos, 0));
+        sVelocity.element(i).assign(vec4(vel, 0));
+        sParticleState.element(i).assign(ps);
+        sOrbitalIsActive.element(i).assign(oiaVec);
 
-        const noiseX = snoise3D({ v: vec3(noisePos, float(0), float(0)) });
-        const noiseY = snoise3D({
-          v: vec3(noisePos, noisePos, float(0)),
+        // Death check
+        If(ps.x.greaterThan(startLife), () => {
+          // Set isActive = 0 and zero color
+          const deadOia = sOrbitalIsActive.element(i).toVar();
+          deadOia.w.assign(float(0));
+          sOrbitalIsActive.element(i).assign(deadOia);
+          sColor.element(i).assign(vec4(0));
         });
-        const noiseZ = snoise3D({
-          v: vec3(noisePos, noisePos, noisePos),
-        });
-
-        // Apply to position
-        pos.assign(
-          pos.add(
-            vec3(noiseX, noiseY, noiseZ).mul(uNoisePower).mul(uNoisePosAmount)
-          )
-        );
-
-        // Apply to rotation (ps.z)
-        If(uNoiseRotAmount.greaterThan(0.001), () => {
-          ps.z.assign(ps.z.add(noiseX.mul(uNoisePower).mul(uNoiseRotAmount)));
-        });
-
-        // Apply to size (ps.y)
-        If(uNoiseSizeAmount.greaterThan(0.001), () => {
-          ps.y.assign(ps.y.add(noiseX.mul(uNoisePower).mul(uNoiseSizeAmount)));
-        });
-      }
-
-      // === WRITE BACK ===
-
-      sPosition.element(i).assign(vec4(pos, 0));
-      sVelocity.element(i).assign(vec4(vel, 0));
-      sParticleState.element(i).assign(ps);
-      sOrbitalIsActive.element(i).assign(oiaVec);
-
-      // Death check
-      If(ps.x.greaterThan(startLife), () => {
-        // Set isActive = 0 and zero color
-        const deadOia = sOrbitalIsActive.element(i).toVar();
-        deadOia.w.assign(float(0));
-        sOrbitalIsActive.element(i).assign(deadOia);
-        sColor.element(i).assign(vec4(0));
       });
-    });
+    }); // end If(i < maxParticles) bounds check
   });
 
   const computeNode = compute(computeKernel(), maxParticles);
@@ -964,8 +1026,6 @@ export function createModifierComputeUpdate(
       delta: uDelta,
       deltaMs: uDeltaMs,
       gravityVelocity: uGravityVelocity,
-      worldPositionChange: uWorldPositionChange,
-      simulationSpaceWorld: uSimSpaceWorld,
       noiseStrength: uNoiseStrength,
       noisePower: uNoisePower,
       noiseFrequency: uNoiseFrequency,

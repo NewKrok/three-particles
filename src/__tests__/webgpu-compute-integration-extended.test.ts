@@ -261,7 +261,7 @@ describe('GPU compute integration', () => {
   });
 
   it('handles world space simulation with GPU compute', () => {
-    const { factory, pipeline } = createFullGPUFactory(10);
+    const { factory } = createFullGPUFactory(10);
     registerTSLMaterialFactory(factory);
 
     const ps = createParticleSystem(
@@ -276,9 +276,58 @@ describe('GPU compute integration', () => {
       1000
     );
 
+    // WORLD-space GPU systems hold matrixWorld at identity — the buffer
+    // stores world coordinates directly, so no per-frame compensation
+    // uniform is needed.
+    expect(ps.instance.matrixWorldAutoUpdate).toBe(false);
     ps.update(1016);
+    expect(ps.instance.matrixWorld.elements).toEqual(
+      new THREE.Matrix4().elements
+    );
+    ps.dispose();
+  });
 
-    expect(pipeline.uniforms.simulationSpaceWorld.value).toBe(1);
+  it('GPU WORLD: instance is not wrapped and matrixWorld stays identity under parent motion', () => {
+    // Regression guard for the Gyroscope-removal refactor: even after the
+    // parent group translates and rotates, the GPU-backed particle system's
+    // `instance` must remain the raw renderable object (no wrapper
+    // Object3D) and its matrixWorld must stay at identity so that the
+    // world-coordinate storage buffer renders as-is.
+    const { factory } = createFullGPUFactory(10);
+    registerTSLMaterialFactory(factory);
+
+    const ps = createParticleSystem(
+      {
+        maxParticles: 10,
+        duration: 5,
+        looping: true,
+        emission: { rateOverTime: 10 },
+        simulationSpace: SimulationSpace.WORLD,
+        simulationBackend: SimulationBackend.GPU,
+      },
+      1000
+    );
+
+    // No Gyroscope / wrapper — instance is the direct renderable.
+    expect(ps.instance).toBeInstanceOf(THREE.Object3D);
+    expect(ps.instance.children).toHaveLength(0);
+
+    // Reparent and shove the parent around between ticks.
+    const parent = new THREE.Group();
+    parent.add(ps.instance);
+    parent.position.set(50, 0, 0);
+    parent.quaternion.setFromEuler(new THREE.Euler(0, Math.PI / 2, 0));
+    parent.updateMatrixWorld(true);
+
+    ps.update(1016);
+    parent.position.set(-30, 12, 7);
+    parent.updateMatrixWorld(true);
+    ps.update(1032);
+
+    expect(ps.instance.matrixWorldAutoUpdate).toBe(false);
+    expect(ps.instance.matrixWorld.elements).toEqual(
+      new THREE.Matrix4().elements
+    );
     ps.dispose();
   });
 });

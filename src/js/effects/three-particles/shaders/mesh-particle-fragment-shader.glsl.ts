@@ -75,6 +75,7 @@ const MeshParticleFragmentShader = `
     }
 
     #include <logdepthbuf_fragment>
+    #include <colorspace_fragment>
   }
 `;
 

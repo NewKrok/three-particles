@@ -45,7 +45,7 @@ function animate() {
 
 ### ParticleSystem Methods
 
-- `instance` — The Three.js Points or Gyroscope object (add to scene)
+- `instance` — The Three.js Points or Mesh object (add to scene)
 - `pauseEmitter()` — Pause particle emission
 - `resumeEmitter()` — Resume particle emission
 - `dispose()` — Clean up and free resources
@@ -227,6 +227,8 @@ enableWebGPU();
 import * as THREE from "three/webgpu";
 const renderer = new THREE.WebGPURenderer({ antialias: true });
 await renderer.init();
+// No outputColorSpace override needed — the library uses the standard
+// three.js linear workflow and works with the default (SRGBColorSpace).
 
 // 3. Create a GPU-accelerated particle system
 import { createParticleSystem, SimulationBackend } from "@newkrok/three-particles";

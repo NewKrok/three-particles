@@ -4,30 +4,13 @@ import { createParticleSystem } from '../js/effects/three-particles/three-partic
 import { ParticleSystem } from '../js/effects/three-particles/types.js';
 
 const countActiveParticles = (ps: ParticleSystem): number => {
-  const points = ps.instance as THREE.Object3D;
-  let geometry: THREE.BufferGeometry;
-  if ((points as THREE.Points).geometry) {
-    geometry = (points as THREE.Points).geometry;
-  } else {
-    // For world space, the instance is a Gyroscope wrapper; get child
-    const child = points.children[0] as THREE.Points;
-    geometry = child.geometry;
-  }
+  const geometry = (ps.instance as THREE.Points).geometry;
   const isActiveAttr = geometry.attributes.isActive;
   let count = 0;
   for (let i = 0; i < isActiveAttr.count; i++) {
     if (isActiveAttr.getX(i)) count++;
   }
   return count;
-};
-
-const getWorldSpaceAttributes = (ps: ParticleSystem) => {
-  const instance = ps.instance as THREE.Object3D;
-  if ((instance as THREE.Points).geometry) {
-    return (instance as THREE.Points).geometry.attributes;
-  }
-  const child = instance.children[0] as THREE.Points;
-  return child.geometry.attributes;
 };
 
 const createWorldSpaceSystem = (
@@ -60,12 +43,13 @@ const createWorldSpaceSystem = (
 };
 
 describe('World Simulation Space', () => {
-  it('should create a Gyroscope wrapper for WORLD simulation space', () => {
+  it('should expose the particle system directly (no wrapper) in WORLD space', () => {
     const { ps } = createWorldSpaceSystem();
 
-    // In world space, instance is a Gyroscope wrapper
+    // After the WORLD-space refactor, instance is the Points/Mesh itself;
+    // no Gyroscope wrapper is used.
     expect(ps.instance).toBeDefined();
-    expect(ps.instance.children.length).toBeGreaterThan(0);
+    expect(ps.instance).toBeInstanceOf(THREE.Points);
 
     ps.dispose();
   });
@@ -86,8 +70,7 @@ describe('World Simulation Space', () => {
     step(16);
 
     // Move the instance
-    const child = ps.instance.children[0] as THREE.Points;
-    child.position.set(10, 0, 0);
+    (ps.instance as THREE.Points).position.set(10, 0, 0);
 
     step(32);
     step(100);
@@ -112,8 +95,7 @@ describe('World Simulation Space', () => {
     expect(initialActive).toBeGreaterThan(0);
 
     // Move emitter - particles should stay in world position
-    const child = ps.instance.children[0] as THREE.Points;
-    child.position.set(5, 0, 0);
+    (ps.instance as THREE.Points).position.set(5, 0, 0);
     step(200);
 
     // System should still function
@@ -155,7 +137,7 @@ describe('World Simulation Space', () => {
     ps.dispose();
   });
 
-  it('should remove the Gyroscope wrapper from scene when disposed', () => {
+  it('should remove the particle system from scene when disposed', () => {
     const scene = new THREE.Group();
     const { ps, step } = createWorldSpaceSystem();
     scene.add(ps.instance);
@@ -189,7 +171,7 @@ describe('World Simulation Space', () => {
 });
 
 describe('Local Simulation Space', () => {
-  it('should not create a Gyroscope wrapper for LOCAL space', () => {
+  it('should expose the Points object directly for LOCAL space', () => {
     const ps = createParticleSystem(
       {
         maxParticles: 10,

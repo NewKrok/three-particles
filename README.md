@@ -177,6 +177,10 @@ enableWebGPU();
 import * as THREE from "three/webgpu";
 const renderer = new THREE.WebGPURenderer({ antialias: true });
 await renderer.init();
+// No special outputColorSpace handling needed — the library follows the
+// standard three.js linear workflow (user colors sRGB, shader math linear,
+// renderer converts on output). Leave outputColorSpace at its default
+// (SRGBColorSpace).
 
 // 3. Create a GPU-accelerated particle system
 import { createParticleSystem, SimulationBackend } from "@newkrok/three-particles";
@@ -235,6 +239,22 @@ WebGPU is fully opt-in and non-breaking:
 Automatically generated TypeDoc: [https://newkrok.github.io/three-particles/api/](https://newkrok.github.io/three-particles/api/)
 
 ## Important Notes
+
+### Color Conventions
+
+All RGB values in particle configs (`startColor`, `backgroundColor`) are
+**sRGB** — the same convention used everywhere else in three.js. Pass the
+value a color picker gives you (e.g. `{ r: 1, g: 0, b: 0 }` for pure red)
+and the renderer will display it correctly.
+
+Internally the library decodes these to linear for shader math and relies
+on the renderer's standard output pass to convert back to sRGB on the way
+to the framebuffer. No special `outputColorSpace` setup is required; the
+three.js default (`SRGBColorSpace`) works.
+
+User-supplied color map textures should also be tagged as sRGB
+(`texture.colorSpace = THREE.SRGBColorSpace`) — this is also the
+three.js default for color textures loaded via `TextureLoader`.
 
 ### Color Over Lifetime
 

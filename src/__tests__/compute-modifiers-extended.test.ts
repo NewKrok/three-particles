@@ -291,8 +291,6 @@ describe('createModifierComputeUpdate — modifier flag coverage', () => {
     expect(pipeline.curveDataLength).toBe(CURVE_RESOLUTION * 11);
     expect(pipeline.uniforms.delta).toBeDefined();
     expect(pipeline.uniforms.gravityVelocity).toBeDefined();
-    expect(pipeline.uniforms.worldPositionChange).toBeDefined();
-    expect(pipeline.uniforms.simulationSpaceWorld).toBeDefined();
     expect(pipeline.uniforms.noiseStrength).toBeDefined();
     expect(pipeline.forceFieldInfo).not.toBeNull();
     expect(pipeline.forceFieldInfo!.countUniform).toBeDefined();
@@ -374,8 +372,6 @@ describe('createModifierComputeUpdate — uniforms', () => {
     expect(pipeline.uniforms.delta).toBeDefined();
     expect(pipeline.uniforms.deltaMs).toBeDefined();
     expect(pipeline.uniforms.gravityVelocity).toBeDefined();
-    expect(pipeline.uniforms.worldPositionChange).toBeDefined();
-    expect(pipeline.uniforms.simulationSpaceWorld).toBeDefined();
   });
 
   it('exposes noise uniforms even when noise is disabled', () => {

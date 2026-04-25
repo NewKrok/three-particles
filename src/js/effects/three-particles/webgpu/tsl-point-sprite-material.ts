@@ -36,7 +36,6 @@ import {
   computeSpriteSheetUV,
   computeSoftParticleFade,
   applyBackgroundDiscard,
-  compensateOutputSRGB,
 } from './tsl-shared.js';
 import type * as THREE from 'three';
 
@@ -170,7 +169,7 @@ export function createPointSpriteTSLMaterial(
     outColor.assign(vec4(outColor.xyz, outColor.w.mul(softFade)));
     Discard(outColor.w.lessThan(ALPHA_DISCARD_THRESHOLD));
 
-    return compensateOutputSRGB({ color: outColor });
+    return outColor;
   })();
 
   // ── Material assembly ───────────────────────────────────────────────────

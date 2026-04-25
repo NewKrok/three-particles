@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { sRGBToLinear } from '../js/effects/three-particles/color-utils.js';
 import {
   Shape,
   LifeTimeCurve,
@@ -635,6 +636,8 @@ describe('Texture sheet animation lifecycle', () => {
 
 describe('Color lifecycle', () => {
   it('should set random color between min and max on activation', () => {
+    // Config values are authored in sRGB; the buffer stores linear.
+    // Convert bounds through the same transfer so the range check is valid.
     const { ps, step } = createTestSystem({
       startColor: {
         min: { r: 0.2, g: 0.3, b: 0.4 },
@@ -647,12 +650,12 @@ describe('Color lifecycle', () => {
     const attrs = getAttributes(ps);
     for (let i = 0; i < attrs.isActive.count; i++) {
       if (attrs.isActive.getX(i)) {
-        expect(attrs.color.getX(i)).toBeGreaterThanOrEqual(0.2);
-        expect(attrs.color.getX(i)).toBeLessThanOrEqual(0.8);
-        expect(attrs.color.getY(i)).toBeGreaterThanOrEqual(0.3);
-        expect(attrs.color.getY(i)).toBeLessThanOrEqual(0.9);
-        expect(attrs.color.getZ(i)).toBeGreaterThanOrEqual(0.4);
-        expect(attrs.color.getZ(i)).toBeLessThanOrEqual(1.0);
+        expect(attrs.color.getX(i)).toBeGreaterThanOrEqual(sRGBToLinear(0.2));
+        expect(attrs.color.getX(i)).toBeLessThanOrEqual(sRGBToLinear(0.8));
+        expect(attrs.color.getY(i)).toBeGreaterThanOrEqual(sRGBToLinear(0.3));
+        expect(attrs.color.getY(i)).toBeLessThanOrEqual(sRGBToLinear(0.9));
+        expect(attrs.color.getZ(i)).toBeGreaterThanOrEqual(sRGBToLinear(0.4));
+        expect(attrs.color.getZ(i)).toBeLessThanOrEqual(sRGBToLinear(1.0));
         break;
       }
     }

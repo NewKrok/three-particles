@@ -390,13 +390,14 @@ describe('Sub-emitters', () => {
       // Fix: should NOT be disposed; Bug: would be disposed (isActiveArr was undefined for WORLD)
       ps.update({ now: startTime + 100, delta: 0.1, elapsed: 0.1 });
 
-      // Sub-emitter wrapper must still be in scene
+      // Sub-emitter instance must still be in scene
       expect(scene.children.length).toBe(2);
 
-      // The sub-emitter wrapper's child (THREE.Points) must have active particles
-      const subWrapper = scene.children.find((c) => c !== ps.instance)!;
-      expect(subWrapper).toBeDefined();
-      const subPoints = subWrapper.children[0] as THREE.Points;
+      // Sub-emitter instance is the Points object directly (no wrapper).
+      const subPoints = scene.children.find(
+        (c) => c !== ps.instance
+      ) as THREE.Points;
+      expect(subPoints).toBeDefined();
       expect(subPoints?.geometry?.attributes?.isActive).toBeDefined();
 
       const isActiveAttr = subPoints.geometry.attributes.isActive;

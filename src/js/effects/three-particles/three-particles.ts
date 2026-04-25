@@ -1,7 +1,7 @@
 import { ObjectUtils } from '@newkrok/three-utils';
 import * as THREE from 'three';
-import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js';
 import { FBM } from 'three-noise/build/three-noise.module.js';
+import { rgbSRGBToLinear, sRGBToLinear } from './color-utils.js';
 import InstancedParticleFragmentShader from './shaders/instanced-particle-fragment-shader.glsl.js';
 import InstancedParticleVertexShader from './shaders/instanced-particle-vertex-shader.glsl.js';
 import MeshParticleFragmentShader from './shaders/mesh-particle-fragment-shader.glsl.js';
@@ -216,12 +216,32 @@ export const registerTSLMaterialFactory = (
 
 // Pre-allocated objects for updateParticleSystemInstance to avoid GC pressure
 const _subEmitterPosition = new THREE.Vector3();
+const _subLocalPosition = new THREE.Vector3();
 const _shadowOrbitalEuler = new THREE.Euler(0, 0, 0, 'XYZ');
 const _lastWorldPositionSnapshot = new THREE.Vector3();
 // Force field local-space conversion helpers (reused across frames)
 const _localForceFieldPos = new THREE.Vector3();
 const _localForceFieldDir = new THREE.Vector3();
 const _inverseQuat = new THREE.Quaternion();
+
+/**
+ * Compares two typed-array slices for value equality.
+ * Used to gate GPU buffer `needsUpdate` flagging so we only re-upload when
+ * the encoded data actually changed. See the force-field / collision-plane
+ * upload block in `updateParticleSystemInstance` for the reasoning.
+ */
+const arraySlicesEqual = (
+  a: Float32Array,
+  aOffset: number,
+  b: Float32Array,
+  bOffset: number,
+  length: number
+): boolean => {
+  for (let i = 0; i < length; i++) {
+    if (a[aOffset + i] !== b[bOffset + i]) return false;
+  }
+  return true;
+};
 let _localForceFields: Array<NormalizedForceFieldConfig> = [];
 // Collision plane local-space conversion helpers (reused across frames)
 const _localCollisionPlanePos = new THREE.Vector3();
@@ -555,14 +575,10 @@ const destroyParticleSystem = (particleSystem: THREE.Points | THREE.Mesh) => {
   createdParticleSystems = createdParticleSystems.filter(
     ({
       particleSystem: savedParticleSystem,
-      wrapper,
       trailMesh,
       generalData: { particleSystemId },
     }) => {
-      if (
-        savedParticleSystem !== particleSystem &&
-        wrapper !== particleSystem
-      ) {
+      if (savedParticleSystem !== particleSystem) {
         return true;
       }
 
@@ -584,7 +600,6 @@ const destroyParticleSystem = (particleSystem: THREE.Points | THREE.Mesh) => {
 
       if (savedParticleSystem.parent)
         savedParticleSystem.parent.remove(savedParticleSystem);
-      if (wrapper?.parent) wrapper.parent.remove(wrapper);
       return false;
     }
   );
@@ -660,9 +675,10 @@ export const createParticleSystem = (
     lastWorldPosition: new THREE.Vector3(-99999),
     currentWorldPosition: new THREE.Vector3(-99999),
     worldPositionChange: new THREE.Vector3(),
+    sourceWorldMatrix: new THREE.Matrix4(),
     worldQuaternion: new THREE.Quaternion(),
     wrapperQuaternion: new THREE.Quaternion(),
-    lastWorldQuaternion: new THREE.Quaternion(-99999),
+    worldScale: new THREE.Vector3(1, 1, 1),
     worldEuler: new THREE.Euler(),
     gravityVelocity: new THREE.Vector3(0, 0, 0),
     startValues: {},
@@ -1023,7 +1039,9 @@ export const createParticleSystem = (
     useFPSForFrameIndex: {
       value: textureSheetAnimation.timeMode === TimeMode.FPS,
     },
-    backgroundColor: { value: renderer.backgroundColor },
+    // backgroundColor is authored in sRGB; convert to linear so the
+    // fragment comparison against the (now linear) texture sample is valid.
+    backgroundColor: { value: rgbSRGBToLinear(renderer.backgroundColor) },
     discardBackgroundColor: { value: renderer.discardBackgroundColor },
     backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
     ...(useInstancing ? { viewportHeight: { value: 1.0 } } : {}),
@@ -1180,16 +1198,22 @@ export const createParticleSystem = (
       : 0;
     scalarArray[base + S_SIZE] = generalData.startValues.startSize[i];
     scalarArray[base + S_ROTATION] = 0;
+    // User color inputs are sRGB; the buffer stores linear so that shader
+    // math, texture modulation, and the renderer's linear→sRGB output pass
+    // all agree. See docs/color-pipeline-standardization-plan.md.
     const colorRandomRatio = Math.random();
-    scalarArray[base + S_COLOR_R] =
+    scalarArray[base + S_COLOR_R] = sRGBToLinear(
       startColor.min!.r! +
-      colorRandomRatio * (startColor.max!.r! - startColor.min!.r!);
-    scalarArray[base + S_COLOR_G] =
+        colorRandomRatio * (startColor.max!.r! - startColor.min!.r!)
+    );
+    scalarArray[base + S_COLOR_G] = sRGBToLinear(
       startColor.min!.g! +
-      colorRandomRatio * (startColor.max!.g! - startColor.min!.g!);
-    scalarArray[base + S_COLOR_B] =
+        colorRandomRatio * (startColor.max!.g! - startColor.min!.g!)
+    );
+    scalarArray[base + S_COLOR_B] = sRGBToLinear(
       startColor.min!.b! +
-      colorRandomRatio * (startColor.max!.b! - startColor.min!.b!);
+        colorRandomRatio * (startColor.max!.b! - startColor.min!.b!)
+    );
     scalarArray[base + S_COLOR_A] = 0;
   }
 
@@ -1362,20 +1386,25 @@ export const createParticleSystem = (
     if (generalData.noise.offsets)
       generalData.noise.offsets[particleIndex] = Math.random() * 100;
 
+    // sRGB → linear on emit; buffer + startValues mirrors both store linear.
+    // See docs/color-pipeline-standardization-plan.md.
     const colorRandomRatio = Math.random();
     const cfgStartColor = normalizedConfig.startColor;
 
-    scalarArray[base + S_COLOR_R] =
+    scalarArray[base + S_COLOR_R] = sRGBToLinear(
       cfgStartColor.min!.r! +
-      colorRandomRatio * (cfgStartColor.max!.r! - cfgStartColor.min!.r!);
+        colorRandomRatio * (cfgStartColor.max!.r! - cfgStartColor.min!.r!)
+    );
 
-    scalarArray[base + S_COLOR_G] =
+    scalarArray[base + S_COLOR_G] = sRGBToLinear(
       cfgStartColor.min!.g! +
-      colorRandomRatio * (cfgStartColor.max!.g! - cfgStartColor.min!.g!);
+        colorRandomRatio * (cfgStartColor.max!.g! - cfgStartColor.min!.g!)
+    );
 
-    scalarArray[base + S_COLOR_B] =
+    scalarArray[base + S_COLOR_B] = sRGBToLinear(
       cfgStartColor.min!.b! +
-      colorRandomRatio * (cfgStartColor.max!.b! - cfgStartColor.min!.b!);
+        colorRandomRatio * (cfgStartColor.max!.b! - cfgStartColor.min!.b!)
+    );
 
     generalData.startValues.startColorR[particleIndex] =
       scalarArray[base + S_COLOR_R];
@@ -1456,12 +1485,32 @@ export const createParticleSystem = (
     // read the particle's approximate position without GPU readback.
     {
       const positionIndex = particleIndex * 3;
-      aPosition.array[positionIndex] =
-        position.x + startPositions[particleIndex].x;
-      aPosition.array[positionIndex + 1] =
-        position.y + startPositions[particleIndex].y;
-      aPosition.array[positionIndex + 2] =
-        position.z + startPositions[particleIndex].z;
+      // WORLD simulation space: the buffer stores world coordinates. The
+      // shape-emission offset (startPositions) is rotated by the emitter's
+      // world rotation AND scaled by the emitter's world scale, matching
+      // Unity's Shape module when Scaling Mode is Local/Hierarchy. The
+      // emitter's world translation is then added so the particle starts
+      // at the correct world-space location.
+      //
+      // LOCAL simulation space: the buffer is in the emitter's local
+      // frame; the shape offset is added as-is (parent scale affects the
+      // rendered size via particleSystem.matrixWorld at draw time).
+      const isWorld =
+        normalizedConfig.simulationSpace === SimulationSpace.WORLD;
+      const ox = startPositions[particleIndex].x;
+      const oy = startPositions[particleIndex].y;
+      const oz = startPositions[particleIndex].z;
+      if (isWorld) {
+        const m = generalData.sourceWorldMatrix.elements;
+        const s = generalData.worldScale;
+        aPosition.array[positionIndex] = position.x + ox * s.x + m[12];
+        aPosition.array[positionIndex + 1] = position.y + oy * s.y + m[13];
+        aPosition.array[positionIndex + 2] = position.z + oz * s.z + m[14];
+      } else {
+        aPosition.array[positionIndex] = position.x + ox;
+        aPosition.array[positionIndex + 1] = position.y + oy;
+        aPosition.array[positionIndex + 2] = position.z + oz;
+      }
       if (!useGPUCompute) {
         aPosition.needsUpdate = true;
       }
@@ -1527,15 +1576,28 @@ export const createParticleSystem = (
     scalarArray[base + S_LIFETIME] = 0;
 
     if (useGPUCompute && gpuPipeline) {
-      // Write all particle data to GPU storage buffers
+      // Write all particle data to GPU storage buffers.
+      //
+      // WORLD simulation space: the GPU buffer stores world coordinates.
+      // The shape offset (startPositions) is scaled by the emitter's
+      // world scale (Unity Shape-module parity) and then offset by the
+      // emitter's world translation. LOCAL space uses the shape offset
+      // as-is since the buffer is in the emitter's local frame.
+      const isWorld =
+        normalizedConfig.simulationSpace === SimulationSpace.WORLD;
+      const m = generalData.sourceWorldMatrix.elements;
+      const s = generalData.worldScale;
+      const ox = startPositions[particleIndex].x;
+      const oy = startPositions[particleIndex].y;
+      const oz = startPositions[particleIndex].z;
       _tslMaterialFactory!.writeParticleToModifierBuffers!(
         gpuPipeline.buffers,
         particleIndex,
         {
           position: {
-            x: position.x + startPositions[particleIndex].x,
-            y: position.y + startPositions[particleIndex].y,
-            z: position.z + startPositions[particleIndex].z,
+            x: position.x + (isWorld ? ox * s.x + m[12] : ox),
+            y: position.y + (isWorld ? oy * s.y + m[13] : oy),
+            z: position.z + (isWorld ? oz * s.z + m[14] : oz),
           },
           velocity: {
             x: velocities[particleIndex].x,
@@ -1604,13 +1666,7 @@ export const createParticleSystem = (
   const cleanupCompletedInstances = (instances: Array<ParticleSystem>) => {
     for (let i = instances.length - 1; i >= 0; i--) {
       const sub = instances[i];
-      const obj3d =
-        sub.instance instanceof THREE.Points ||
-        sub.instance instanceof THREE.Mesh
-          ? sub.instance
-          : (sub.instance.children[0] as THREE.Points | THREE.Mesh | undefined);
-      const geomAttrs = (obj3d as THREE.Points | THREE.Mesh | undefined)
-        ?.geometry?.attributes;
+      const geomAttrs = sub.instance.geometry?.attributes;
       const isActiveAttr = geomAttrs
         ? (geomAttrs.isActive ?? geomAttrs.instanceIsActive)
         : undefined;
@@ -1639,6 +1695,16 @@ export const createParticleSystem = (
     velocity: THREE.Vector3,
     spawnNow: number
   ) => {
+    // The death/birth callbacks pass `position` in world coordinates. The
+    // sub-emitter becomes a child of particleSystem.parent, so its
+    // transform.position must be expressed in that parent's local frame.
+    const parentObj = particleSystem.parent;
+    _subLocalPosition.copy(position);
+    if (parentObj) {
+      parentObj.updateMatrixWorld();
+      parentObj.worldToLocal(_subLocalPosition);
+    }
+
     for (const subConfig of configs) {
       const instances = subEmitterInstancesMap.get(subConfig)!;
       const maxInst = subConfig.maxInstances ?? 32;
@@ -1657,7 +1723,11 @@ export const createParticleSystem = (
           simulationBackend: SimulationBackend.CPU,
           transform: {
             ...subConfig.config.transform,
-            position: new THREE.Vector3(position.x, position.y, position.z),
+            position: new THREE.Vector3(
+              _subLocalPosition.x,
+              _subLocalPosition.y,
+              _subLocalPosition.z
+            ),
           },
           renderer: {
             ...(subConfig.config.renderer ?? {}),
@@ -1688,7 +1758,6 @@ export const createParticleSystem = (
         spawnNow
       );
 
-      const parentObj = (wrapper || particleSystem).parent;
       if (parentObj) parentObj.add(subSystem.instance);
 
       instances.push(subSystem);
@@ -1781,7 +1850,9 @@ export const createParticleSystem = (
       map: { value: particleMap },
       useMap: { value: !!particleMap },
       discardBackgroundColor: { value: renderer.discardBackgroundColor },
-      backgroundColor: { value: renderer.backgroundColor },
+      // sRGB → linear so the trail fragment comparison matches the
+      // (now linear) texture sample and vertex color.
+      backgroundColor: { value: rgbSRGBToLinear(renderer.backgroundColor) },
       backgroundColorTolerance: { value: renderer.backgroundColorTolerance },
       softParticlesEnabled: { value: softParticlesEnabled },
       softParticlesIntensity: {
@@ -1924,10 +1995,14 @@ export const createParticleSystem = (
   const calculatedCreationTime =
     now + calculateValue(generalData.particleSystemId, startDelay) * 1000;
 
-  let wrapper: Gyroscope | undefined;
+  // WORLD simulation space: decouple rendering transform from the emitter.
+  // The particle buffer stores world-space coordinates, so matrixWorld is
+  // forced to identity each frame. The emitter's actual world transform is
+  // captured in generalData.sourceWorldMatrix for positioning new particles
+  // and orienting the emission shape.
   if (normalizedConfig.simulationSpace === SimulationSpace.WORLD) {
-    wrapper = new Gyroscope();
-    wrapper.add(particleSystem);
+    particleSystem.matrixWorldAutoUpdate = false;
+    particleSystem.matrixWorld.identity();
   }
 
   const hasDeathSubEmitters = deathSubEmitters.length > 0;
@@ -1948,7 +2023,11 @@ export const createParticleSystem = (
         );
         // Convert local particle position to world space so the sub-emitter
         // spawns at the correct scene position regardless of transform offset.
+        // updateMatrixWorld() guarantees the transform is fresh — otherwise a
+        // parent moved after the last scene traversal would place the spawn
+        // at a stale position.
         if (simulationSpace === SimulationSpace.LOCAL) {
+          particleSystem.updateMatrixWorld();
           particleSystem.localToWorld(_subEmitterPosition);
         }
         spawnSubEmitters(
@@ -1975,7 +2054,11 @@ export const createParticleSystem = (
         );
         // Convert local particle position to world space so the sub-emitter
         // spawns at the correct scene position regardless of transform offset.
+        // updateMatrixWorld() guarantees the transform is fresh — otherwise a
+        // parent moved after the last scene traversal would place the spawn
+        // at a stale position.
         if (simulationSpace === SimulationSpace.LOCAL) {
+          particleSystem.updateMatrixWorld();
           particleSystem.localToWorld(_subEmitterPosition);
         }
         spawnSubEmitters(
@@ -1989,7 +2072,6 @@ export const createParticleSystem = (
 
   const instanceData: ParticleSystemInstance = {
     particleSystem,
-    wrapper,
     mappedAttributes,
     scalarArray,
     scalarInterleavedBuffer,
@@ -2074,14 +2156,40 @@ export const createParticleSystem = (
     // Update instance-level cached scalars
     if (partialConfig.gravity !== undefined) {
       instanceData.gravity = cfg.gravity;
-      // Force gravityVelocity recalculation on next frame
-      generalData.lastWorldQuaternion.x = -99999;
     }
     if (partialConfig.duration !== undefined)
       instanceData.duration = cfg.duration;
     if (partialConfig.looping !== undefined) instanceData.looping = cfg.looping;
-    if (partialConfig.simulationSpace !== undefined)
+    if (
+      partialConfig.simulationSpace !== undefined &&
+      instanceData.simulationSpace !== cfg.simulationSpace
+    ) {
+      // Switching simulation space live. The existing buffer of active
+      // particles is in the _old_ frame — rather than walk the buffer and
+      // convert every position (which still wouldn't reproduce the visual
+      // continuity the old frame had), we deactivate the live particles
+      // so the system re-emits from the new frame's origin cleanly. New
+      // emissions use the right frame because `simulationSpace` is also
+      // synced below.
+      //
+      // We also flip `matrixWorldAutoUpdate` + reset `lastWorldPosition`
+      // to match the state createParticleSystem would have set. Without
+      // this, particles rendered in the first few frames after the switch
+      // inherit the wrong world matrix and appear to jump between origins.
+      for (let i = 0; i < maxParticles; i++) {
+        if (scalarArray[i * SCALAR_STRIDE + S_IS_ACTIVE]) {
+          deactivateParticle(i);
+        }
+      }
+      generalData.lastWorldPosition.set(-99999, -99999, -99999);
+      if (cfg.simulationSpace === SimulationSpace.WORLD) {
+        particleSystem.matrixWorldAutoUpdate = false;
+        particleSystem.matrixWorld.identity();
+      } else {
+        particleSystem.matrixWorldAutoUpdate = true;
+      }
       instanceData.simulationSpace = cfg.simulationSpace;
+    }
     if (partialConfig.emission !== undefined)
       instanceData.emission = cfg.emission;
 
@@ -2127,7 +2235,7 @@ export const createParticleSystem = (
   };
 
   return {
-    instance: wrapper || particleSystem,
+    instance: particleSystem,
     resumeEmitter,
     pauseEmitter,
     dispose,
@@ -2218,7 +2326,6 @@ const updateParticleSystemInstance = (
     generalData,
     onComplete,
     particleSystem,
-    wrapper,
     elapsedUniform,
     creationTime,
     lastEmissionTime,
@@ -2257,53 +2364,100 @@ const updateParticleSystemInstance = (
     lastWorldPosition,
     currentWorldPosition,
     worldPositionChange,
-    lastWorldQuaternion,
     worldQuaternion,
     worldEuler,
     gravityVelocity,
+    sourceWorldMatrix,
     isEnabled,
   } = generalData;
-
-  if (wrapper?.parent)
-    generalData.wrapperQuaternion.copy(wrapper.parent.quaternion);
 
   _lastWorldPositionSnapshot.copy(lastWorldPosition);
 
   elapsedUniform.value = elapsed;
 
-  particleSystem.getWorldPosition(currentWorldPosition);
+  // Emitter pose for this frame.
+  //
+  // WORLD: build sourceWorldMatrix explicitly (parent.matrixWorld × local).
+  //   The particle buffer stores world coordinates, so particleSystem's own
+  //   matrixWorld is held at identity (see matrixWorldAutoUpdate=false in
+  //   createParticleSystem). sourceWorldMatrix is used to place new
+  //   particles and orient the emission shape.
+  //
+  // LOCAL: standard Three.js — matrixWorld is fully parent-composed at
+  //   render time, particles live in the local frame, and emissions use
+  //   the identity quaternion (no rotation of the shape offset).
+  if (simulationSpace === SimulationSpace.WORLD) {
+    particleSystem.updateMatrix();
+    if (particleSystem.parent) {
+      particleSystem.parent.updateMatrixWorld();
+      sourceWorldMatrix.multiplyMatrices(
+        particleSystem.parent.matrixWorld,
+        particleSystem.matrix
+      );
+    } else {
+      sourceWorldMatrix.copy(particleSystem.matrix);
+    }
+    sourceWorldMatrix.decompose(
+      currentWorldPosition,
+      worldQuaternion,
+      generalData.worldScale
+    );
+    generalData.wrapperQuaternion.copy(worldQuaternion);
+    particleSystem.matrixWorld.identity();
+  } else {
+    particleSystem.updateMatrixWorld();
+    particleSystem.getWorldPosition(currentWorldPosition);
+    particleSystem.getWorldQuaternion(worldQuaternion);
+    particleSystem.getWorldScale(generalData.worldScale);
+    generalData.wrapperQuaternion.identity();
+  }
+
   if (lastWorldPosition.x !== -99999) {
     worldPositionChange.set(
       currentWorldPosition.x - lastWorldPosition.x,
       currentWorldPosition.y - lastWorldPosition.y,
       currentWorldPosition.z - lastWorldPosition.z
     );
+  } else {
+    worldPositionChange.set(0, 0, 0);
   }
   if (isEnabled) {
     generalData.distanceFromLastEmitByDistance += worldPositionChange.length();
   }
-  particleSystem.getWorldPosition(lastWorldPosition);
-  particleSystem.getWorldQuaternion(worldQuaternion);
-  if (
-    lastWorldQuaternion.x === -99999 ||
-    lastWorldQuaternion.x !== worldQuaternion.x ||
-    lastWorldQuaternion.y !== worldQuaternion.y ||
-    lastWorldQuaternion.z !== worldQuaternion.z
-  ) {
-    worldEuler.setFromQuaternion(worldQuaternion);
-    lastWorldQuaternion.copy(worldQuaternion);
-    gravityVelocity.set(
-      lastWorldPosition.x,
-      lastWorldPosition.y + gravity,
-      lastWorldPosition.z
-    );
-    particleSystem.worldToLocal(gravityVelocity);
+  lastWorldPosition.copy(currentWorldPosition);
+  worldEuler.setFromQuaternion(worldQuaternion);
+
+  // Gravity is always -Y in world space (Unity semantics). In WORLD
+  // simulation the buffer is world-space, so gravity is used directly.
+  //
+  // In LOCAL simulation the buffer is in the emitter's local frame, so
+  // gravity is rotated by the inverse of the emitter's world rotation AND
+  // divided by the emitter's world scale — this way the rendered fall
+  // matches -g m/s² in world units, independent of how the emitter is
+  // rotated or scaled by its parent chain.
+  if (simulationSpace === SimulationSpace.WORLD) {
+    gravityVelocity.set(0, gravity, 0);
+  } else {
+    gravityVelocity.set(0, gravity, 0);
+    _inverseQuat.copy(worldQuaternion).invert();
+    gravityVelocity.applyQuaternion(_inverseQuat);
+    const sx = generalData.worldScale.x || 1;
+    const sy = generalData.worldScale.y || 1;
+    const sz = generalData.worldScale.z || 1;
+    gravityVelocity.x /= sx;
+    gravityVelocity.y /= sy;
+    gravityVelocity.z /= sz;
   }
 
-  // Transform force field positions/directions into local space once per frame
-  // (particle positions in the buffer are in local space, so force fields must match)
+  // Force field positions/directions are user-authored in world space.
+  //
+  // WORLD simulation: buffer is already in world space — copy through.
+  // LOCAL simulation: transform into the emitter's local frame so field
+  //   positions and directions match the particle buffer's frame.
   if (hasForceFields) {
-    _inverseQuat.copy(worldQuaternion).invert();
+    if (simulationSpace === SimulationSpace.LOCAL) {
+      _inverseQuat.copy(worldQuaternion).invert();
+    }
 
     _localForceFields.length = normalizedForceFields.length;
 
@@ -2328,19 +2482,26 @@ const updateParticleSystemInstance = (
       dst.range = src.range;
       dst.falloff = src.falloff;
 
-      _localForceFieldPos.copy(src.position);
-      particleSystem.worldToLocal(_localForceFieldPos);
-      dst.position.copy(_localForceFieldPos);
+      if (simulationSpace === SimulationSpace.WORLD) {
+        dst.position.copy(src.position);
+        dst.direction.copy(src.direction);
+      } else {
+        _localForceFieldPos.copy(src.position);
+        particleSystem.worldToLocal(_localForceFieldPos);
+        dst.position.copy(_localForceFieldPos);
 
-      _localForceFieldDir.copy(src.direction);
-      _localForceFieldDir.applyQuaternion(_inverseQuat);
-      dst.direction.copy(_localForceFieldDir);
+        _localForceFieldDir.copy(src.direction);
+        _localForceFieldDir.applyQuaternion(_inverseQuat);
+        dst.direction.copy(_localForceFieldDir);
+      }
     }
   }
 
-  // Transform collision plane positions/normals into local space once per frame
+  // Collision plane positions/normals — same policy as force fields.
   if (hasCollisionPlanes) {
-    if (!hasForceFields) _inverseQuat.copy(worldQuaternion).invert();
+    if (simulationSpace === SimulationSpace.LOCAL && !hasForceFields) {
+      _inverseQuat.copy(worldQuaternion).invert();
+    }
 
     _localCollisionPlanes.length = normalizedCollisionPlanes.length;
 
@@ -2363,13 +2524,18 @@ const updateParticleSystemInstance = (
       dst.dampen = src.dampen;
       dst.lifetimeLoss = src.lifetimeLoss;
 
-      _localCollisionPlanePos.copy(src.position);
-      particleSystem.worldToLocal(_localCollisionPlanePos);
-      dst.position.copy(_localCollisionPlanePos);
+      if (simulationSpace === SimulationSpace.WORLD) {
+        dst.position.copy(src.position);
+        dst.normal.copy(src.normal);
+      } else {
+        _localCollisionPlanePos.copy(src.position);
+        particleSystem.worldToLocal(_localCollisionPlanePos);
+        dst.position.copy(_localCollisionPlanePos);
 
-      _localCollisionPlaneNormal.copy(src.normal);
-      _localCollisionPlaneNormal.applyQuaternion(_inverseQuat);
-      dst.normal.copy(_localCollisionPlaneNormal);
+        _localCollisionPlaneNormal.copy(src.normal);
+        _localCollisionPlaneNormal.applyQuaternion(_inverseQuat);
+        dst.normal.copy(_localCollisionPlaneNormal);
+      }
     }
   }
 
@@ -2399,16 +2565,6 @@ const updateParticleSystemInstance = (
       gravityVelocity.y,
       gravityVelocity.z
     );
-    setUniformVec3(
-      cp.uniforms.worldPositionChange,
-      generalData.worldPositionChange.x,
-      generalData.worldPositionChange.y,
-      generalData.worldPositionChange.z
-    );
-    setUniformFloat(
-      cp.uniforms.simulationSpaceWorld,
-      simulationSpace === SimulationSpace.WORLD ? 1 : 0
-    );
 
     // Noise uniforms
     // GPU simplex noise output is not normalised by FBM's octave accumulator,
@@ -2424,7 +2580,15 @@ const updateParticleSystemInstance = (
     setUniformFloat(cp.uniforms.noiseRotationAmount, noiseData.rotationAmount);
     setUniformFloat(cp.uniforms.noiseSizeAmount, noiseData.sizeAmount);
 
-    // Force field buffer update — write encoded data into curveData tail
+    // Force-field and collision-plane uploads share the `curveData` storage
+    // buffer with the per-particle init slots. A blanket `needsUpdate = true`
+    // re-uploads the whole Float32Array, which stomps on init flags the
+    // compute shader already cleared on the GPU side but are still `1` in
+    // the CPU mirror (the `flushEmitQueue` logic only clears them a frame
+    // later). We therefore use `addUpdateRange()` so the WebGPU backend
+    // uploads just the force-field / collision-plane tail region, leaving
+    // the init-slot region intact on the GPU. `flushEmitQueue` does the
+    // same for its own region below.
     if (
       cp.forceFieldInfo &&
       hasForceFields &&
@@ -2436,7 +2600,9 @@ const updateParticleSystemInstance = (
         generalData.normalizedLifetimePercentage
       );
       const curveArr = cp.buffers.curveData.array as Float32Array;
-      curveArr.set(encodedFF, cp.forceFieldInfo.offset);
+      const offset = cp.forceFieldInfo.offset;
+      curveArr.set(encodedFF, offset);
+      cp.buffers.curveData.addUpdateRange(offset, encodedFF.length);
       cp.buffers.curveData.needsUpdate = true;
       setUniformFloat(
         cp.forceFieldInfo.countUniform,
@@ -2444,7 +2610,6 @@ const updateParticleSystemInstance = (
       );
     }
 
-    // Collision plane buffer update — write encoded data into curveData tail
     if (
       cp.collisionPlaneInfo &&
       hasCollisionPlanes &&
@@ -2454,7 +2619,9 @@ const updateParticleSystemInstance = (
         _localCollisionPlanes
       );
       const curveArr = cp.buffers.curveData.array as Float32Array;
-      curveArr.set(encodedCP, cp.collisionPlaneInfo.offset);
+      const offset = cp.collisionPlaneInfo.offset;
+      curveArr.set(encodedCP, offset);
+      cp.buffers.curveData.addUpdateRange(offset, encodedCP.length);
       cp.buffers.curveData.needsUpdate = true;
       setUniformFloat(
         cp.collisionPlaneInfo.countUniform,
@@ -2512,11 +2679,6 @@ const updateParticleSystemInstance = (
           }
 
           const positionIndex = index * 3;
-          if (simulationSpace === SimulationSpace.WORLD) {
-            positionArr[positionIndex] -= worldPositionChange.x;
-            positionArr[positionIndex + 1] -= worldPositionChange.y;
-            positionArr[positionIndex + 2] -= worldPositionChange.z;
-          }
           positionArr[positionIndex] += velocity.x * delta;
           positionArr[positionIndex + 1] += velocity.y * delta;
           positionArr[positionIndex + 2] += velocity.z * delta;
@@ -2607,18 +2769,9 @@ const updateParticleSystemInstance = (
             gravity !== 0 ||
             velocity.x !== 0 ||
             velocity.y !== 0 ||
-            velocity.z !== 0 ||
-            worldPositionChange.x !== 0 ||
-            worldPositionChange.y !== 0 ||
-            worldPositionChange.z !== 0
+            velocity.z !== 0
           ) {
             const positionIndex = index * 3;
-
-            if (simulationSpace === SimulationSpace.WORLD) {
-              positionArr[positionIndex] -= worldPositionChange.x;
-              positionArr[positionIndex + 1] -= worldPositionChange.y;
-              positionArr[positionIndex + 2] -= worldPositionChange.z;
-            }
 
             positionArr[positionIndex] += velocity.x * delta;
             positionArr[positionIndex + 1] += velocity.y * delta;
